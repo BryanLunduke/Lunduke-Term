@@ -6,8 +6,10 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <sys/wait.h>
 
 namespace lterm {
@@ -119,6 +121,8 @@ TerminalView::~TerminalView() {
                     backendName().c_str(), stats_.contentFrames, stats_.fullRepaints, stats_.rowsPainted,
                     stats_.ticks, med(stats_.paintMs), med(stats_.effectsSourceMs), med(stats_.tickMs),
                     painter_ ? painter_->cachedGlyphs() : size_t(0));
+        std::printf("stats: quality=%s software=%d tick-interval %.1f ms\n", effectsQualityName(quality_),
+                    software_ ? 1 : 0, tickIntervalMs_);
         std::fflush(stdout);
     }
     if (glPipe_) {
@@ -138,8 +142,12 @@ double TerminalView::nowMs() const { return (g_get_monotonic_time() - t0_) / 100
 std::string TerminalView::backendName() const {
     switch (mode_) {
     case Mode::Plain: return profile_.id + ", no effects";
-    case Mode::Cpu: return profile_.id + ", effects: C++ fallback (" + std::to_string(opts_.threads) + " threads)";
-    case Mode::Gl: return profile_.id + ", effects: GLSL on " + (glRenderer_.empty() ? "GtkGLArea" : glRenderer_);
+    case Mode::Cpu:
+        return profile_.id + ", effects: C++ fallback (" + std::to_string(opts_.threads) + " threads), quality " +
+               effectsQualityName(quality_);
+    case Mode::Gl:
+        return profile_.id + ", effects: GLSL on " + (glRenderer_.empty() ? "GtkGLArea" : glRenderer_) +
+               ", quality " + effectsQualityName(quality_) + (software_ ? " (software rendering)" : "");
     }
     return "?";
 }
@@ -295,8 +303,11 @@ void TerminalView::setEffects(bool on) {
 
 void TerminalView::chooseMode() {
     Mode m = !effectsOn_ ? Mode::Plain : (glFailed_ ? Mode::Cpu : Mode::Gl);
+    mode_ = m;
+    updateQuality();
     if (m == Mode::Cpu && !cpu_) {
-        cpu_.reset(new CpuEffects(profile_.fx, opts_.threads));
+        cpu_.reset(new CpuEffects(fx_, opts_.threads));
+        cpuOutValid_ = false;
         if (w_ > 0) cpu_->resize(w_, h_);
     }
     if (m != Mode::Cpu) cpu_.reset();  // frees ~45 MB of float buffers when not in use
@@ -337,7 +348,9 @@ void TerminalView::onGlRealize() {
     const auto* r = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
     glRenderer_ = r ? r : "?";
     glParamsStale_ = true;
+    updateQuality();
     signalBackend.emit(backendName());
+    updateAnimation();
 }
 
 void TerminalView::onGlUnrealize() {
@@ -350,7 +363,7 @@ bool TerminalView::onGlRender(const Glib::RefPtr<Gdk::GLContext>&) {
     if (glFailed_ || mode_ != Mode::Gl) return true;
     if (!glPipe_ || glParamsStale_) {
         if (glPipe_) glPipe_->release();
-        glPipe_.reset(new GlPipeline(profile_.fx));
+        glPipe_.reset(new GlPipeline(fx_));
         glParamsStale_ = false;
         effectsSourceStale_ = true;
         if (!glPipe_->ok()) {
@@ -408,11 +421,18 @@ bool TerminalView::onDraw(const Cairo::RefPtr<Cairo::Context>& cr) {
             srcDirtyY0_ = srcDirtyY1_ = 0;
         }
         const auto r0 = std::chrono::steady_clock::now();
-        cairo_surface_flush(out_);
-        cpu_->renderTo(static_cast<float>(t), cairo_image_surface_get_data(out_), cairo_image_surface_get_stride(out_),
-                       PixelOrder::BGRA);
-        cairo_surface_mark_dirty(out_);
-        if (!content) {
+        // Nothing animates (static quality, or a profile without time-based effects): the
+        // output is a pure function of the source, so an expose just repaints the last one.
+        const bool timeless = !fx_.animated() && fx_.burnIn <= 0;
+        const bool rerender = content || !cpuOutValid_ || !timeless;
+        if (rerender) {
+            cairo_surface_flush(out_);
+            cpu_->renderTo(static_cast<float>(t), cairo_image_surface_get_data(out_),
+                           cairo_image_surface_get_stride(out_), PixelOrder::BGRA);
+            cairo_surface_mark_dirty(out_);
+            cpuOutValid_ = true;
+        }
+        if (!content && rerender) {
             ++stats_.ticks;
             stats_.tickMs.push_back(
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - r0).count());
@@ -558,24 +578,96 @@ void TerminalView::onFrameTimer() {
 
 bool TerminalView::animationWanted() const {
     if (!effectsOn_ || mode_ == Mode::Plain || !visible_) return false;
-    if (profile_.fx.animated() && (active_ || !opts_.pauseWhenUnfocused)) return true;
-    return nowMs() < lastContentMs_ + profile_.fx.burnInFadeMs() + 100.0;
+    if (fx_.animated() && (active_ || !opts_.pauseWhenUnfocused)) return true;
+    const float fade = fx_.burnInFadeMs();
+    return fade > 0 && nowMs() < lastContentMs_ + fade + 100.0;
+}
+
+double TerminalView::baseTickIntervalMs() const {
+    const double base = 1000.0 / std::max(1, opts_.effectsFps);
+    return quality_ == EffectsQuality::Reduced ? 2.0 * base : base;  // reduced: half-rate animation
+}
+
+static double processCpuMs() {
+    timespec ts{};
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
 }
 
 void TerminalView::updateAnimation() {
     const bool want = animationWanted();
-    if (want && !tick_.connected())
+    if (want && !tick_.connected()) {
+        govWall0_ = nowMs();
+        govCpu0_ = processCpuMs();
         tick_ = Glib::signal_timeout().connect(sigc::mem_fun(*this, &TerminalView::onTick),
-                                               1000 / std::max(1, opts_.effectsFps));
-    else if (!want && tick_.connected())
+                                               static_cast<unsigned>(tickIntervalMs_ + 0.5));
+    } else if (!want && tick_.connected()) {
         tick_.disconnect();
+    }
+}
+
+void TerminalView::updateQuality() {
+    // GL: known once the GtkGLArea is realized; until then only the environment tells.
+    software_ = mode_ == Mode::Cpu || softwareRenderingForced() ||
+                (mode_ == Mode::Gl && isSoftwareRendererName(glRenderer_));
+    const EffectsQuality q =
+        qualityDemoted_ ? EffectsQuality::Static : resolveEffectsQuality(opts_.effectsQuality, software_);
+    const EffectParams fx = applyEffectsQuality(profile_.fx, q);
+    const bool changed = q != quality_ || !sameEffectParams(fx, fx_);
+    quality_ = q;
+    fx_ = fx;
+    tickIntervalMs_ = baseTickIntervalMs();
+    if (!changed) return;
+    if (cpu_) {
+        cpu_.reset(new CpuEffects(fx_, opts_.threads));
+        if (w_ > 0) cpu_->resize(w_, h_);
+        cpuOutValid_ = false;
+    }
+    glParamsStale_ = true;
+    effectsSourceStale_ = true;
+    if (tick_.connected()) tick_.disconnect();  // restarted at the new rate by updateAnimation()
+}
+
+bool TerminalView::governTick() {
+    if (!software_ || opts_.cpuBudget <= 0 || quality_ == EffectsQuality::Static) return false;
+    const double wall = nowMs(), cpu = processCpuMs();
+    const double dWall = wall - govWall0_;
+    if (dWall < 1000.0) return false;  // one-second windows
+    const double load = (cpu - govCpu0_) / dWall;  // cores
+    govWall0_ = wall;
+    govCpu0_ = cpu;
+    const double budget = opts_.cpuBudget, maxInterval = 1000.0;
+    double next = tickIntervalMs_;
+    if (load > budget) next = std::min(maxInterval, tickIntervalMs_ * (load / budget) * 1.05);
+    else if (load < 0.6 * budget) next = std::max(baseTickIntervalMs(), tickIntervalMs_ * 0.85);
+    if (load > budget && tickIntervalMs_ >= maxInterval && opts_.effectsQuality == EffectsQuality::Auto) {
+        // Even one frame per second costs more than the budget (e.g. llvmpipe in a VM without
+        // KVM): stop animating and show the static picture.
+        std::fprintf(stderr, "lunduke-terminal: animation needs %.0f%% of a core at 1 fps; effects-quality auto -> static\n",
+                     load * 100.0);
+        qualityDemoted_ = true;
+        updateQuality();
+        signalBackend.emit(backendName());
+        if (mode_ == Mode::Gl) gl_.queue_render();
+        else if (mode_ == Mode::Cpu) area_.queue_draw();
+        return true;  // updateQuality() stopped the timer
+    }
+    if (std::fabs(next - tickIntervalMs_) > 0.05 * tickIntervalMs_) {
+        tickIntervalMs_ = next;
+        tick_ = Glib::signal_timeout().connect(sigc::mem_fun(*this, &TerminalView::onTick),
+                                               static_cast<unsigned>(tickIntervalMs_ + 0.5));
+        return true;  // the caller's timer source ends; the new one takes over
+    }
+    return false;
 }
 
 bool TerminalView::onTick() {
     if (!animationWanted()) return false;  // paused (unfocused/hidden) or burn-in settled
     if (mode_ == Mode::Gl) gl_.queue_render();
     else if (mode_ == Mode::Cpu) area_.queue_draw();
-    return true;
+    const bool replaced = governTick();  // new rate (new timer) or animation stopped
+    stats_.finalTickIntervalMs = tickIntervalMs_;
+    return !replaced;
 }
 
 void TerminalView::setWindowActive(bool active) {
@@ -682,7 +774,7 @@ void TerminalView::pasteClipboard(bool primary) {
 }
 
 bool TerminalView::cellAt(double x, double y, int& row, int& col) const {
-    const float curvature = effectsOn_ && mode_ != Mode::Plain ? profile_.fx.screenCurvature * 0.4f : 0.0f;
+    const float curvature = effectsOn_ && mode_ != Mode::Plain ? fx_.screenCurvature * 0.4f : 0.0f;
     return pointToCell(x, y, w_, h_, curvature, marginX_, marginY_, painter_->cellWidth(), painter_->cellHeight(),
                        session_->rows(), session_->cols(), row, col);
 }

@@ -22,6 +22,11 @@ struct ViewOptions {
     int threads = 4;                // C++ fallback threads
     int effectsFps = 20;            // animated effects tick (cool-retro-term 1.2.0 also uses 20)
     int maxFps = 60;                // cap for content updates
+    // M2: auto (reduced on software rendering) | full | reduced | static, see effects.hpp
+    EffectsQuality effectsQuality = EffectsQuality::Auto;
+    // Software rendering only: tick slower until the animation uses at most this fraction of
+    // one core (process CPU time, so llvmpipe's threads count). 0 disables the governor.
+    double cpuBudget = 0.25;
     bool pauseWhenUnfocused = true; // stop the animation (not content updates) when inactive
     std::string fontFamily;         // empty: the profile's
     int fontPx = 0;                 // 0: the profile's
@@ -42,6 +47,7 @@ struct ViewOptions {
 struct ViewStats {
     long contentFrames = 0, ticks = 0, rowsPainted = 0, fullRepaints = 0;
     std::vector<double> paintMs, effectsSourceMs, tickMs;
+    double finalTickIntervalMs = 0;  // governor state on exit
 };
 
 // The terminal widget. Pipeline: libvterm -> Grid -> glyph-cached Pango/Cairo source image
@@ -66,6 +72,9 @@ public:
     void setProfile(const std::string& id);
     const Profile& profile() const { return profile_; }
     std::string backendName() const;
+    EffectsQuality effectsQuality() const { return quality_; }  // resolved (never Auto)
+    bool softwareRendering() const { return software_; }
+    double tickIntervalMs() const { return tickIntervalMs_; }
     const ViewStats& stats() const { return stats_; }
     int scrollOffset() const { return scrollOffset_; }
     const Selection& selection() const { return sel_; }
@@ -112,6 +121,9 @@ private:
     bool onTick();
     double nowMs() const;
     bool animationWanted() const;
+    void updateQuality();          // resolve effects-quality for the current renderer
+    double baseTickIntervalMs() const;
+    bool governTick();             // software rendering: keep the idle animation within cpuBudget
 
     ViewOptions opts_;
     Profile profile_;
@@ -126,6 +138,14 @@ private:
     std::unique_ptr<CpuEffects> cpu_;
     std::unique_ptr<GlPipeline> glPipe_;
     bool glParamsStale_ = false;
+    // M2 effects quality: the profile's parameters after applyEffectsQuality().
+    EffectParams fx_;
+    EffectsQuality quality_ = EffectsQuality::Full;
+    bool software_ = false;
+    bool qualityDemoted_ = false;  // auto fell back to static: the budget was out of reach
+    double tickIntervalMs_ = 50;
+    double govWall0_ = 0, govCpu0_ = 0;
+    bool cpuOutValid_ = false;     // out_ holds the effects output of the current source
 
     Grid cur_, next_;
     int w_ = 0, h_ = 0;

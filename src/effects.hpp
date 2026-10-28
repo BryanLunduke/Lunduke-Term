@@ -14,6 +14,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace lterm {
@@ -56,6 +57,29 @@ struct EffectParams {
     // Time after a content change until the burn-in ghost has fully faded (ms), 0 without burn-in.
     float burnInFadeMs() const;
 };
+
+// M2: effects quality. Software rasterisers (Mesa llvmpipe/softpipe/swrast, or the C++
+// fallback) spend a whole core per animated frame at 1280x800, so `auto` picks `reduced` there
+// and `full` on a real GPU.
+//   full     the profile as designed (M1 output, unchanged)
+//   reduced  no static noise / jitter (drops the per-pixel noise fetch from every tick), half
+//            bloom radius, animation ticks at half rate under a CPU governor; flicker,
+//            horizontal sync, glowing line, burn-in and scanlines stay
+//   static   nothing animates: no noise, jitter, flicker, sync, glowing line or burn-in. The
+//            remaining passes (warp, tint, bloom, scanlines, ambient: a fixed per-pixel
+//            overlay) run once per content change and the view never ticks
+enum class EffectsQuality { Auto, Full, Reduced, Static };
+bool parseEffectsQuality(const std::string& s, EffectsQuality& out);
+const char* effectsQualityName(EffectsQuality q);
+// GL_RENDERER of a Mesa software rasteriser (llvmpipe, softpipe, swrast), case-insensitive.
+bool isSoftwareRendererName(const std::string& glRenderer);
+// LIBGL_ALWAYS_SOFTWARE set to anything but "", "0" or "false".
+bool softwareRenderingForced();
+// Auto -> Reduced on software rendering, Full otherwise; explicit choices are kept.
+EffectsQuality resolveEffectsQuality(EffectsQuality q, bool softwareRendering);
+// The profile parameters for a resolved quality (Full returns p unchanged).
+EffectParams applyEffectsQuality(const EffectParams& p, EffectsQuality resolved);
+bool sameEffectParams(const EffectParams& a, const EffectParams& b);
 
 // Byte order of 8-bit source/destination pixels. BGRA is Cairo's ARGB32/RGB24 in memory on a
 // little-endian machine, which lets the view hand its Cairo surface over without conversion.

@@ -4,6 +4,7 @@
 // Skips (77) when no EGL/GL 3.3 context is available.
 #include "cpu_effects.hpp"
 #include "gl_effects.hpp"
+#include "profiles.hpp"
 #include "synthetic_frame.hpp"
 
 #include <cmath>
@@ -56,6 +57,20 @@ int main() {
         std::printf("%s burn-in, renderer %s: PSNR %.2f dB, max diff %d\n", p->burnInHalfRes ? "half-res" : "full-res",
                     gl.renderer().c_str(), ps, mx);
         if (ps < 40.0) ++fails;
+    }
+
+    // M2: every effects-quality level of the amber profile (and of the default parameters,
+    // which have scanlines) must match between the GL and C++ back-ends too.
+    for (const char* prof : {"amber", "green-scanlines"}) {
+        const Profile* pr = findProfile(prof);
+        if (!pr) continue;
+        for (EffectsQuality q : {EffectsQuality::Full, EffectsQuality::Reduced, EffectsQuality::Static}) {
+            const EffectParams p = applyEffectsQuality(pr->fx, q);
+            GlEffects gq(p);
+            const double ps = compare(gq, p, a, b, &mx);
+            std::printf("%s %s: PSNR %.2f dB, max diff %d\n", prof, effectsQualityName(q), ps, mx);
+            if (ps < 40.0) ++fails;
+        }
     }
 
     // Resize loop: object counts must stay constant and the output must still match.

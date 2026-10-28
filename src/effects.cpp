@@ -3,7 +3,9 @@
 #include "sampling.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
 
 namespace lterm {
 
@@ -63,6 +65,72 @@ FrameUniforms frameUniforms(const EffectParams& p, float timeMs, float burnInLas
 float EffectParams::burnInFadeMs() const {
     if (burnIn <= 0) return 0.0f;
     return lint(160.0f, 1600.0f, burnIn);  // decay reaches 1 after 1/burnInTime ms
+}
+
+bool parseEffectsQuality(const std::string& s, EffectsQuality& out) {
+    if (s == "auto") out = EffectsQuality::Auto;
+    else if (s == "full") out = EffectsQuality::Full;
+    else if (s == "reduced") out = EffectsQuality::Reduced;
+    else if (s == "static") out = EffectsQuality::Static;
+    else return false;
+    return true;
+}
+
+const char* effectsQualityName(EffectsQuality q) {
+    switch (q) {
+    case EffectsQuality::Auto: return "auto";
+    case EffectsQuality::Full: return "full";
+    case EffectsQuality::Reduced: return "reduced";
+    case EffectsQuality::Static: return "static";
+    }
+    return "?";
+}
+
+bool isSoftwareRendererName(const std::string& glRenderer) {
+    std::string r;
+    for (char c : glRenderer) r += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return r.find("llvmpipe") != std::string::npos || r.find("softpipe") != std::string::npos ||
+           r.find("swrast") != std::string::npos;
+}
+
+bool softwareRenderingForced() {
+    const char* v = std::getenv("LIBGL_ALWAYS_SOFTWARE");
+    if (!v || !*v) return false;
+    const std::string s(v);
+    return s != "0" && s != "false" && s != "FALSE";
+}
+
+EffectsQuality resolveEffectsQuality(EffectsQuality q, bool softwareRendering) {
+    if (q != EffectsQuality::Auto) return q;
+    return softwareRendering ? EffectsQuality::Reduced : EffectsQuality::Full;
+}
+
+EffectParams applyEffectsQuality(const EffectParams& p, EffectsQuality resolved) {
+    EffectParams r = p;
+    if (resolved == EffectsQuality::Reduced || resolved == EffectsQuality::Static) {
+        r.staticNoise = 0.0f;
+        r.jitter = 0.0f;
+        r.bloomRadiusHalfRes = std::max(4, p.bloomRadiusHalfRes / 2);
+        r.burnInHalfRes = true;
+    }
+    if (resolved == EffectsQuality::Static) {
+        r.flickering = 0.0f;
+        r.horizontalSync = 0.0f;
+        r.glowingLine = 0.0f;
+        r.burnIn = 0.0f;
+    }
+    return r;
+}
+
+bool sameEffectParams(const EffectParams& a, const EffectParams& b) {
+    auto rgb = [](const Rgb& x, const Rgb& y) { return x.r == y.r && x.g == y.g && x.b == y.b; };
+    return rgb(a.fontColor, b.fontColor) && rgb(a.backgroundColor, b.backgroundColor) && a.bloom == b.bloom &&
+           a.burnIn == b.burnIn && a.chromaColor == b.chromaColor && a.brightness == b.brightness &&
+           a.ambientLight == b.ambientLight && a.flickering == b.flickering && a.glowingLine == b.glowingLine &&
+           a.horizontalSync == b.horizontalSync && a.jitter == b.jitter && a.screenCurvature == b.screenCurvature &&
+           a.staticNoise == b.staticNoise && a.rasterization == b.rasterization &&
+           a.scanlinePeriod == b.scanlinePeriod && a.rasterizationIntensity == b.rasterizationIntensity &&
+           a.bloomRadiusHalfRes == b.bloomRadiusHalfRes && a.burnInHalfRes == b.burnInHalfRes;
 }
 
 std::vector<float> bloomWeights(int radius) {

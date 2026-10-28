@@ -2,6 +2,7 @@
 // Lunduke Terminal entry point.
 //   lunduke-terminal [--profile ID] [--effects|--no-effects] [--renderer auto|gl|cpu]
 //                    [--threads N] [--effects-fps N] [--max-fps N] [--no-pause-unfocused]
+//                    [--effects-quality auto|full|reduced|static] [--cpu-budget PERCENT]
 //                    [--font FAMILY] [--font-px N] [--size WxH] [--quit-after MS] [--stats]
 //                    [--scrollback N] [--login] [--cwd DIR] [--on-exit close|hold|hold-on-error]
 //                    [--hold] [--bell LIST] [--cursor-shape block|underline|bar]
@@ -9,6 +10,7 @@
 //                    [--list-profiles] [-e COMMAND ARGS...]
 // Settings (optional): $XDG_CONFIG_HOME/lunduke-terminal/settings.ini, group [terminal], keys
 // profile, effects (true/false), renderer, threads, effects-fps, max-fps, pause-unfocused,
+// effects-quality, cpu-budget (percent of one core, software rendering only, 0 = off),
 // font, font-px, scrollback-lines, login-shell, cwd, on-exit, bell (comma list of visual,
 // urgent, audible or none), cursor-shape, cursor-blink, word-chars. Command-line options win.
 #include "terminal_view.hpp"
@@ -52,6 +54,9 @@ void loadSettings(lterm::ViewOptions& o) {
         if (kf.has_key(g, "threads")) o.threads = kf.get_integer(g, "threads");
         if (kf.has_key(g, "effects-fps")) o.effectsFps = kf.get_integer(g, "effects-fps");
         if (kf.has_key(g, "max-fps")) o.maxFps = kf.get_integer(g, "max-fps");
+        if (kf.has_key(g, "effects-quality") && !parseEffectsQuality(kf.get_string(g, "effects-quality"), o.effectsQuality))
+            std::fprintf(stderr, "lunduke-terminal: effects-quality must be auto, full, reduced or static\n");
+        if (kf.has_key(g, "cpu-budget")) o.cpuBudget = kf.get_double(g, "cpu-budget") / 100.0;
         if (kf.has_key(g, "pause-unfocused")) o.pauseWhenUnfocused = kf.get_boolean(g, "pause-unfocused");
         if (kf.has_key(g, "font")) o.fontFamily = kf.get_string(g, "font");
         if (kf.has_key(g, "font-px")) o.fontPx = kf.get_integer(g, "font-px");
@@ -84,6 +89,12 @@ int main(int argc, char** argv) {
         else if (a == "--effects-fps" && i + 1 < argc) opts.effectsFps = std::atoi(argv[++i]);
         else if (a == "--max-fps" && i + 1 < argc) opts.maxFps = std::atoi(argv[++i]);
         else if (a == "--no-pause-unfocused") opts.pauseWhenUnfocused = false;
+        else if (a == "--effects-quality" && i + 1 < argc) {
+            if (!parseEffectsQuality(argv[++i], opts.effectsQuality)) {
+                std::fprintf(stderr, "lunduke-terminal: --effects-quality must be auto, full, reduced or static\n");
+                return 2;
+            }
+        } else if (a == "--cpu-budget" && i + 1 < argc) opts.cpuBudget = std::atof(argv[++i]) / 100.0;
         else if (a == "--font" && i + 1 < argc) opts.fontFamily = argv[++i];
         else if (a == "--font-px" && i + 1 < argc) opts.fontPx = std::atoi(argv[++i]);
         else if (a == "--size" && i + 1 < argc) std::sscanf(argv[++i], "%dx%d", &w, &h);

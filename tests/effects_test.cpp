@@ -80,5 +80,51 @@ int main() {
     }
 
     if (failures == 0) std::printf("effects_test: OK\n");
+    // M2 effects quality.
+    {
+        EffectsQuality q;
+        CHECK(parseEffectsQuality("static", q) && q == EffectsQuality::Static);
+        CHECK(parseEffectsQuality("auto", q) && q == EffectsQuality::Auto);
+        CHECK(!parseEffectsQuality("ultra", q));
+        CHECK(isSoftwareRendererName("llvmpipe (LLVM 15.0.6, 256 bits)"));
+        CHECK(isSoftwareRendererName("Mesa softpipe"));
+        CHECK(isSoftwareRendererName("Software Rasterizer (SWRAST)"));
+        CHECK(!isSoftwareRendererName("AMD Radeon RX 6600 (radeonsi, navi23, LLVM 15.0.6)"));
+        CHECK(!isSoftwareRendererName("Mesa Intel(R) UHD Graphics 620 (KBL GT2)"));
+        setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
+        CHECK(softwareRenderingForced());
+        setenv("LIBGL_ALWAYS_SOFTWARE", "0", 1);
+        CHECK(!softwareRenderingForced());
+        unsetenv("LIBGL_ALWAYS_SOFTWARE");
+        CHECK(!softwareRenderingForced());
+        CHECK(resolveEffectsQuality(EffectsQuality::Auto, true) == EffectsQuality::Reduced);
+        CHECK(resolveEffectsQuality(EffectsQuality::Auto, false) == EffectsQuality::Full);
+        CHECK(resolveEffectsQuality(EffectsQuality::Full, true) == EffectsQuality::Full);
+        CHECK(resolveEffectsQuality(EffectsQuality::Static, false) == EffectsQuality::Static);
+        EffectParams p;  // animated, with burn-in
+        CHECK(sameEffectParams(applyEffectsQuality(p, EffectsQuality::Full), p));  // full = unchanged
+        const EffectParams r = applyEffectsQuality(p, EffectsQuality::Reduced);
+        CHECK(r.staticNoise == 0 && r.jitter == 0 && r.flickering == p.flickering && r.burnIn == p.burnIn);
+        CHECK(r.bloomRadiusHalfRes == p.bloomRadiusHalfRes / 2 && r.animated());
+        const EffectParams st = applyEffectsQuality(p, EffectsQuality::Static);
+        CHECK(!st.animated() && st.burnIn == 0 && st.burnInFadeMs() == 0 && st.bloom == p.bloom);
+        // Static output does not depend on time: one render per content change is exact.
+        const int W = 160, H = 100;
+        auto src = renderSyntheticFrame(W, H, 0, "DejaVu Sans Mono", 12);
+        CpuEffects e(st, 2);
+        e.resize(W, H);
+        e.setSource(src.data(), W * 4, 1000.0f);
+        std::vector<uint8_t> o1(W * H * 4), o2(W * H * 4);
+        e.render(1000.0f, o1.data());
+        e.render(98765.0f, o2.data());
+        CHECK(o1 == o2);
+        CpuEffects full(p, 2);
+        full.resize(W, H);
+        full.setSource(src.data(), W * 4, 1000.0f);
+        full.render(1000.0f, o1.data());
+        full.render(1517.0f, o2.data());
+        CHECK(o1 != o2);  // control: full animates
+    }
+
     return failures ? 1 : 0;
 }
