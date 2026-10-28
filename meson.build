@@ -33,6 +33,24 @@ executable('lunduke-terminal',
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep],
   install : true)
 
+# Desktop integration (installed by `meson install`; see docs/PACKAGING.md).
+app_id = 'org.lunduke.LundukeTerminal'
+install_data('data/' + app_id + '.desktop', install_dir : get_option('datadir') / 'applications')
+install_data('data/' + app_id + '.metainfo.xml', install_dir : get_option('datadir') / 'metainfo')
+install_data('data/icons/hicolor/scalable/apps/' + app_id + '.svg',
+  install_dir : get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps')
+install_data('README.md', 'docs/FONTS.md', 'docs/PACKAGING.md',
+  install_dir : get_option('datadir') / 'doc' / 'lunduke-terminal')
+desktop_validate = find_program('desktop-file-validate', required : false)
+if desktop_validate.found()
+  test('desktop-file', desktop_validate, args : [meson.current_source_dir() / 'data' / app_id + '.desktop'])
+endif
+appstreamcli = find_program('appstreamcli', required : false)
+if appstreamcli.found()
+  test('metainfo', appstreamcli, args : ['validate', '--no-net', '--explain',
+    meson.current_source_dir() / 'data' / app_id + '.metainfo.xml'])
+endif
+
 executable('lterm-m0-bench', 'tools/m0_bench.cpp',
   include_directories : inc,
   link_with : [effects_lib, gl_lib],

@@ -1,0 +1,21 @@
+[Desktop Entry]
+Type=Application
+Name=Lunduke Terminal
+GenericName=Terminal
+Comment=Retro CRT-style terminal emulator
+Exec=lunduke-terminal
+Icon=org.lunduke.LundukeTerminal
+Terminal=false
+Categories=System;TerminalEmulator;GTK;
+Keywords=shell;prompt;command;commandline;cmd;crt;retro;
+StartupNotify=true
+StartupWMClass=lunduke-terminal
+Actions=new-window;amber;
+
+[Desktop Action new-window]
+Name=New Window
+Exec=lunduke-terminal
+
+[Desktop Action amber]
+Name=New Amber CRT Window
+Exec=lunduke-terminal --profile amber

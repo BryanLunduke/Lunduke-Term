@@ -87,6 +87,7 @@ int main(int argc, char** argv) {
     lterm::ViewOptions opts;
     loadSettings(opts);
     int w = 1280, h = 800, quitAfter = 0;
+    std::string title = "Lunduke Terminal";  // -T/--title (x-terminal-emulator interface)
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         if (a == "--no-effects") opts.effects = 0;
@@ -108,6 +109,7 @@ int main(int argc, char** argv) {
         else if (a == "--size" && i + 1 < argc) std::sscanf(argv[++i], "%dx%d", &w, &h);
         else if (a == "--quit-after" && i + 1 < argc) quitAfter = std::atoi(argv[++i]);
         else if (a == "--stats") opts.stats = true;
+        else if ((a == "-T" || a == "--title") && i + 1 < argc) title = argv[++i];
         else if (a == "--scrollback" && i + 1 < argc) opts.scrollbackLines = std::strtoll(argv[++i], nullptr, 10);
         else if (a == "--login") opts.loginShell = true;
         else if (a == "--cwd" && i + 1 < argc) opts.cwd = argv[++i];
@@ -150,9 +152,10 @@ int main(int argc, char** argv) {
         return 2;
     }
     int gargc = 1;
-    auto app = Gtk::Application::create(gargc, argv, "org.lunduke.Terminal", Gio::APPLICATION_NON_UNIQUE);
+    auto app = Gtk::Application::create(gargc, argv, "org.lunduke.LundukeTerminal", Gio::APPLICATION_NON_UNIQUE);
+    Gtk::Window::set_default_icon_name("org.lunduke.LundukeTerminal");  // data/icons (meson install)
     Gtk::Window win;
-    win.set_title("Lunduke Terminal");
+    win.set_title(title);
     win.set_default_size(w, h);
     win.add_events(Gdk::VISIBILITY_NOTIFY_MASK | Gdk::STRUCTURE_MASK);
     lterm::TerminalView view(opts);

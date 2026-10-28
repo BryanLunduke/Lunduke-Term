@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+<component type="desktop-application">
+  <id>org.lunduke.LundukeTerminal</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Lunduke Terminal</name>
+  <summary>Retro CRT-style terminal emulator</summary>
+  <developer id="com.lunduke">
+    <name>The Lunduke Journal</name>
+  </developer>
+  <description>
+    <p>
+      A terminal emulator for LCOS with the look of an old CRT monitor: phosphor glow, scanlines,
+      burn-in, curvature, RGB shift and an optional monitor bezel, after cool-retro-term 1.2.0
+      but without Qt. The default profile is a plain terminal without any effects.
+    </p>
+    <p>
+      The effects run on the GPU (OpenGL 3.3) with a C++ fallback, and drop to a static picture
+      on slow software rendering so an idle terminal uses no CPU.
+    </p>
+  </description>
+  <launchable type="desktop-id">org.lunduke.LundukeTerminal.desktop</launchable>
+  <url type="homepage">https://lunduke.com</url>
+  <provides>
+    <binary>lunduke-terminal</binary>
+  </provides>
+  <categories>
+    <category>System</category>
+    <category>TerminalEmulator</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.0.1" date="2026-10-28">
+      <description>
+        <p>Development snapshot (M2): effects quality levels, HiDPI, RGB shift, bezel, tabs, search and a settings dialog.</p>
+      </description>
+    </release>
+  </releases>
+</component>

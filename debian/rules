@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+# Packaging prep only: not built or uploaded yet (see docs/PACKAGING.md).
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@ --buildsystem=meson
+
+override_dh_auto_configure:
+	dh_auto_configure -- -Dbuildtype=plain
+
+# view_test needs an X display; the GL match test runs on llvmpipe.
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	xvfb-run -a -s "-screen 0 1280x1024x24" dh_auto_test --no-parallel
+endif
