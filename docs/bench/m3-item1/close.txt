@@ -1,0 +1,9 @@
+# lterm-m3-close-bench 20 (host, release, DISPLAY :44); same source compiled against d402d31 and m3-core
+# before (d402d31)
+sh (exits on SIGHUP)               19 closes: per close median   5.50 ms, max   6.05 ms, total  105.66 ms; all children gone 0 ms after the last close
+bash -i (exits on SIGHUP)          19 closes: per close median   5.62 ms, max   5.99 ms, total  107.82 ms; all children gone 0 ms after the last close
+ignores SIGHUP (trap '' HUP)       19 closes: per close median  51.77 ms, max  52.45 ms, total  984.62 ms; after 6 s: 19 still running, 0 zombies
+# after (M3 1c)
+sh (exits on SIGHUP)               19 closes: per close median   1.71 ms, max  10.28 ms, total   45.59 ms; all children gone 0 ms after the last close
+bash -i (exits on SIGHUP)          19 closes: per close median   0.40 ms, max   0.73 ms, total    8.04 ms; all children gone 0 ms after the last close
+ignores SIGHUP (trap '' HUP)       19 closes: per close median   0.38 ms, max   0.63 ms, total    7.74 ms; all children gone 1997 ms after the last close

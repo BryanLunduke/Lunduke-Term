@@ -662,6 +662,60 @@ static void testGovernor(const char* renderer) {
     CHECK(w.view->effectsQuality() == EffectsQuality::Full);
 }
 
+static char procState(pid_t pid) {  // 0: gone
+    char path[64];
+    std::snprintf(path, sizeof path, "/proc/%d/stat", pid);
+    std::string st;
+    try { st = Glib::file_get_contents(path); } catch (...) { return 0; }
+    const size_t p = st.rfind(')');
+    return p != std::string::npos && p + 2 < st.size() ? st[p + 2] : '?';
+}
+
+// M3 item 1c: closing tabs never blocks on the child; one that ignores SIGHUP is killed later.
+static void testTabClose() {
+    ViewOptions o;
+    o.command = {"/bin/sh", "-c", "trap '' HUP; sleep 30"};  // ignores SIGHUP: needs the SIGKILL
+    {
+        TerminalWindow w(o);
+        w.set_default_size(480, 320);
+        w.show();
+        const int n = 20;
+        std::vector<pid_t> pids;
+        for (int i = 0; i < n; ++i) {
+            TerminalView* v = w.newTab(true);
+            CHECK(v);
+            if (v) pids.push_back(v->childPid());
+            pump(5);
+        }
+        pump(400);
+        double worst = 0, total = 0;
+        while (w.tabCount() > 1) {
+            TerminalView* v = w.view(w.tabCount() - 1);
+            const auto t0 = std::chrono::steady_clock::now();
+            w.closeTab(v);
+            const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+            worst = std::max(worst, ms);
+            total += ms;
+            pump(2);
+        }
+        CHECK(w.tabCount() == 1);
+        CHECK(TerminalView::pendingReaps() == n - 1);
+        // Right after the closes the children still run (they ignore SIGHUP)...
+        int running = 0;
+        for (int i = 1; i < n; ++i) running += procState(pids[i]) != 0;
+        // ...and are killed after the grace period and reaped: no zombies.
+        const auto c0 = std::chrono::steady_clock::now();
+        CHECK(waitFor([&] { return TerminalView::pendingReaps() == 0; }, 5000));
+        const double goneMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - c0).count();
+        int left = 0;
+        for (int i = 1; i < n; ++i) left += procState(pids[i]) != 0;
+        CHECK(left == 0);
+        std::printf("tab close (ASan build): %d closes, worst %.2f ms, total %.2f ms; %d still running right after, "
+                    "all reaped %.0f ms later\n", n - 1, worst, total, running, goneMs);
+        CHECK(worst < 25.0);  // M2: >= 50 ms per tab whose child ignores SIGHUP
+    }
+}
+
 int main(int argc, char** argv) {
     if (!getenv("DISPLAY") || !*getenv("DISPLAY")) {
         std::printf("view test skipped: no DISPLAY\n");
@@ -682,6 +736,7 @@ int main(int argc, char** argv) {
     testSearchBig();
     testSearchBar();
     testSettingsDialog();
+    testTabClose();
     testGovernor("auto");
     testGovernor("cpu");
     if (failures) {

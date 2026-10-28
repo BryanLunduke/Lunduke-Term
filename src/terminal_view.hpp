@@ -133,6 +133,11 @@ public:
     EffectsGovernor& governor() { return gov_; }
     bool qualityDemoted() const { return qualityDemoted_; }
     void setRenderCostForTest(double ms) { testRenderCostMs_ = ms; }
+    // M3 item 1c: closing a view never waits for its child. It is sent SIGHUP (process group),
+    // SIGKILL after kHangupGraceMs if still running, and reaped by a GLib child watch.
+    static constexpr unsigned kHangupGraceMs = 2000;
+    static void reapInBackground(pid_t pid, unsigned killAfterMs);
+    static int pendingReaps();  // hung-up children not reaped yet (tests)
 
 protected:
     void on_size_allocate(Gtk::Allocation& a) override;

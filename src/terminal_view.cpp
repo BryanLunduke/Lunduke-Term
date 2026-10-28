@@ -11,6 +11,7 @@
 #include <cstring>
 #include <ctime>
 #include <sys/wait.h>
+#include <csignal>
 
 namespace lterm {
 
@@ -124,15 +125,51 @@ TerminalView::TerminalView(const ViewOptions& opts)
     chooseMode();
 }
 
+// M3 item 1c: background reaping of hung-up children.
+namespace {
+int pendingReaps_ = 0;
+struct Reap {
+    pid_t pid;
+    guint timer = 0;
+};
+}  // namespace
+
+int TerminalView::pendingReaps() { return pendingReaps_; }
+
+void TerminalView::reapInBackground(pid_t pid, unsigned killAfterMs) {
+    auto* r = new Reap{pid};
+    ++pendingReaps_;
+    r->timer = g_timeout_add(killAfterMs, [](gpointer d) -> gboolean {
+        auto* r = static_cast<Reap*>(d);
+        r->timer = 0;
+        // Still ours and not reaped yet (WNOWAIT leaves a zombie for the child watch): kill the
+        // process group the child leads, and the child.
+        siginfo_t si{};
+        if (waitid(P_PID, static_cast<id_t>(r->pid), &si, WEXITED | WNOHANG | WNOWAIT) == 0 && si.si_pid == 0) {
+            kill(-r->pid, SIGKILL);
+            kill(r->pid, SIGKILL);
+        }
+        return G_SOURCE_REMOVE;
+    }, r);
+    g_child_watch_add(pid, [](GPid p, gint, gpointer d) {
+        auto* r = static_cast<Reap*>(d);
+        if (r->timer) g_source_remove(r->timer);
+        g_spawn_close_pid(p);
+        --pendingReaps_;
+        delete r;
+    }, r);
+}
+
 TerminalView::~TerminalView() {
     alive_.reset();  // pending clipboard replies must not touch this object any more
     if (childWatch_) {
         g_source_remove(childWatch_);
         childWatch_ = 0;
-        // The window closed while the child still runs: hang up, and make sure the child is
-        // reaped even if it takes its time to exit (no zombie while the process lives on).
-        const pid_t left = session_->hangup(50);
-        if (left > 0) g_child_watch_add(left, [](GPid pid, gint, gpointer) { g_spawn_close_pid(pid); }, nullptr);
+        // The window closed while the child still runs: hang up without waiting (M3: M2 polled
+        // for up to 50 ms here, on the main thread, for every tab). A GLib child watch reaps it
+        // whenever it exits; if it ignores SIGHUP, it gets SIGKILL after kHangupGraceMs.
+        const pid_t left = session_->hangup(0);
+        if (left > 0) reapInBackground(left, kHangupGraceMs);
     }
     writeWatch_.disconnect();
     searchRefresh_.disconnect();
