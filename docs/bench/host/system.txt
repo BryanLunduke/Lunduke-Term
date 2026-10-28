@@ -1,0 +1,23 @@
+date: Wed Oct 28 11:14:36 CDT 2026
+uname: Linux 6.12.94+ x86_64
+model name	: Intel(R) Xeon(R) Processor
+cpus: 8
+flags (avx*/sse4*): fma sse4_1 sse4_2 avx avx2 avx512f avx512dq avx512ifma avx512cd avx512bw avx512vl avx_vnni avx512_bf16 avx512vbmi avx512_vbmi2 avx512_vnni avx512_bitalg avx512_vpopcntdq avx512_fp16 
+MemTotal:       16386368 kB
+MemAvailable:   11201772 kB
+load: 1.46 1.42 1.32 1/961 27179
+lterm-m1-bench: ymm/zmm instructions: 0
+lunduke-terminal: ymm/zmm instructions: 0
+util_cpu_caps.has_sse4_1 = 1
+util_cpu_caps.has_sse4_2 = 1
+util_cpu_caps.has_avx = 1
+util_cpu_caps.has_avx2 = 1
+util_cpu_caps.has_avx512f = 1
+util_cpu_caps.has_avx512dq = 1
+util_cpu_caps.has_avx512ifma = 1
+util_cpu_caps.has_avx512pf = 0
+no-AVX llvmpipe (GALLIUM_OVERRIDE_CPU_CAPS=sse4.1 LP_NATIVE_VECTOR_WIDTH=128):
+util_cpu_caps.has_avx = 0
+util_cpu_caps.has_avx2 = 0
+gl amber 64x64 LP_NUM_THREADS=default (llvmpipe (LLVM 19.1.7, 128 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 0.86 ms, tick 0.27 ms
+done: Wed Oct 28 11:20:04 CDT 2026

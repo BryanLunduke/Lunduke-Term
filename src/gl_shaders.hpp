@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// GLSL 3.30 versions of the passes in cpu_effects.cpp. Keep the two in sync.
+// GLSL 3.30 versions of the passes in cpu_effects.cpp (GL is the main path since M1; the C++
+// code is the fallback). Keep the two in sync: tests/gl_match_test.cpp checks PSNR >= 40 dB.
 #pragma once
 
 namespace lterm::glsl {
@@ -121,9 +122,12 @@ uniform float vrY;
 uniform float rasterIntensity;
 uniform float flicker;
 uniform float ambient;
+uniform bool flipY;         // drawing straight into a window framebuffer (origin bottom-left)
 float fractf(float x) { return x - floor(x); }
 void main() {
-    vec2 uv = gl_FragCoord.xy / size;
+    vec2 fc = gl_FragCoord.xy;
+    if (flipY) fc.y = size.y - fc.y;
+    vec2 uv = fc / size;
     vec2 cc = vec2(0.5) - uv;
     float dist = length(cc);
     vec2 sc = curvature != 0.0 ? barrel(uv, curvature) : uv;

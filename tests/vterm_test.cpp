@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "profiles.hpp"
 #include "vterm_session.hpp"
 
 #include <cstdio>
@@ -51,6 +52,24 @@ int main() {
     s.onTitle = [&] { seen = s.title(); };
     feed(s, "\x1b]2;M0 title\x07");
     CHECK(seen == "M0 title");
+
+    // Profile palette mapping: ANSI 0-15 come from the palette, default colours from fg/bg,
+    // 256-colour/truecolor foregrounds are lifted to the minimum grey.
+    {
+        VtermSession p(3, 20);
+        std::array<Color8, 16> pal{};
+        for (int i = 0; i < 16; ++i) pal[i] = Color8{uint8_t(i * 10), uint8_t(i * 10 + 1), uint8_t(i * 10 + 2)};
+        p.setColors(Color8{1, 2, 3}, Color8{4, 5, 6}, pal, 0.5f);
+        feed(p, "a\x1b[34mb\x1b[94mc\x1b[38;2;0;0;80md\x1b[0;45me");
+        Grid h;
+        p.fillGrid(h);
+        CHECK(h.at(0, 0).fg.r == 1 && h.at(0, 0).fg.b == 3);
+        CHECK(h.at(0, 0).bg.r == 4 && h.at(0, 0).bg.b == 6);
+        CHECK(h.at(0, 1).fg.r == 40 && h.at(0, 1).fg.g == 41);    // palette[4]
+        CHECK(h.at(0, 2).fg.r == 120 && h.at(0, 2).fg.b == 122);  // palette[12]
+        CHECK(greyOf(h.at(0, 3).fg) >= 0.49f);                     // truecolor dark blue lifted
+        CHECK(h.at(0, 4).bg.r == 50);                              // palette[5] background
+    }
 
     if (failures == 0) std::printf("vterm_test: OK\n");
     return failures ? 1 : 0;

@@ -1,0 +1,21 @@
+date: Wed Oct 28 04:25:45 PM UTC 2026
+uname: Linux 7.2.6-lunduke x86_64
+model name	: QEMU TCG CPU version 2.5+
+cpus: 4
+flags (avx*/sse4*): fma sse4_1 sse4_2 avx sse4a avx2 
+MemTotal:        2015236 kB
+MemAvailable:    1669416 kB
+load: 1.71 1.36 0.63 4/328 12448
+util_cpu_caps.has_sse4_1 = 1
+util_cpu_caps.has_sse4_2 = 1
+util_cpu_caps.has_avx = 1
+util_cpu_caps.has_avx2 = 1
+util_cpu_caps.has_avx512f = 0
+util_cpu_caps.has_avx512dq = 0
+util_cpu_caps.has_avx512ifma = 0
+util_cpu_caps.has_avx512pf = 0
+no-AVX llvmpipe (GALLIUM_OVERRIDE_CPU_CAPS=sse4.1 LP_NATIVE_VECTOR_WIDTH=128):
+util_cpu_caps.has_avx = 0
+util_cpu_caps.has_avx2 = 0
+gl amber 64x64 LP_NUM_THREADS=default (llvmpipe (LLVM 19.1.7, 128 bits) / 4.6 (Core Profile) Mesa 26.1.6-1~bpo13+1): content pass 25.54 ms, tick 11.52 ms
+done: Wed Oct 28 04:56:55 PM UTC 2026

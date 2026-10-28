@@ -1,0 +1,15 @@
+# window 1280x800, idle shell, cpu = (utime+stime)/wall over 10 s; 100% = one core
+plain (default): cpu 0.0% rss 52300kB
+amber GL: cpu 90.0% rss 231652kB
+amber CPU threads=1: cpu 99.8% rss 127916kB
+amber CPU threads=2: cpu 134.9% rss 127968kB
+amber CPU threads=4: cpu 135.7% rss 127964kB
+amber GL LP_NUM_THREADS=1: cpu 78.1% rss 228484kB
+amber GL LP_NUM_THREADS=2: cpu 82.3% rss 228516kB
+amber GL LP_NUM_THREADS=4: cpu 89.1% rss 228652kB
+amber GL LP_NUM_THREADS=1 no-AVX: cpu 97.7% rss 230460kB
+amber GL LP_NUM_THREADS=2 no-AVX: cpu 139.9% rss 228128kB
+amber GL LP_NUM_THREADS=4 no-AVX: cpu 124.9% rss 228032kB
+amber CPU threads=4 no-AVX: cpu 136.8% rss 127772kB
+amber GL --effects-fps 10: cpu 45.9% rss 228796kB
+ibm-3278 GL (static profile): cpu 0.0% rss 228552kB
