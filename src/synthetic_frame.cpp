@@ -79,17 +79,18 @@ void fillSyntheticGrid(Grid& g, int scroll) {
 }
 
 std::vector<uint8_t> renderSyntheticFrame(int w, int h, int scroll, const std::string& family, int px,
-                                          std::string* resolved) {
-    GridPainter painter(family, px);
+                                          std::string* resolved, int scale) {
+    GridPainter painter(family, px, scale);
     if (resolved) *resolved = painter.resolvedFamily();
+    const int m = kMargin * painter.scale();
     Grid g;
-    g.resize((h - 2 * kMargin) / painter.cellHeight(), (w - 2 * kMargin) / painter.cellWidth());
+    g.resize((h - 2 * m) / painter.cellHeight(), (w - 2 * m) / painter.cellWidth());
     fillSyntheticGrid(g, scroll);
     cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_RGB24, w, h);
     cairo_t* cr = cairo_create(s);
     cairo_set_source_rgb(cr, 0, 0, 0);
     cairo_paint(cr);
-    painter.paint(cr, g, kMargin, kMargin, Color8{208, 208, 208});
+    painter.paint(cr, g, m, m, Color8{208, 208, 208});
     cairo_destroy(cr);
     std::vector<uint8_t> out;
     surfaceToRgba(s, out);

@@ -29,7 +29,19 @@ std::vector<std::string> childEnvironment(char** base);
 // Paste preparation: newlines become CR (what a keyboard Enter sends) and control characters
 // other than TAB/CR are dropped (so pasted text cannot smuggle ESC sequences such as the
 // bracketed-paste terminator "\e[201~" into the application).
+// Also drops C1 controls (U+0080-U+009F, e.g. U+009B = CSI, which some applications still
+// honour) and bytes that are not valid UTF-8, as xterm does in UTF-8 mode.
 std::string sanitizePaste(const std::string& text);
+
+// Limits against hostile or runaway input.
+constexpr size_t kMaxTitleBytes = 4096;            // OSC 0/2 window title
+constexpr size_t kMaxScrollbackLines = 1000000;    // scrollback-lines setting / --scrollback
+// Negative -> 0, above kMaxScrollbackLines -> kMaxScrollbackLines.
+size_t clampScrollbackLines(long long requested);
+// Child side of spawn(): closes every fd >= 3 (close_range, or close() up to maxFd).
+void closeFrom3(int maxFd);
+// Truncates to at most max bytes without splitting a UTF-8 sequence.
+void truncateUtf8(std::string& s, size_t max);
 
 class VtermSession : public LineSource {
 public:
@@ -43,8 +55,10 @@ public:
     bool spawn(const std::vector<std::string>& argv) { return spawn(SpawnOptions{argv, false, {}}); }
     int masterFd() const { return fd_; }
     pid_t childPid() const { return pid_; }
-    // Kills the child's process group with SIGHUP (window closed while it still runs).
-    void hangup();
+    // Kills the child's process group with SIGHUP (window closed while it still runs) and reaps
+    // the child if it exits within waitMs. Returns the pid if it is still running (the caller
+    // must arrange for it to be reaped, e.g. a GLib child watch), else -1.
+    pid_t hangup(int waitMs = 50);
     void markExited() { pid_ = -1; }
 
     // Reads whatever is available on the PTY and feeds libvterm. Returns false on EOF/HUP.
@@ -84,7 +98,8 @@ public:
 
     // Scrollback. Lines have global numbers that never change while they exist: screen row r is
     // line topLine() + r; history goes down to firstLine().
-    void setScrollbackLimit(size_t lines);
+    void setScrollbackLimit(size_t lines);  // clamped to kMaxScrollbackLines
+    size_t scrollbackLimit() const { return sbLimit_; }
     size_t scrollbackSize() const { return sb_.size(); }
     long topLine() const { return pushed_; }
     long firstLine() const override { return pushed_ - static_cast<long>(sb_.size()); }
@@ -123,10 +138,14 @@ private:
     static int cbMoveCursor(VTermPos pos, VTermPos, int visible, void* user);
     static int cbSetTermProp(VTermProp prop, VTermValue* val, void* user);
     static int cbBell(void* user);
+    static int cbCsiFallback(const char* leader, const long args[], int argcount, const char* intermed, char command,
+                             void* user);
     static int cbPushLine(int cols, const VTermScreenCell* cells, void* user);
     static int cbPopLine(int cols, VTermScreenCell* cells, void* user);
     static int cbSbClear(void* user);
     static void cbOutput(const char* s, size_t len, void* user);
+    void feedRaw(const char* bytes, size_t len);
+    void snapshotWraps();  // see wrapSnap_
 
     VTerm* vt_ = nullptr;
     VTermScreen* screen_ = nullptr;
@@ -142,6 +161,25 @@ private:
     bool altScreen_ = false, reverse_ = false;
     bool x10_ = false;
     int scanState_ = 0;
+    int csiState_ = 0;    // feed(): 0 ground, 1 after ESC, 2 inside CSI
+    long csiStart_ = -1;  // index of the ESC of the open CSI in the current chunk
+    // libvterm's DECSC/DECRC (ESC 7/8, CSI ?1048/?1049) do not save the character set state
+    // (G0/G1 designations, SO/SI), which a VT100 does; feed() tracks it and restores it.
+    struct Charsets {
+        char g0 = 'B', g1 = 'B';
+        bool shifted = false;  // SO: G1 invoked into GL
+    };
+    Charsets cs_, savedCs_;
+    int escTarget_ = 0;       // feed() state 3: 0 = G0, 1 = G1 being designated
+    std::string csiParams_;   // parameters of the open CSI (bounded)
+    void restoreCharsets();
+    std::string penSgr() const;
+    // Continuation flags of the screen rows, taken just before an operation that may push
+    // several lines to the scrollback at once (CSI S, CSI M, resize). libvterm shifts its line
+    // info before the pushes, which loses the flags of all but the last pushed row.
+    std::vector<char> wrapSnap_;
+    bool wrapSnapActive_ = false;
+    int wrapSnapPushes_ = 0;
     std::string scanParams_;
     std::string title_, titleBuf_;
     std::string pendingOut_, writeQueue_;

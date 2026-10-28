@@ -2,16 +2,25 @@
 // Lunduke Terminal entry point.
 //   lunduke-terminal [--profile ID] [--effects|--no-effects] [--renderer auto|gl|cpu]
 //                    [--threads N] [--effects-fps N] [--max-fps N] [--no-pause-unfocused]
+//                    [--effects-quality auto|full|reduced|static] [--cpu-budget PERCENT]
 //                    [--font FAMILY] [--font-px N] [--size WxH] [--quit-after MS] [--stats]
 //                    [--scrollback N] [--login] [--cwd DIR] [--on-exit close|hold|hold-on-error]
 //                    [--hold] [--bell LIST] [--cursor-shape block|underline|bar]
 //                    [--cursor-blink|--no-cursor-blink]
-//                    [--list-profiles] [-e COMMAND ARGS...]
+//                    [--frame|--no-frame] [--frame-size PX] [--frame-color #RRGGBB]
+//                    [--frame-shininess 0..1] [--rgb-shift 0..1]
+//                    [-T|--title TITLE] [--list-profiles] [-e COMMAND ARGS...]
 // Settings (optional): $XDG_CONFIG_HOME/lunduke-terminal/settings.ini, group [terminal], keys
 // profile, effects (true/false), renderer, threads, effects-fps, max-fps, pause-unfocused,
+// effects-quality, cpu-budget (percent of one core, software rendering only, 0 = off),
 // font, font-px, scrollback-lines, login-shell, cwd, on-exit, bell (comma list of visual,
-// urgent, audible or none), cursor-shape, cursor-blink, word-chars. Command-line options win.
-#include "terminal_view.hpp"
+// urgent, audible or none), cursor-shape, cursor-blink, word-chars, frame (true/false),
+// frame-size, frame-color, frame-shininess, rgb-shift. Command-line options win.
+// The settings dialog (Ctrl+Shift+S) writes profile, font, font-px, effects-quality,
+// scrollback-lines and frame there ("Save as default"), keeping the other keys.
+// Keys: Ctrl+Shift+T new tab, Ctrl+Shift+W close tab, Ctrl+PgUp/PgDn switch tabs,
+// Ctrl+Shift+F search the scrollback, Ctrl+Shift+S settings.
+#include "terminal_window.hpp"
 
 #include <gtkmm.h>
 
@@ -52,10 +61,13 @@ void loadSettings(lterm::ViewOptions& o) {
         if (kf.has_key(g, "threads")) o.threads = kf.get_integer(g, "threads");
         if (kf.has_key(g, "effects-fps")) o.effectsFps = kf.get_integer(g, "effects-fps");
         if (kf.has_key(g, "max-fps")) o.maxFps = kf.get_integer(g, "max-fps");
+        if (kf.has_key(g, "effects-quality") && !parseEffectsQuality(kf.get_string(g, "effects-quality"), o.effectsQuality))
+            std::fprintf(stderr, "lunduke-terminal: effects-quality must be auto, full, reduced or static\n");
+        if (kf.has_key(g, "cpu-budget")) o.cpuBudget = kf.get_double(g, "cpu-budget") / 100.0;
         if (kf.has_key(g, "pause-unfocused")) o.pauseWhenUnfocused = kf.get_boolean(g, "pause-unfocused");
         if (kf.has_key(g, "font")) o.fontFamily = kf.get_string(g, "font");
         if (kf.has_key(g, "font-px")) o.fontPx = kf.get_integer(g, "font-px");
-        if (kf.has_key(g, "scrollback-lines")) o.scrollbackLines = kf.get_integer(g, "scrollback-lines");
+        if (kf.has_key(g, "scrollback-lines")) o.scrollbackLines = kf.get_int64(g, "scrollback-lines");
         if (kf.has_key(g, "login-shell")) o.loginShell = kf.get_boolean(g, "login-shell");
         if (kf.has_key(g, "cwd")) o.cwd = kf.get_string(g, "cwd");
         if (kf.has_key(g, "on-exit")) o.onExit = kf.get_string(g, "on-exit");
@@ -63,6 +75,11 @@ void loadSettings(lterm::ViewOptions& o) {
         if (kf.has_key(g, "cursor-shape")) o.cursorShape = kf.get_string(g, "cursor-shape");
         if (kf.has_key(g, "cursor-blink")) o.cursorBlink = kf.get_boolean(g, "cursor-blink");
         if (kf.has_key(g, "word-chars")) o.wordChars = kf.get_string(g, "word-chars");
+        if (kf.has_key(g, "frame")) o.tube.frame = kf.get_boolean(g, "frame") ? 1 : 0;
+        if (kf.has_key(g, "frame-size")) o.tube.frameSize = static_cast<float>(kf.get_double(g, "frame-size"));
+        if (kf.has_key(g, "frame-color")) o.tube.frameColor = kf.get_string(g, "frame-color");
+        if (kf.has_key(g, "frame-shininess")) o.tube.frameShininess = static_cast<float>(kf.get_double(g, "frame-shininess"));
+        if (kf.has_key(g, "rgb-shift")) o.tube.rgbShift = static_cast<float>(kf.get_double(g, "rgb-shift"));
     } catch (const Glib::Error& e) {
         std::fprintf(stderr, "lunduke-terminal: %s: %s\n", path.c_str(), e.what().c_str());
     }
@@ -74,6 +91,7 @@ int main(int argc, char** argv) {
     lterm::ViewOptions opts;
     loadSettings(opts);
     int w = 1280, h = 800, quitAfter = 0;
+    std::string title = "Lunduke Terminal";  // -T/--title (x-terminal-emulator interface)
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         if (a == "--no-effects") opts.effects = 0;
@@ -84,12 +102,19 @@ int main(int argc, char** argv) {
         else if (a == "--effects-fps" && i + 1 < argc) opts.effectsFps = std::atoi(argv[++i]);
         else if (a == "--max-fps" && i + 1 < argc) opts.maxFps = std::atoi(argv[++i]);
         else if (a == "--no-pause-unfocused") opts.pauseWhenUnfocused = false;
+        else if (a == "--effects-quality" && i + 1 < argc) {
+            if (!parseEffectsQuality(argv[++i], opts.effectsQuality)) {
+                std::fprintf(stderr, "lunduke-terminal: --effects-quality must be auto, full, reduced or static\n");
+                return 2;
+            }
+        } else if (a == "--cpu-budget" && i + 1 < argc) opts.cpuBudget = std::atof(argv[++i]) / 100.0;
         else if (a == "--font" && i + 1 < argc) opts.fontFamily = argv[++i];
         else if (a == "--font-px" && i + 1 < argc) opts.fontPx = std::atoi(argv[++i]);
         else if (a == "--size" && i + 1 < argc) std::sscanf(argv[++i], "%dx%d", &w, &h);
         else if (a == "--quit-after" && i + 1 < argc) quitAfter = std::atoi(argv[++i]);
         else if (a == "--stats") opts.stats = true;
-        else if (a == "--scrollback" && i + 1 < argc) opts.scrollbackLines = std::atoi(argv[++i]);
+        else if ((a == "-T" || a == "--title") && i + 1 < argc) title = argv[++i];
+        else if (a == "--scrollback" && i + 1 < argc) opts.scrollbackLines = std::strtoll(argv[++i], nullptr, 10);
         else if (a == "--login") opts.loginShell = true;
         else if (a == "--cwd" && i + 1 < argc) opts.cwd = argv[++i];
         else if (a == "--on-exit" && i + 1 < argc) opts.onExit = argv[++i];
@@ -98,6 +123,12 @@ int main(int argc, char** argv) {
         else if (a == "--cursor-shape" && i + 1 < argc) opts.cursorShape = argv[++i];
         else if (a == "--cursor-blink") opts.cursorBlink = true;
         else if (a == "--no-cursor-blink") opts.cursorBlink = false;
+        else if (a == "--frame") opts.tube.frame = 1;
+        else if (a == "--no-frame") opts.tube.frame = 0;
+        else if (a == "--frame-size" && i + 1 < argc) opts.tube.frameSize = static_cast<float>(std::atof(argv[++i]));
+        else if (a == "--frame-color" && i + 1 < argc) opts.tube.frameColor = argv[++i];
+        else if (a == "--frame-shininess" && i + 1 < argc) opts.tube.frameShininess = static_cast<float>(std::atof(argv[++i]));
+        else if (a == "--rgb-shift" && i + 1 < argc) opts.tube.rgbShift = static_cast<float>(std::atof(argv[++i]));
         else if (a == "--list-profiles") {
             for (const auto& p : lterm::builtinProfiles()) {
                 const auto f = lterm::profileFont(p);
@@ -125,63 +156,12 @@ int main(int argc, char** argv) {
         return 2;
     }
     int gargc = 1;
-    auto app = Gtk::Application::create(gargc, argv, "org.lunduke.Terminal", Gio::APPLICATION_NON_UNIQUE);
-    Gtk::Window win;
-    win.set_title("Lunduke Terminal");
+    auto app = Gtk::Application::create(gargc, argv, "org.lunduke.LundukeTerminal", Gio::APPLICATION_NON_UNIQUE);
+    Gtk::Window::set_default_icon_name("org.lunduke.LundukeTerminal");  // data/icons (meson install)
+    lterm::TerminalWindow win(opts, title);
     win.set_default_size(w, h);
-    win.add_events(Gdk::VISIBILITY_NOTIFY_MASK | Gdk::STRUCTURE_MASK);
-    lterm::TerminalView view(opts);
-    win.add(view);
-    view.signalTitle.connect([&](const std::string& t) { win.set_title(t + " - Lunduke Terminal"); });
-    view.signalChildExited.connect([&] { win.hide(); });
-    view.signalExitStatus.connect([&](int status) {
-        char t[64];
-        if (WIFSIGNALED(status)) std::snprintf(t, sizeof t, "[killed: signal %d] ", WTERMSIG(status));
-        else std::snprintf(t, sizeof t, "[exited: %d] ", WIFEXITED(status) ? WEXITSTATUS(status) : -1);
-        win.set_title(t + win.get_title());
-    });
-    // Bell: urgency hint while the window is not focused; cleared when it gets focus.
-    view.signalBell.connect([&] {
-        if (!win.is_active()) win.set_urgency_hint(true);
-    });
-    view.signalBackend.connect([](const std::string& b) {
-        std::fprintf(stderr, "lunduke-terminal: %s\n", b.c_str());
-    });
-
-    // Pause the effects animation when the window is inactive, iconified or fully covered.
-    bool iconified = false, obscured = false, mapped = false;
-    auto updateVisible = [&] { view.setWindowVisible(mapped && !iconified && !obscured); };
-    win.property_is_active().signal_changed().connect([&] {
-        view.setWindowActive(win.is_active());
-        if (win.is_active()) win.set_urgency_hint(false);
-    });
-    win.signal_window_state_event().connect([&](GdkEventWindowState* e) {
-        iconified = (e->new_window_state & (GDK_WINDOW_STATE_ICONIFIED | GDK_WINDOW_STATE_WITHDRAWN)) != 0;
-        updateVisible();
-        return false;
-    });
-    win.signal_visibility_notify_event().connect([&](GdkEventVisibility* e) {
-        obscured = e->state == GDK_VISIBILITY_FULLY_OBSCURED;
-        updateVisible();
-        return false;
-    });
-    win.signal_map_event().connect([&](GdkEventAny*) {
-        mapped = true;
-        updateVisible();
-        return false;
-    });
-    win.signal_unmap_event().connect([&](GdkEventAny*) {
-        mapped = false;
-        updateVisible();
-        return false;
-    });
-
-    win.show_all();
-    view.setWindowActive(win.is_active());
-    if (!view.start()) {
-        std::fprintf(stderr, "lunduke-terminal: could not start the shell\n");
-        return 1;
-    }
+    win.show();
+    if (!win.newTab(true)) return 1;
     if (quitAfter > 0) Glib::signal_timeout().connect_once([&] { win.hide(); }, quitAfter);
     return app->run(win);
 }

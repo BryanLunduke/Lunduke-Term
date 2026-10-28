@@ -7,7 +7,7 @@
 
 namespace lterm {
 
-GridPainter::GridPainter(const std::string& family, int pixelSize) {
+GridPainter::GridPainter(const std::string& family, int pixelSize, int scale) : scale_(std::max(1, scale)) {
     font_ = pango_font_description_new();
     pango_font_description_set_family(font_, family.c_str());
     pango_font_description_set_absolute_size(font_, pixelSize * PANGO_SCALE);
@@ -31,6 +31,13 @@ GridPainter::GridPainter(const std::string& family, int pixelSize) {
     pango_font_metrics_unref(m);
     if (cellW_ < 1) cellW_ = 1;
     if (cellH_ < 1) cellH_ = 1;
+    cellW_ *= scale_;
+    cellH_ *= scale_;
+    ascent_ *= scale_;
+    if (scale_ > 1) {  // rasterise at device resolution
+        pango_font_description_set_absolute_size(font_, double(pixelSize) * scale_ * PANGO_SCALE);
+        pango_font_description_set_absolute_size(bold_, double(pixelSize) * scale_ * PANGO_SCALE);
+    }
     padX_ = std::max(1, cellW_ / 2);
     glyphLayout_ = pango_layout_new(ctx_);
 }
@@ -180,15 +187,16 @@ void GridPainter::paintRows(cairo_t* cr, const Grid& g, int ox, int oy, Color8 c
                 const int x = ox + c * cellW_;
                 setColor(cr, cursorColor);
                 if (g.cursorHollow) {
-                    cairo_set_line_width(cr, 1.0);
-                    cairo_rectangle(cr, x + 0.5, y + 0.5, w - 1, cellH_ - 1);
+                    const double lw = scale_;
+                    cairo_set_line_width(cr, lw);
+                    cairo_rectangle(cr, x + lw / 2, y + lw / 2, w - lw, cellH_ - lw);
                     cairo_stroke(cr);
                 } else if (g.cursorShape == Grid::CursorShape::Underline) {
-                    const int t = std::max(2, cellH_ / 8);
+                    const int t = std::max(2 * scale_, cellH_ / 8);
                     cairo_rectangle(cr, x, y + cellH_ - t, w, t);
                     cairo_fill(cr);
                 } else {
-                    cairo_rectangle(cr, x, y, std::max(2, cellW_ / 8), cellH_);
+                    cairo_rectangle(cr, x, y, std::max(2 * scale_, cellW_ / 8), cellH_);
                     cairo_fill(cr);
                 }
             }

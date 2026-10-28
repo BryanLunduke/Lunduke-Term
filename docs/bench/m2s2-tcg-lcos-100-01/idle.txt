@@ -1,0 +1,13 @@
+# window 1280x800, idle shell, cpu over 10 s after 40 s; 100% = one core
+amber gl auto: cpu 0.0% [stats: quality=static software=1 tick-interval 50.0 ms ]
+amber+bezel gl auto: cpu 0.0% [stats: quality=static software=1 tick-interval 50.0 ms ]
+ibm-dos(rgb) gl auto: cpu 0.0% [stats: quality=static software=1 tick-interval 50.0 ms ]
+amber gl static: cpu 0.0% [stats: quality=static software=1 tick-interval 50.0 ms ]
+amber+bezel gl static: cpu 0.0% [stats: quality=static software=1 tick-interval 50.0 ms ]
+ibm-dos(rgb) gl static: cpu 0.0% [stats: quality=static software=1 tick-interval 50.0 ms ]
+amber cpu auto: cpu 0.0% [stats: quality=static software=1 tick-interval 50.0 ms ]
+amber+bezel cpu auto: cpu 0.0% [stats: quality=static software=1 tick-interval 50.0 ms ]
+ibm-dos(rgb) cpu auto: cpu 0.0% [stats: quality=static software=1 tick-interval 50.0 ms ]
+amber cpu static: cpu 0.0% [stats: quality=static software=1 tick-interval 50.0 ms ]
+amber+bezel cpu static: cpu 0.0% [stats: quality=static software=1 tick-interval 50.0 ms ]
+ibm-dos(rgb) cpu static: cpu 0.0% [stats: quality=static software=1 tick-interval 50.0 ms ]

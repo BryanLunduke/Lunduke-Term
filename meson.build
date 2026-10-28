@@ -24,14 +24,32 @@ effects_lib = static_library('lterm-effects',
 gl_lib = static_library('lterm-gl', 'src/gl_effects.cpp', 'src/gl_pipeline.cpp',
   link_with : effects_lib, dependencies : [epoxy_dep, egl_dep])
 
-vterm_lib = static_library('lterm-vterm', 'src/vterm_session.cpp', 'src/selection.cpp',
+vterm_lib = static_library('lterm-vterm', 'src/vterm_session.cpp', 'src/selection.cpp', 'src/search.cpp',
   link_with : effects_lib, dependencies : [vterm_dep, util_dep, pangocairo_dep])
 
 executable('lunduke-terminal',
-  'src/main.cpp', 'src/terminal_view.cpp',
+  'src/main.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp',
   link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep],
   install : true)
+
+# Desktop integration (installed by `meson install`; see docs/PACKAGING.md).
+app_id = 'org.lunduke.LundukeTerminal'
+install_data('data/' + app_id + '.desktop', install_dir : get_option('datadir') / 'applications')
+install_data('data/' + app_id + '.metainfo.xml', install_dir : get_option('datadir') / 'metainfo')
+install_data('data/icons/hicolor/scalable/apps/' + app_id + '.svg',
+  install_dir : get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps')
+install_data('README.md', 'docs/FONTS.md', 'docs/PACKAGING.md',
+  install_dir : get_option('datadir') / 'doc' / 'lunduke-terminal')
+desktop_validate = find_program('desktop-file-validate', required : false)
+if desktop_validate.found()
+  test('desktop-file', desktop_validate, args : [meson.current_source_dir() / 'data' / app_id + '.desktop'])
+endif
+appstreamcli = find_program('appstreamcli', required : false)
+if appstreamcli.found()
+  test('metainfo', appstreamcli, args : ['validate', '--no-net', '--explain',
+    meson.current_source_dir() / 'data' / app_id + '.metainfo.xml'])
+endif
 
 executable('lterm-m0-bench', 'tools/m0_bench.cpp',
   include_directories : inc,
@@ -59,3 +77,16 @@ test('gl-match', executable('gl_match_test', 'tests/gl_match_test.cpp',
 test('session', executable('session_test', 'tests/session_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
   timeout : 60)
+test('fixes', executable('fixes_test', 'tests/fixes_test.cpp',
+  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
+  timeout : 60)
+test('search', executable('search_test', 'tests/search_test.cpp',
+  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
+  timeout : 60)
+# GTK-level fixes; AddressSanitizer makes a use-after-free fail loudly. Skips without $DISPLAY.
+view_test_exe = executable('view_test', 'tests/view_test.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp',
+  include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
+  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep, dependency('x11')],
+  cpp_args : ['-fsanitize=address', '-fno-omit-frame-pointer'], link_args : ['-fsanitize=address'])
+test('view', view_test_exe, env : ['ASAN_OPTIONS=detect_leaks=0:abort_on_error=1', 'LIBGL_ALWAYS_SOFTWARE=1'],
+  timeout : 60, is_parallel : false)

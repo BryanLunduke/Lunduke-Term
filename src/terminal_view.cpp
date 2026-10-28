@@ -6,8 +6,10 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <sys/wait.h>
 
 namespace lterm {
@@ -54,12 +56,19 @@ TerminalView::TerminalView(const ViewOptions& opts)
         p = findProfile("plain");
     }
     profile_ = *p;
+    {
+        const std::string m = applyTubeOverrides(profile_, opts_.tube);
+        if (!m.empty()) std::fprintf(stderr, "lunduke-terminal: %s\n", m.c_str());
+    }
     effectsOn_ = opts_.effects < 0 ? profile_.effects : opts_.effects != 0;
     glFailed_ = opts_.renderer == "cpu";
     session_.reset(new VtermSession(24, 80));
     session_->onTitle = [this] { signalTitle.emit(session_->title()); };
     session_->onBell = [this] { onBell(); };
-    session_->setScrollbackLimit(static_cast<size_t>(std::max(0, opts_.scrollbackLines)));
+    const size_t sb = clampScrollbackLines(opts_.scrollbackLines);
+    if (opts_.scrollbackLines > static_cast<long long>(kMaxScrollbackLines))
+        std::fprintf(stderr, "lunduke-terminal: scrollback-lines %lld is too large, using %zu\n", opts_.scrollbackLines, sb);
+    session_->setScrollbackLimit(sb);
     sel_.setWordChars(opts_.wordChars);
     t0_ = g_get_monotonic_time();
 
@@ -85,13 +94,23 @@ TerminalView::TerminalView(const ViewOptions& opts)
     gl_.signal_realize().connect(sigc::mem_fun(*this, &TerminalView::onGlRealize));
     gl_.signal_unrealize().connect(sigc::mem_fun(*this, &TerminalView::onGlUnrealize), false);
     gl_.signal_render().connect(sigc::mem_fun(*this, &TerminalView::onGlRender), false);
+    property_scale_factor().signal_changed().connect(sigc::mem_fun(*this, &TerminalView::onScaleChanged));
     applyProfile();
     chooseMode();
 }
 
 TerminalView::~TerminalView() {
-    if (childWatch_) g_source_remove(childWatch_);
+    alive_.reset();  // pending clipboard replies must not touch this object any more
+    if (childWatch_) {
+        g_source_remove(childWatch_);
+        childWatch_ = 0;
+        // The window closed while the child still runs: hang up, and make sure the child is
+        // reaped even if it takes its time to exit (no zombie while the process lives on).
+        const pid_t left = session_->hangup(50);
+        if (left > 0) g_child_watch_add(left, [](GPid pid, gint, gpointer) { g_spawn_close_pid(pid); }, nullptr);
+    }
     writeWatch_.disconnect();
+    searchRefresh_.disconnect();
     bellTimer_.disconnect();
     blink_.disconnect();
     io_.disconnect();
@@ -108,6 +127,8 @@ TerminalView::~TerminalView() {
                     backendName().c_str(), stats_.contentFrames, stats_.fullRepaints, stats_.rowsPainted,
                     stats_.ticks, med(stats_.paintMs), med(stats_.effectsSourceMs), med(stats_.tickMs),
                     painter_ ? painter_->cachedGlyphs() : size_t(0));
+        std::printf("stats: quality=%s software=%d tick-interval %.1f ms\n", effectsQualityName(quality_),
+                    software_ ? 1 : 0, tickIntervalMs_);
         std::fflush(stdout);
     }
     if (glPipe_) {
@@ -127,8 +148,12 @@ double TerminalView::nowMs() const { return (g_get_monotonic_time() - t0_) / 100
 std::string TerminalView::backendName() const {
     switch (mode_) {
     case Mode::Plain: return profile_.id + ", no effects";
-    case Mode::Cpu: return profile_.id + ", effects: C++ fallback (" + std::to_string(opts_.threads) + " threads)";
-    case Mode::Gl: return profile_.id + ", effects: GLSL on " + (glRenderer_.empty() ? "GtkGLArea" : glRenderer_);
+    case Mode::Cpu:
+        return profile_.id + ", effects: C++ fallback (" + std::to_string(opts_.threads) + " threads), quality " +
+               effectsQualityName(quality_);
+    case Mode::Gl:
+        return profile_.id + ", effects: GLSL on " + (glRenderer_.empty() ? "GtkGLArea" : glRenderer_) +
+               ", quality " + effectsQualityName(quality_) + (software_ ? " (software rendering)" : "");
     }
     return "?";
 }
@@ -245,7 +270,7 @@ void TerminalView::applyProfile() {
     if (!pick.monospace)
         std::fprintf(stderr, "lunduke-terminal: font '%s' is not monospaced\n", pick.family.c_str());
     const int px = opts_.fontPx > 0 ? opts_.fontPx : pick.px;
-    painter_.reset(new GridPainter(pick.family, px));
+    painter_.reset(new GridPainter(pick.family, px, scale_));  // px stays logical
     applyColors();
     cpu_.reset();
     glParamsStale_ = true;
@@ -263,10 +288,12 @@ void TerminalView::setProfile(const std::string& id) {
     const Profile* p = findProfile(id);
     if (!p) return;
     profile_ = *p;
+    applyTubeOverrides(profile_, opts_.tube);
     applyProfile();
     if (opts_.effects < 0) effectsOn_ = profile_.effects;
     applyColors();
     chooseMode();
+    if (w_ > 0) layoutGrid();  // the bezel (if any) takes room
     updateContent();
     requestFrame();
     updateAnimation();
@@ -276,6 +303,7 @@ void TerminalView::setEffects(bool on) {
     effectsOn_ = on;
     applyColors();
     chooseMode();
+    if (w_ > 0) layoutGrid();  // the bezel (if any) takes room
     fullRepaint_ = contentDirty_ = effectsSourceStale_ = true;
     updateContent();
     requestFrame();
@@ -284,8 +312,11 @@ void TerminalView::setEffects(bool on) {
 
 void TerminalView::chooseMode() {
     Mode m = !effectsOn_ ? Mode::Plain : (glFailed_ ? Mode::Cpu : Mode::Gl);
+    mode_ = m;
+    updateQuality();
     if (m == Mode::Cpu && !cpu_) {
-        cpu_.reset(new CpuEffects(profile_.fx, opts_.threads));
+        cpu_.reset(new CpuEffects(fx_, opts_.threads));
+        cpuOutValid_ = false;
         if (w_ > 0) cpu_->resize(w_, h_);
     }
     if (m != Mode::Cpu) cpu_.reset();  // frees ~45 MB of float buffers when not in use
@@ -326,7 +357,9 @@ void TerminalView::onGlRealize() {
     const auto* r = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
     glRenderer_ = r ? r : "?";
     glParamsStale_ = true;
+    updateQuality();
     signalBackend.emit(backendName());
+    updateAnimation();
 }
 
 void TerminalView::onGlUnrealize() {
@@ -337,9 +370,14 @@ void TerminalView::onGlUnrealize() {
 
 bool TerminalView::onGlRender(const Glib::RefPtr<Gdk::GLContext>&) {
     if (glFailed_ || mode_ != Mode::Gl) return true;
+    // GtkGLArea's framebuffer: read it before updateSource() binds the pipeline's own FBOs
+    // (M1 read it afterwards, so a content frame landed in an internal FBO and only the next
+    // effects tick showed it; with nothing animating, the window stayed black).
+    GLint fbo = 0;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &fbo);
     if (!glPipe_ || glParamsStale_) {
         if (glPipe_) glPipe_->release();
-        glPipe_.reset(new GlPipeline(profile_.fx));
+        glPipe_.reset(new GlPipeline(fx_));
         glParamsStale_ = false;
         effectsSourceStale_ = true;
         if (!glPipe_->ok()) {
@@ -368,8 +406,6 @@ bool TerminalView::onGlRender(const Glib::RefPtr<Gdk::GLContext>&) {
         srcDirtyY0_ = srcDirtyY1_ = 0;
     }
     const auto r0 = std::chrono::steady_clock::now();
-    GLint fbo = 0;
-    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &fbo);
     glPipe_->render(static_cast<float>(t), static_cast<unsigned>(fbo), true);
     if (opts_.stats) glFinish();
     if (!content) {
@@ -397,37 +433,50 @@ bool TerminalView::onDraw(const Cairo::RefPtr<Cairo::Context>& cr) {
             srcDirtyY0_ = srcDirtyY1_ = 0;
         }
         const auto r0 = std::chrono::steady_clock::now();
-        cairo_surface_flush(out_);
-        cpu_->renderTo(static_cast<float>(t), cairo_image_surface_get_data(out_), cairo_image_surface_get_stride(out_),
-                       PixelOrder::BGRA);
-        cairo_surface_mark_dirty(out_);
-        if (!content) {
+        // Nothing animates (static quality, or a profile without time-based effects): the
+        // output is a pure function of the source, so an expose just repaints the last one.
+        const bool timeless = !fx_.animated() && fx_.burnIn <= 0;
+        const bool rerender = content || !cpuOutValid_ || !timeless;
+        if (rerender) {
+            cairo_surface_flush(out_);
+            cpu_->renderTo(static_cast<float>(t), cairo_image_surface_get_data(out_),
+                           cairo_image_surface_get_stride(out_), PixelOrder::BGRA);
+            cairo_surface_mark_dirty(out_);
+            cpuOutValid_ = true;
+        }
+        if (!content && rerender) {
             ++stats_.ticks;
             stats_.tickMs.push_back(
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - r0).count());
         }
         lastFrameMs_ = t;
-        cairo_set_source_surface(cr->cobj(), out_, 0, 0);
-    } else {
-        cairo_set_source_surface(cr->cobj(), src_, 0, 0);
     }
-    cairo_paint(cr->cobj());
+    // The surfaces are in device pixels; GTK's context is in logical ones (device scale).
+    cairo_t* c = cr->cobj();
+    cairo_save(c);
+    if (scale_ > 1) cairo_scale(c, 1.0 / scale_, 1.0 / scale_);
+    cairo_set_source_surface(c, mode_ == Mode::Cpu && cpu_ ? out_ : src_, 0, 0);
+    cairo_pattern_set_filter(cairo_get_source(c), CAIRO_FILTER_NEAREST);
+    cairo_paint(c);
+    cairo_restore(c);
     return true;
 }
 
 void TerminalView::layoutGrid() {
-    marginX_ = std::max(profile_.marginMinPx, static_cast<int>(w_ * profile_.marginFrac));
-    marginY_ = std::max(profile_.marginMinPx, static_cast<int>(h_ * profile_.marginFrac));
-    const int cols = std::max(1, (w_ - 2 * marginX_) / painter_->cellWidth());
-    const int rows = std::max(1, (h_ - 2 * marginY_) / painter_->cellHeight());
-    if (profile_.marginFrac > 0) {  // centre the grid inside the tube
-        marginX_ = (w_ - cols * painter_->cellWidth()) / 2;
-        marginY_ = (h_ - rows * painter_->cellHeight()) / 2;
-    }
+    // A bezel takes its width on every side; the profile's margins are then inside the glass.
+    const int inset = frameActive()
+                          ? static_cast<int>(std::ceil(frameGeometry(fx_, w_, h_).inset / std::max(1, scale_)))
+                          : 0;
+    const GridLayout g = computeGridLayout(w_, h_, scale_, painter_->cellWidth(), painter_->cellHeight(),
+                                           profile_.marginMinPx, profile_.marginFrac, inset);
+    marginX_ = g.marginX;
+    marginY_ = g.marginY;
+    const int rows = g.rows, cols = g.cols;
     if (rows != session_->rows() || cols != session_->cols()) {
         session_->resize(rows, cols);
         sel_.clear();  // reflow moves text around
         scrollOffset_ = std::min(scrollOffset_, static_cast<int>(session_->scrollbackSize()));
+        if (!searchQuery_.empty()) refreshSearch();  // reflow moved the matches too
     }
 }
 
@@ -440,8 +489,28 @@ void TerminalView::allocateSurfaces() {
 
 void TerminalView::on_size_allocate(Gtk::Allocation& a) {
     Gtk::Box::on_size_allocate(a);
-    const int w = std::max(1, a.get_width()), h = std::max(1, a.get_height());
-    if (w == w_ && h == h_) return;
+    relayout(std::max(1, a.get_width()), std::max(1, a.get_height()));
+}
+
+// HiDPI: notify::scale-factor (moved to a monitor with another scale, GDK_SCALE) comes without
+// a new allocation, because the logical size stays the same.
+void TerminalView::onScaleChanged() {
+    if (lw_ > 0) relayout(lw_, lh_);
+}
+
+void TerminalView::relayout(int lw, int lh) {
+    const int scale = std::max(1, get_scale_factor());
+    const bool rescale = scale != scale_;
+    if (rescale) {
+        scale_ = scale;
+        w_ = h_ = 0;  // no layout at the old device size with the new cell size
+        applyScale();
+    }
+    lw_ = lw;
+    lh_ = lh;
+    // Everything below works in device pixels: the logical allocation times the GTK scale.
+    const int w = lw * scale_, h = lh * scale_;
+    if (w == w_ && h == h_ && !rescale) return;
     w_ = w;
     h_ = h;
     allocateSurfaces();
@@ -450,6 +519,13 @@ void TerminalView::on_size_allocate(Gtk::Allocation& a) {
     fullRepaint_ = contentDirty_ = effectsSourceStale_ = true;
     updateContent();
     if (mode_ == Mode::Gl) gl_.queue_render();
+    else if (rescale) area_.queue_draw();
+}
+
+void TerminalView::applyScale() {
+    // New glyph rasterisation and pixel-sized effect parameters; the caller resizes.
+    applyProfile();  // drops the C++ effects; chooseMode() makes new ones with the scaled parameters
+    chooseMode();
 }
 
 bool TerminalView::updateContent() {
@@ -468,8 +544,35 @@ bool TerminalView::updateContent() {
                     std::swap(cell.fg, cell.bg);
                 }
     }
-    if (session_->reverseVideo() != bellFlash_)
+    // Search matches: Tango yellow, the current one orange (dark text on both).
+    if (!matches_.empty()) {
+        const long top = session_->topLine() - scrollOffset_, bottom = top + next_.rows;
+        auto it = std::lower_bound(matches_.begin(), matches_.end(), top,
+                                   [](const SearchMatch& m, long line) { return m.end.line < line; });
+        for (; it != matches_.end() && it->start.line < bottom; ++it) {
+            const bool current = (it - matches_.begin()) == matchIndex_;
+            const Color8 bg = current ? Color8{0xf5, 0x79, 0x00} : Color8{0xc4, 0xa0, 0x00};
+            for (long l = std::max(top, it->start.line); l <= std::min(bottom - 1, it->end.line); ++l) {
+                const int c0 = l == it->start.line ? it->start.col : 0;
+                const int c1 = l == it->end.line ? it->end.col : next_.cols - 1;
+                for (int c = std::max(0, c0); c <= std::min(next_.cols - 1, c1); ++c) {
+                    Cell& cell = next_.at(static_cast<int>(l - top), c);
+                    cell.bg = bg;
+                    cell.fg = Color8{0, 0, 0};
+                }
+            }
+        }
+    }
+    // DECSCNM: libvterm already reverses every cell (attrs.reverse ^ global reverse), so only the
+    // margins need it here. The visual bell inverts the cells and the margins.
+    if (bellFlash_)
         for (Cell& cell : next_.cells) std::swap(cell.fg, cell.bg);
+    const bool inverse = session_->reverseVideo() != bellFlash_;
+    if (inverse != inverseShown_) {
+        inverseShown_ = inverse;
+        fullRepaint_ = true;
+    }
+    const Color8 clearColor = inverse ? profile_.fg : profile_.bg;
     const int shape = session_->cursorShape();
     if (shape == VTERM_PROP_CURSORSHAPE_UNDERLINE) next_.cursorShape = Grid::CursorShape::Underline;
     else if (shape == VTERM_PROP_CURSORSHAPE_BAR_LEFT) next_.cursorShape = Grid::CursorShape::Bar;
@@ -493,10 +596,10 @@ bool TerminalView::updateContent() {
     if (n == 0 && !full) return false;
     cairo_t* c = cairo_create(src_);
     if (full) {
-        cairo_set_source_rgb(c, profile_.bg.r / 255.0, profile_.bg.g / 255.0, profile_.bg.b / 255.0);
+        cairo_set_source_rgb(c, clearColor.r / 255.0, clearColor.g / 255.0, clearColor.b / 255.0);
         cairo_paint(c);
     }
-    painter_->paintRows(c, next_, marginX_, marginY_, profile_.cursor, profile_.bg, full ? nullptr : &rows, w_);
+    painter_->paintRows(c, next_, marginX_, marginY_, inverse ? profile_.bg : profile_.cursor, clearColor, full ? nullptr : &rows, w_);
     cairo_destroy(c);
     std::swap(cur_, next_);
     fullRepaint_ = false;
@@ -518,7 +621,8 @@ bool TerminalView::updateContent() {
     stats_.paintMs.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
     lastContentMs_ = nowMs();
     if (mode_ == Mode::Plain) {
-        area_.queue_draw_area(0, y0, w_, y1 - y0);
+        const int ly0 = y0 / scale_, ly1 = (y1 + scale_ - 1) / scale_;  // logical
+        area_.queue_draw_area(0, ly0, lw_, ly1 - ly0);
         srcDirtyY0_ = srcDirtyY1_ = 0;  // the plain view reads src_ directly
     }
     return true;
@@ -547,24 +651,96 @@ void TerminalView::onFrameTimer() {
 
 bool TerminalView::animationWanted() const {
     if (!effectsOn_ || mode_ == Mode::Plain || !visible_) return false;
-    if (profile_.fx.animated() && (active_ || !opts_.pauseWhenUnfocused)) return true;
-    return nowMs() < lastContentMs_ + profile_.fx.burnInFadeMs() + 100.0;
+    if (fx_.animated() && (active_ || !opts_.pauseWhenUnfocused)) return true;
+    const float fade = fx_.burnInFadeMs();
+    return fade > 0 && nowMs() < lastContentMs_ + fade + 100.0;
+}
+
+double TerminalView::baseTickIntervalMs() const {
+    const double base = 1000.0 / std::max(1, opts_.effectsFps);
+    return quality_ == EffectsQuality::Reduced ? 2.0 * base : base;  // reduced: half-rate animation
+}
+
+static double processCpuMs() {
+    timespec ts{};
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
 }
 
 void TerminalView::updateAnimation() {
     const bool want = animationWanted();
-    if (want && !tick_.connected())
+    if (want && !tick_.connected()) {
+        govWall0_ = nowMs();
+        govCpu0_ = processCpuMs();
         tick_ = Glib::signal_timeout().connect(sigc::mem_fun(*this, &TerminalView::onTick),
-                                               1000 / std::max(1, opts_.effectsFps));
-    else if (!want && tick_.connected())
+                                               static_cast<unsigned>(tickIntervalMs_ + 0.5));
+    } else if (!want && tick_.connected()) {
         tick_.disconnect();
+    }
+}
+
+void TerminalView::updateQuality() {
+    // GL: known once the GtkGLArea is realized; until then only the environment tells.
+    software_ = mode_ == Mode::Cpu || softwareRenderingForced() ||
+                (mode_ == Mode::Gl && isSoftwareRendererName(glRenderer_));
+    const EffectsQuality q =
+        qualityDemoted_ ? EffectsQuality::Static : resolveEffectsQuality(opts_.effectsQuality, software_);
+    const EffectParams fx = scaleEffectParams(applyEffectsQuality(profile_.fx, q), scale_);
+    const bool changed = q != quality_ || !sameEffectParams(fx, fx_);
+    quality_ = q;
+    fx_ = fx;
+    tickIntervalMs_ = baseTickIntervalMs();
+    if (!changed) return;
+    if (cpu_) {
+        cpu_.reset(new CpuEffects(fx_, opts_.threads));
+        if (w_ > 0) cpu_->resize(w_, h_);
+        cpuOutValid_ = false;
+    }
+    glParamsStale_ = true;
+    effectsSourceStale_ = true;
+    if (tick_.connected()) tick_.disconnect();  // restarted at the new rate by updateAnimation()
+}
+
+bool TerminalView::governTick() {
+    if (!software_ || opts_.cpuBudget <= 0 || quality_ == EffectsQuality::Static) return false;
+    const double wall = nowMs(), cpu = processCpuMs();
+    const double dWall = wall - govWall0_;
+    if (dWall < 1000.0) return false;  // one-second windows
+    const double load = (cpu - govCpu0_) / dWall;  // cores
+    govWall0_ = wall;
+    govCpu0_ = cpu;
+    const double budget = opts_.cpuBudget, maxInterval = 1000.0;
+    double next = tickIntervalMs_;
+    if (load > budget) next = std::min(maxInterval, tickIntervalMs_ * (load / budget) * 1.05);
+    else if (load < 0.6 * budget) next = std::max(baseTickIntervalMs(), tickIntervalMs_ * 0.85);
+    if (load > budget && tickIntervalMs_ >= maxInterval && opts_.effectsQuality == EffectsQuality::Auto) {
+        // Even one frame per second costs more than the budget (e.g. llvmpipe in a VM without
+        // KVM): stop animating and show the static picture.
+        std::fprintf(stderr, "lunduke-terminal: animation needs %.0f%% of a core at 1 fps; effects-quality auto -> static\n",
+                     load * 100.0);
+        qualityDemoted_ = true;
+        updateQuality();
+        signalBackend.emit(backendName());
+        if (mode_ == Mode::Gl) gl_.queue_render();
+        else if (mode_ == Mode::Cpu) area_.queue_draw();
+        return true;  // updateQuality() stopped the timer
+    }
+    if (std::fabs(next - tickIntervalMs_) > 0.05 * tickIntervalMs_) {
+        tickIntervalMs_ = next;
+        tick_ = Glib::signal_timeout().connect(sigc::mem_fun(*this, &TerminalView::onTick),
+                                               static_cast<unsigned>(tickIntervalMs_ + 0.5));
+        return true;  // the caller's timer source ends; the new one takes over
+    }
+    return false;
 }
 
 bool TerminalView::onTick() {
     if (!animationWanted()) return false;  // paused (unfocused/hidden) or burn-in settled
     if (mode_ == Mode::Gl) gl_.queue_render();
     else if (mode_ == Mode::Cpu) area_.queue_draw();
-    return true;
+    const bool replaced = governTick();  // new rate (new timer) or animation stopped
+    stats_.finalTickIntervalMs = tickIntervalMs_;
+    return !replaced;
 }
 
 void TerminalView::setWindowActive(bool active) {
@@ -601,6 +777,13 @@ bool TerminalView::onPtyIo(Glib::IOCondition) {
     }
     if (session_->takeDamage()) {
         contentDirty_ = true;
+        if (!searchQuery_.empty() && !searchRefresh_.connected())  // debounced: 250 ms after output
+            searchRefresh_ = Glib::signal_timeout().connect(
+                [this] {
+                    refreshSearch();
+                    return false;
+                },
+                250);
         requestFrame();
         updateBlink();  // DECSCUSR / ?12 may have changed blinking
         // Output overwrote the selected text (clear, an editor redraw): drop the selection. A
@@ -659,8 +842,10 @@ void TerminalView::copyClipboard() {
 
 void TerminalView::pasteClipboard(bool primary) {
     if (holding_) return;
+    std::weak_ptr<char> alive = alive_;
     Gtk::Clipboard::get(primary ? GDK_SELECTION_PRIMARY : GDK_SELECTION_CLIPBOARD)
-        ->request_text([this](const Glib::ustring& t) {
+        ->request_text([this, alive](const Glib::ustring& t) {
+            if (alive.expired()) return;  // the view was destroyed while the request was pending
             if (t.empty() || holding_ || exited_) return;
             snapToBottom();
             session_->paste(t.raw());
@@ -668,10 +853,34 @@ void TerminalView::pasteClipboard(bool primary) {
         });
 }
 
+void TerminalView::testButton(bool press, int button, double x, double y, guint state) {
+    GdkEventButton ev{};
+    ev.type = press ? GDK_BUTTON_PRESS : GDK_BUTTON_RELEASE;
+    ev.button = static_cast<guint>(button);
+    ev.x = x;
+    ev.y = y;
+    ev.state = state;
+    if (press) onButtonPress(&ev);
+    else onButtonRelease(&ev);
+}
+
+void TerminalView::testMotion(double x, double y, guint state) {
+    GdkEventMotion ev{};
+    ev.type = GDK_MOTION_NOTIFY;
+    ev.x = x;
+    ev.y = y;
+    ev.state = state;
+    onMotion(&ev);
+}
+
+bool TerminalView::frameActive() const { return effectsOn_ && mode_ != Mode::Plain && fx_.frame; }
+
 bool TerminalView::cellAt(double x, double y, int& row, int& col) const {
-    const float curvature = effectsOn_ && mode_ != Mode::Plain ? profile_.fx.screenCurvature * 0.4f : 0.0f;
-    return pointToCell(x, y, w_, h_, curvature, marginX_, marginY_, painter_->cellWidth(), painter_->cellHeight(),
-                       session_->rows(), session_->cols(), row, col);
+    const float curvature = effectsOn_ && mode_ != Mode::Plain ? fx_.screenCurvature * 0.4f : 0.0f;
+    const FrameGeometry frame = frameActive() ? frameGeometry(fx_, w_, h_) : FrameGeometry{};
+    // Event coordinates are logical pixels; the layout is in device pixels.
+    return pointToCell(x * scale_, y * scale_, w_, h_, curvature, marginX_, marginY_, painter_->cellWidth(), painter_->cellHeight(),
+                       session_->rows(), session_->cols(), row, col, frame);
 }
 
 bool TerminalView::mouseReporting(guint state) const {
@@ -682,7 +891,10 @@ bool TerminalView::onButtonPress(GdkEventButton* ev) {
     if (mode_ == Mode::Gl) gl_.grab_focus();
     else area_.grab_focus();
     int row, col;
-    cellAt(ev->x, ev->y, row, col);
+    const bool inside = cellAt(ev->x, ev->y, row, col);
+    // A press on the bezel (or the glass's rounded corners) is not on the terminal: it neither
+    // starts a selection nor reaches a mouse-reporting application. Middle-click paste still works.
+    if (!inside && frameActive() && ev->button != 2) return true;
     const VTermModifier mod = modsOf(ev->state);
     if (mouseReporting(ev->state)) {
         if (ev->type != GDK_BUTTON_PRESS) return true;  // GTK's extra 2/3-click events
@@ -743,8 +955,9 @@ bool TerminalView::onMotion(GdkEventMotion* ev) {
     }
     if (selecting_ && (ev->state & GDK_BUTTON1_MASK)) {
         // Dragging past the top/bottom edge scrolls the history.
-        if (ev->y < marginY_) scrollBy(1);
-        else if (ev->y >= h_ - marginY_) scrollBy(-1);
+        const double dy = ev->y * scale_;
+        if (dy < marginY_) scrollBy(1);
+        else if (dy >= h_ - marginY_) scrollBy(-1);
         sel_.extend(*session_, SelPos{session_->topLine() - scrollOffset_ + row, col});
         selectionChanged();
         return true;
@@ -841,6 +1054,134 @@ bool TerminalView::onKey(GdkEventKey* ev) {
         return true;
     }
     return false;
+}
+
+// ---- M2 stage 3: search ----
+
+int TerminalView::setSearch(const std::string& query, bool caseSensitive) {
+    searchQuery_ = query;
+    searchCase_ = caseSensitive;
+    searchRefresh_.disconnect();
+    matches_ = findAll(*session_, query, caseSensitive);
+    if (session_->altScreen()) {  // full-screen apps: only what is on the screen
+        const long top = session_->topLine();
+        matches_.erase(std::remove_if(matches_.begin(), matches_.end(),
+                                      [top](const SearchMatch& m) { return m.start.line < top; }),
+                       matches_.end());
+    }
+    // Start at the newest match at or above the bottom of what is shown.
+    const SelPos from{session_->topLine() - scrollOffset_ + session_->rows(), 0};
+    matchIndex_ = stepMatch(matches_, from, true);
+    if (matchIndex_ >= 0) revealMatch(matchIndex_);
+    contentDirty_ = true;
+    requestFrame();
+    signalSearchChanged.emit();
+    return searchCount();
+}
+
+bool TerminalView::searchStep(bool backward) {
+    if (matches_.empty()) return false;
+    const SelPos from = matchIndex_ >= 0 ? matches_[matchIndex_].start
+                                         : SelPos{session_->topLine() - scrollOffset_ + session_->rows(), 0};
+    matchIndex_ = stepMatch(matches_, from, backward);
+    revealMatch(matchIndex_);
+    contentDirty_ = true;
+    requestFrame();
+    signalSearchChanged.emit();
+    return true;
+}
+
+void TerminalView::clearSearch() {
+    searchRefresh_.disconnect();
+    const bool had = !matches_.empty() || !searchQuery_.empty();
+    searchQuery_.clear();
+    matches_.clear();
+    matchIndex_ = -1;
+    if (!had) return;
+    contentDirty_ = true;
+    requestFrame();
+    signalSearchChanged.emit();
+}
+
+void TerminalView::refreshSearch() {
+    if (searchQuery_.empty()) return;
+    const bool had = matchIndex_ >= 0 && matchIndex_ < searchCount();
+    const SelPos cur = had ? matches_[matchIndex_].start : SelPos{};
+    matches_ = findAll(*session_, searchQuery_, searchCase_);
+    if (session_->altScreen()) {
+        const long top = session_->topLine();
+        matches_.erase(std::remove_if(matches_.begin(), matches_.end(),
+                                      [top](const SearchMatch& m) { return m.start.line < top; }),
+                       matches_.end());
+    }
+    matchIndex_ = -1;
+    if (had)
+        for (int i = 0; i < searchCount(); ++i)
+            if (!(matches_[i].start < cur)) {  // the same match, or the next one if it went away
+                matchIndex_ = i;
+                break;
+            }
+    if (matchIndex_ < 0 && !matches_.empty()) matchIndex_ = searchCount() - 1;
+    contentDirty_ = true;
+    requestFrame();
+    signalSearchChanged.emit();
+}
+
+void TerminalView::revealMatch(int index) {
+    if (index < 0 || index >= searchCount()) return;
+    const SearchMatch& m = matches_[index];
+    const int rows = session_->rows();
+    const long top = session_->topLine() - scrollOffset_;
+    if (m.start.line >= top && m.end.line < top + rows) return;
+    const long newTop = m.start.line - rows / 3;
+    const long off = std::clamp<long>(session_->topLine() - newTop, 0, static_cast<long>(session_->scrollbackSize()));
+    scrollBy(static_cast<int>(off) - scrollOffset_);
+}
+
+void TerminalView::grabTerminalFocus() {
+    if (mode_ == Mode::Gl) gl_.grab_focus();
+    else area_.grab_focus();
+}
+
+bool TerminalView::terminalHasFocus() const { return area_.has_focus() || gl_.has_focus(); }
+
+// ---- M2 stage 3: live settings ----
+
+void TerminalView::setFont(const std::string& family, int px) {
+    if (family == opts_.fontFamily && px == opts_.fontPx) return;
+    opts_.fontFamily = family;
+    opts_.fontPx = std::max(0, px);
+    applyProfile();  // new painter, cell size and grid
+    chooseMode();
+    updateContent();
+    requestFrame();
+}
+
+void TerminalView::setEffectsQuality(EffectsQuality q) {
+    opts_.effectsQuality = q;
+    qualityDemoted_ = false;  // an explicit choice; auto may demote again
+    updateQuality();
+    if (w_ > 0) layoutGrid();
+    fullRepaint_ = contentDirty_ = effectsSourceStale_ = true;
+    updateContent();
+    requestFrame();
+    updateAnimation();
+    signalBackend.emit(backendName());
+}
+
+void TerminalView::setScrollbackLines(long long lines) {
+    opts_.scrollbackLines = lines;
+    session_->setScrollbackLimit(clampScrollbackLines(lines));
+    scrollOffset_ = std::min(scrollOffset_, static_cast<int>(session_->scrollbackSize()));
+    if (sel_.active() && sel_.start().line < session_->firstLine()) sel_.clear();
+    if (!searchQuery_.empty()) refreshSearch();
+    contentDirty_ = true;
+    requestFrame();
+}
+
+void TerminalView::setFrame(int frame) {
+    opts_.tube.frame = frame;
+    setProfile(profile_.id);  // re-applies the tube overrides
 }
 
 }  // namespace lterm

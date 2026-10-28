@@ -1,0 +1,24 @@
+$ env build/lterm-m1-bench --tick --threads 4 --size 1280x800 --profile amber --quality full --runs 20
+cpu amber/full 1280x800 threads=4: content pass 23.44 ms, tick 19.57 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=1 build/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --quality full --runs 20
+gl amber/full 1280x800 LP_NUM_THREADS=1 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 103.85 ms, tick 32.42 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=2 build/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --quality full --runs 20
+gl amber/full 1280x800 LP_NUM_THREADS=2 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 59.83 ms, tick 18.36 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=4 build/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --quality full --runs 20
+gl amber/full 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 36.03 ms, tick 10.07 ms
+$ env build/lterm-m1-bench --tick --threads 4 --size 1280x800 --profile amber --quality reduced --runs 20
+cpu amber/reduced 1280x800 threads=4: content pass 20.97 ms, tick 15.07 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=1 build/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --quality reduced --runs 20
+gl amber/reduced 1280x800 LP_NUM_THREADS=1 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 72.68 ms, tick 25.81 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=2 build/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --quality reduced --runs 20
+gl amber/reduced 1280x800 LP_NUM_THREADS=2 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 39.48 ms, tick 13.36 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=4 build/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --quality reduced --runs 20
+gl amber/reduced 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 25.24 ms, tick 7.32 ms
+$ env build/lterm-m1-bench --tick --threads 4 --size 1280x800 --profile amber --quality static --runs 20
+cpu amber/static 1280x800 threads=4: content pass 21.80 ms, tick 8.56 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=1 build/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --quality static --runs 20
+gl amber/static 1280x800 LP_NUM_THREADS=1 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 85.45 ms, tick 22.65 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=2 build/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --quality static --runs 20
+gl amber/static 1280x800 LP_NUM_THREADS=2 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 36.69 ms, tick 9.95 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=4 build/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --quality static --runs 20
+gl amber/static 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 22.54 ms, tick 5.45 ms

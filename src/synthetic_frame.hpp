@@ -16,8 +16,9 @@ constexpr int kMargin = 24;  // px between the tube edge and the text grid
 // `scroll` shifts the content up by that many lines (used to exercise burn-in).
 void fillSyntheticGrid(Grid& g, int scroll);
 
-// Renders the synthetic grid into a w x h RGBA8 frame using Pango/Cairo.
+// Renders the synthetic grid into a w x h RGBA8 frame using Pango/Cairo. w, h are device
+// pixels; pixelSize and the margin are logical (HiDPI scale: see GridPainter).
 std::vector<uint8_t> renderSyntheticFrame(int w, int h, int scroll, const std::string& family,
-                                          int pixelSize, std::string* resolvedFamily = nullptr);
+                                          int pixelSize, std::string* resolvedFamily = nullptr, int scale = 1);
 
 }  // namespace lterm

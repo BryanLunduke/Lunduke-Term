@@ -14,6 +14,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace lterm {
@@ -47,6 +48,23 @@ struct EffectParams {
     // The M0 golden comparison used full resolution; both are kept so the M0 numbers can be
     // reproduced.
     bool burnInHalfRes = true;
+    // M2 HiDPI: device pixels per logical pixel (the GTK scale factor). Every pixel-sized
+    // parameter above is in device pixels; scaleEffectParams() converts a logical profile. The
+    // noise texture is sampled per logical pixel, so the grain looks the same at any scale.
+    float pixelScale = 1.0f;
+
+    // M2 item 5. RGB shift (CRT 1.2.0 rbgShift): the red/blue fringes of a misconverged tube.
+    // The neighbour samples sit 12 * rgbShift * 0.75 logical px (CRT's 12 * rbgShift *
+    // totalFontScaling) left and right of each pixel; 0 = off.
+    float rgbShift = 0.0f;
+    // Bezel: a plastic frame around a rounded, curved screen, with shading on the inner bevel,
+    // a highlight on the glass and the phosphor glow reflected on the frame. The geometry,
+    // shading and highlight are a static layer rendered once per size/parameter change; only
+    // the reflection follows the content (and only on the frame's pixels).
+    bool frame = false;
+    float frameSize = 28.0f;                     // logical px between the window edge and the glass
+    Rgb frameColor{0.17f, 0.16f, 0.15f};         // plastic colour
+    float frameShininess = 0.5f;                 // 0 matte .. 1 glossy (bevel specular, glass, reflection)
 
     // True when the picture changes on its own (noise, flicker, jitter, sync, glowing line),
     // i.e. the view needs an effects tick even when the terminal content is unchanged.
@@ -56,6 +74,32 @@ struct EffectParams {
     // Time after a content change until the burn-in ghost has fully faded (ms), 0 without burn-in.
     float burnInFadeMs() const;
 };
+
+// M2: effects quality. Software rasterisers (Mesa llvmpipe/softpipe/swrast, or the C++
+// fallback) spend a whole core per animated frame at 1280x800, so `auto` picks `reduced` there
+// and `full` on a real GPU.
+//   full     the profile as designed (M1 output, unchanged)
+//   reduced  no static noise / jitter (drops the per-pixel noise fetch from every tick), half
+//            bloom radius, animation ticks at half rate under a CPU governor; flicker,
+//            horizontal sync, glowing line, burn-in and scanlines stay
+//   static   nothing animates: no noise, jitter, flicker, sync, glowing line or burn-in. The
+//            remaining passes (warp, tint, bloom, scanlines, ambient: a fixed per-pixel
+//            overlay) run once per content change and the view never ticks
+enum class EffectsQuality { Auto, Full, Reduced, Static };
+bool parseEffectsQuality(const std::string& s, EffectsQuality& out);
+const char* effectsQualityName(EffectsQuality q);
+// GL_RENDERER of a Mesa software rasteriser (llvmpipe, softpipe, swrast), case-insensitive.
+bool isSoftwareRendererName(const std::string& glRenderer);
+// LIBGL_ALWAYS_SOFTWARE set to anything but "", "0" or "false".
+bool softwareRenderingForced();
+// Auto -> Reduced on software rendering, Full otherwise; explicit choices are kept.
+EffectsQuality resolveEffectsQuality(EffectsQuality q, bool softwareRendering);
+// The profile parameters for a resolved quality (Full returns p unchanged).
+EffectParams applyEffectsQuality(const EffectParams& p, EffectsQuality resolved);
+// HiDPI: scanline period and bloom radius times `scale` (radius capped at 64, the shader limit),
+// pixelScale = scale. The picture at scale 2 is then the scale-1 picture at twice the resolution.
+EffectParams scaleEffectParams(const EffectParams& p, int scale);
+bool sameEffectParams(const EffectParams& a, const EffectParams& b);
 
 // Byte order of 8-bit source/destination pixels. BGRA is Cairo's ARGB32/RGB24 in memory on a
 // little-endian machine, which lets the view hand its Cairo surface over without conversion.
@@ -73,6 +117,26 @@ struct DerivedParams {
     float burnInTime;         // 1/lint(160,1600,burnIn)  (per ms)
 };
 DerivedParams derive(const EffectParams& p);
+
+// Screen rectangle inside the bezel, in device pixels (all zero without a frame).
+struct FrameGeometry {
+    float inset = 0;           // device px from each window edge to the glass
+    float ix = 0, iy = 0;      // the same as a fraction of width / height
+    float innerW = 0, innerH = 0;
+    float radius = 0;          // corner radius of the glass, device px
+};
+FrameGeometry frameGeometry(const EffectParams& p, int width, int height);
+// Output uv (0..1 over the widget) -> source uv, through the bezel inset and the barrel warp.
+// `local` gets the warped screen-local coordinates (0..1 on the glass).
+inline void screenCoords(float u, float v, const FrameGeometry& g, float curvature, float& su, float& sv,
+                         float& lu, float& lv);
+// Signed distance (device px) from the glass edge, negative on the glass, for screen-local lu/lv.
+float screenSdf(const FrameGeometry& g, float lu, float lv);
+// The RGB shift's displacement in device px.
+inline float rgbShiftPx(const EffectParams& p) { return 12.0f * 0.75f * p.rgbShift * p.pixelScale; }
+// Static bezel layer, premultiplied RGBA float: base (frame + glass highlight + inner shadow) and
+// refl (r = reflection weight, g/b = mirrored source uv). Rows [y0, y1). Mirrored in GLSL kFrame.
+void frameLayerRows(const EffectParams& p, int width, int height, int y0, int y1, float* base, float* refl);
 
 // Deterministic 512x512 RGBA noise texture (stand-in for CRT's allNoise512.png).
 constexpr int kNoiseSize = 512;
@@ -101,6 +165,15 @@ inline void barrel(float u, float v, float curvature, float& ou, float& ov) {
     float d = (cx * cx + cy * cy) * curvature;
     ou = u - cx * (1.0f + d) * d;
     ov = v - cy * (1.0f + d) * d;
+}
+
+inline void screenCoords(float u, float v, const FrameGeometry& g, float curvature, float& su, float& sv,
+                         float& lu, float& lv) {
+    lu = (u - g.ix) / (1.0f - 2.0f * g.ix);
+    lv = (v - g.iy) / (1.0f - 2.0f * g.iy);
+    if (curvature != 0.0f) barrel(lu, lv, curvature, lu, lv);
+    su = g.ix + lu * (1.0f - 2.0f * g.ix);
+    sv = g.iy + lv * (1.0f - 2.0f * g.iy);
 }
 
 // Abstract interface used by the benchmark, the comparison tool and the terminal window.

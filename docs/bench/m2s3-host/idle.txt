@@ -1,0 +1,11 @@
+# host, stage 3 (7a13b12), window 1280x800, idle shell, cpu over 10 s; 100% = one core
+plain 1 tab: cpu 0.0% [stats: quality=reduced software=1 tick-interval 100.0 ms]
+plain 3 tabs: cpu 0.0% [stats: quality=reduced software=1 tick-interval 100.0 ms]
+amber gl auto 1 tab: cpu 17.4% [stats: quality=reduced software=1 tick-interval 244.9 ms]
+amber gl auto 3 tabs: cpu 18.7% [stats: quality=reduced software=1 tick-interval 198.9 ms]
+amber gl static: cpu 0.0% [stats: quality=static software=1 tick-interval 50.0 ms]
+vintage gl auto: cpu 15.8% [stats: quality=reduced software=1 tick-interval 234.1 ms]
+vintage+bezel gl auto: cpu 17.1% [stats: quality=reduced software=1 tick-interval 259.3 ms]
+futuristic gl auto: cpu 18.1% [stats: quality=reduced software=1 tick-interval 220.8 ms]
+paper-white gl auto: cpu 17.0% [stats: quality=reduced software=1 tick-interval 191.5 ms]
+paper-white gl auto: cpu 18.2% [stats: quality=reduced software=1 tick-interval 238.9 ms]

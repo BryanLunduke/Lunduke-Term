@@ -1,0 +1,9 @@
+half-res burn-in, renderer llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1: PSNR 106.98 dB, max diff 1
+full-res burn-in, renderer llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1: PSNR 106.98 dB, max diff 1
+amber full: PSNR 99.00 dB, max diff 0
+amber reduced: PSNR 103.97 dB, max diff 1
+amber static: PSNR 106.98 dB, max diff 1
+green-scanlines full: PSNR 99.00 dB, max diff 0
+green-scanlines reduced: PSNR 106.98 dB, max diff 1
+green-scanlines static: PSNR 99.00 dB, max diff 0
+after 50 resizes: textures 9 -> 9, fbos 7 -> 7, glIsTexture 10 -> 10, PSNR 106.98 dB, max diff 1

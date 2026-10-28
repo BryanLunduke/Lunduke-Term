@@ -71,6 +71,68 @@ int main() {
         CHECK(h.at(0, 4).bg.r == 50);                              // palette[5] background
     }
 
+    // M2 stage 2 (vttest 2 "save/restore cursor"): DECSC/DECRC save the character sets too.
+    {
+        VtermSession q(3, 20);
+        // G0 = DEC graphics, save, back to ASCII, restore (the cursor too): the 'q' written
+        // over the ASCII one must be a line again.
+        feed(q, "\x1b(0q\x1b" "7\x1b(Bq\x1b" "8q");
+        CHECK(q.rowText(0) == "\xe2\x94\x80\xe2\x94\x80");
+        // Split over chunk boundaries, and the CSI ?1048 form, and SO/SI (G1).
+        feed(q, "\r\n\x1b)0\x0e");
+        feed(q, "\x1b[?10");
+        feed(q, "48h\x0f\x1b");
+        feed(q, "(Bx\x1b[?1048l" "x");
+        CHECK(q.rowText(1) == "\xe2\x94\x82");
+        // RIS resets the tracked state: no stale restore afterwards.
+        VtermSession u(3, 20);
+        feed(u, "\x1b(0q\x1b" "7\x1b" "c\x1b" "8q");
+        CHECK(u.rowText(0) == " q");
+    }
+    // vttest 11.8.7.3: private mode 47 switches to/from the alternate screen.
+    {
+        VtermSession a(3, 10);
+        feed(a, "main\x1b[?4");
+        feed(a, "7hALT");
+        CHECK(a.altScreen() && a.rowText(0) == "    ALT");
+        feed(a, "\x1b[?47l");
+        CHECK(!a.altScreen() && a.rowText(0) == "main");
+    }
+    // vim: resizing while a full-screen program has a reverse/colour pen must not paint the
+    // new and reflowed blanks (also those of the main screen behind it) with that pen.
+    {
+        VtermSession v(3, 10);
+        v.setColors(Color8{200, 200, 200}, Color8{0, 0, 0}, std::array<Color8, 16>{}, 0.f);
+        feed(v, "main\x1b[?1049h\x1b[7;44mstatus");
+        v.resize(5, 20);
+        feed(v, "X\x1b[?1049l");
+        Grid h;
+        v.fillGrid(h);
+        CHECK(h.at(0, 8).bg.r == 0 && h.at(0, 8).bg.b == 0);   // was the old width
+        CHECK(h.at(0, 15).bg.r == 0 && h.at(0, 15).bg.b == 0);  // new column
+        CHECK(h.at(4, 3).bg.r == 0);                            // new row
+        feed(v, "\x1b[?1049h");
+        v.resize(4, 12);
+        feed(v, "\x1b[HY");
+        v.fillGrid(h);
+        CHECK(h.at(0, 0).text == "Y" && h.at(0, 0).fg.b > 100);  // pen (reverse on blue) kept
+        CHECK(h.at(3, 11).bg.r == 0 && h.at(3, 11).bg.b == 0);
+    }
+    // DECSCNM: libvterm reverses the cells itself; the grid must come out light exactly once.
+    {
+        VtermSession r(2, 10);
+        r.setColors(Color8{200, 200, 200}, Color8{0, 0, 0}, std::array<Color8, 16>{}, 0.f);
+        feed(r, "a\x1b[?5h");
+        Grid h;
+        r.fillGrid(h);
+        CHECK(r.reverseVideo());
+        CHECK(h.at(0, 0).bg.r == 200 && h.at(0, 0).fg.r == 0);
+        CHECK(h.at(1, 5).bg.r == 200);
+        feed(r, "\x1b[?5l");
+        r.fillGrid(h);
+        CHECK(!r.reverseVideo() && h.at(0, 0).bg.r == 0);
+    }
+
     if (failures == 0) std::printf("vterm_test: OK\n");
     return failures ? 1 : 0;
 }

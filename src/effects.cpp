@@ -3,7 +3,9 @@
 #include "sampling.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
 
 namespace lterm {
 
@@ -21,6 +23,92 @@ DerivedParams derive(const EffectParams& p) {
     d.jitterY = 0.002f * p.jitter;
     d.burnInTime = p.burnIn > 0 ? 1.0f / lint(160.0f, 1600.0f, p.burnIn) : 0.0f;
     return d;
+}
+
+FrameGeometry frameGeometry(const EffectParams& p, int width, int height) {
+    FrameGeometry g;
+    if (!p.frame || width <= 0 || height <= 0 || p.frameSize <= 0) return g;
+    g.inset = std::min(p.frameSize * p.pixelScale, 0.25f * std::min(width, height));
+    g.ix = g.inset / width;
+    g.iy = g.inset / height;
+    g.innerW = width - 2.0f * g.inset;
+    g.innerH = height - 2.0f * g.inset;
+    g.radius = std::min(0.6f * g.inset, 0.5f * std::min(g.innerW, g.innerH));
+    return g;
+}
+
+float screenSdf(const FrameGeometry& g, float lu, float lv) {
+    const float px = (lu - 0.5f) * g.innerW, py = (lv - 0.5f) * g.innerH;
+    const float qx = std::fabs(px) - (0.5f * g.innerW - g.radius);
+    const float qy = std::fabs(py) - (0.5f * g.innerH - g.radius);
+    const float mx = std::max(qx, 0.0f), my = std::max(qy, 0.0f);
+    return std::sqrt(mx * mx + my * my) + std::min(std::max(qx, qy), 0.0f) - g.radius;
+}
+
+namespace {
+inline float clamp01f(float x) { return x < 0 ? 0 : (x > 1 ? 1 : x); }
+inline float smooth(float e0, float e1, float x) {
+    const float t = clamp01f((x - e0) / (e1 - e0));
+    return t * t * (3.0f - 2.0f * t);
+}
+inline float mixf(float a, float b, float t) { return a + (b - a) * t; }
+inline float signf(float x) { return x > 0 ? 1.0f : (x < 0 ? -1.0f : 0.0f); }
+}  // namespace
+
+// Keep in sync with glsl::kFrame (tests/gl_match_test.cpp compares the two).
+void frameLayerRows(const EffectParams& p, int width, int height, int y0, int y1, float* base, float* refl) {
+    const FrameGeometry g = frameGeometry(p, width, height);
+    const float curv = p.screenCurvature * 0.4f;
+    const float F = g.inset, s = p.frameShininess;
+    const float Lx = -0.4472136f, Ly = -0.8944272f;  // towards the light: up and to the left
+    for (int y = y0; y < y1; ++y) {
+        const float v = (y + 0.5f) / height;
+        for (int x = 0; x < width; ++x) {
+            const float u = (x + 0.5f) / width;
+            float* b = base + (static_cast<size_t>(y - y0) * width + x) * 4;
+            float* r = refl + (static_cast<size_t>(y - y0) * width + x) * 4;
+            float su, sv, lu, lv;
+            screenCoords(u, v, g, curv, su, sv, lu, lv);
+            const float d = screenSdf(g, lu, lv);
+            const float a = clamp01f(d + 0.5f);
+            // Frame: darker towards the glass (the bevel falls into the tube), a dark rim at the
+            // window edge, lit from the top.
+            const float e = std::min(std::min(x + 0.5f, width - x - 0.5f), std::min(y + 0.5f, height - y - 0.5f));
+            float shade = mixf(0.45f, 1.0f, smooth(0.0f, 0.6f * F, d)) * mixf(0.75f, 1.0f, smooth(0.0f, 0.2f * F, e)) *
+                          mixf(1.08f, 0.90f, v);
+            // Inner bevel: outward normal of the glass outline, diffuse + specular.
+            const float px = (lu - 0.5f) * g.innerW, py = (lv - 0.5f) * g.innerH;
+            float nx = signf(px) * std::max(std::fabs(px) - (0.5f * g.innerW - g.radius), 0.0f);
+            float ny = signf(py) * std::max(std::fabs(py) - (0.5f * g.innerH - g.radius), 0.0f);
+            const float len = std::sqrt(nx * nx + ny * ny);
+            if (len > 0.0f) {
+                nx /= len;
+                ny /= len;
+            }
+            const float lam = -(nx * Lx + ny * Ly);
+            const float band = 1.0f - smooth(0.0f, 0.35f * F, d);
+            shade *= 1.0f + 0.35f * lam * band;
+            const float spec = s * 0.55f * std::pow(std::max(lam, 0.0f), 8.0f) * band;
+            // Glass: the bezel's shadow just inside the edge, and a soft highlight top left.
+            const float sh = (1.0f - a) * 0.6f * (1.0f - smooth(0.0f, 0.10f * F + 2.0f * p.pixelScale, -d));
+            const float A = a + sh;
+            const float gx = (lu - 0.30f) / 0.20f, gy = (lv - 0.17f) / 0.11f;
+            float gl = s * 0.09f * std::exp(-(gx * gx + gy * gy));
+            if (gl < 1.0f / 1024.0f) gl = 0.0f;
+            b[0] = a * (p.frameColor.r * shade + spec) + (1.0f - A) * gl;
+            b[1] = a * (p.frameColor.g * shade + spec) + (1.0f - A) * gl;
+            b[2] = a * (p.frameColor.b * shade + spec) + (1.0f - A) * gl;
+            b[3] = A;
+            // Reflection of the glow on the frame, strongest next to the glass.
+            float wr = a * s * 0.45f * std::exp(-std::max(d, 0.0f) / std::max(1.0f, 0.3f * F));
+            if (wr < 1.0f / 1024.0f) wr = 0.0f;
+            const float mu = 1.0f - std::fabs(1.0f - std::fabs(lu)), mv = 1.0f - std::fabs(1.0f - std::fabs(lv));
+            r[0] = wr;
+            r[1] = g.ix + mu * (1.0f - 2.0f * g.ix);
+            r[2] = g.iy + mv * (1.0f - 2.0f * g.iy);
+            r[3] = 0.0f;
+        }
+    }
 }
 
 const std::vector<float>& noiseTexture() {
@@ -63,6 +151,83 @@ FrameUniforms frameUniforms(const EffectParams& p, float timeMs, float burnInLas
 float EffectParams::burnInFadeMs() const {
     if (burnIn <= 0) return 0.0f;
     return lint(160.0f, 1600.0f, burnIn);  // decay reaches 1 after 1/burnInTime ms
+}
+
+bool parseEffectsQuality(const std::string& s, EffectsQuality& out) {
+    if (s == "auto") out = EffectsQuality::Auto;
+    else if (s == "full") out = EffectsQuality::Full;
+    else if (s == "reduced") out = EffectsQuality::Reduced;
+    else if (s == "static") out = EffectsQuality::Static;
+    else return false;
+    return true;
+}
+
+const char* effectsQualityName(EffectsQuality q) {
+    switch (q) {
+    case EffectsQuality::Auto: return "auto";
+    case EffectsQuality::Full: return "full";
+    case EffectsQuality::Reduced: return "reduced";
+    case EffectsQuality::Static: return "static";
+    }
+    return "?";
+}
+
+bool isSoftwareRendererName(const std::string& glRenderer) {
+    std::string r;
+    for (char c : glRenderer) r += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return r.find("llvmpipe") != std::string::npos || r.find("softpipe") != std::string::npos ||
+           r.find("swrast") != std::string::npos;
+}
+
+bool softwareRenderingForced() {
+    const char* v = std::getenv("LIBGL_ALWAYS_SOFTWARE");
+    if (!v || !*v) return false;
+    const std::string s(v);
+    return s != "0" && s != "false" && s != "FALSE";
+}
+
+EffectsQuality resolveEffectsQuality(EffectsQuality q, bool softwareRendering) {
+    if (q != EffectsQuality::Auto) return q;
+    return softwareRendering ? EffectsQuality::Reduced : EffectsQuality::Full;
+}
+
+EffectParams applyEffectsQuality(const EffectParams& p, EffectsQuality resolved) {
+    EffectParams r = p;
+    if (resolved == EffectsQuality::Reduced || resolved == EffectsQuality::Static) {
+        r.staticNoise = 0.0f;
+        r.jitter = 0.0f;
+        r.bloomRadiusHalfRes = std::max(4, p.bloomRadiusHalfRes / 2);
+        r.burnInHalfRes = true;
+    }
+    if (resolved == EffectsQuality::Static) {
+        r.flickering = 0.0f;
+        r.horizontalSync = 0.0f;
+        r.glowingLine = 0.0f;
+        r.burnIn = 0.0f;
+    }
+    return r;
+}
+
+EffectParams scaleEffectParams(const EffectParams& p, int scale) {
+    EffectParams r = p;
+    const int s = std::max(1, scale);
+    r.scanlinePeriod = p.scanlinePeriod * s;
+    r.bloomRadiusHalfRes = std::min(64, p.bloomRadiusHalfRes * s);
+    r.pixelScale = p.pixelScale * s;  // frameSize and rgbShift are logical: scaled via pixelScale
+    return r;
+}
+
+bool sameEffectParams(const EffectParams& a, const EffectParams& b) {
+    auto rgb = [](const Rgb& x, const Rgb& y) { return x.r == y.r && x.g == y.g && x.b == y.b; };
+    return rgb(a.fontColor, b.fontColor) && rgb(a.backgroundColor, b.backgroundColor) && a.bloom == b.bloom &&
+           a.burnIn == b.burnIn && a.chromaColor == b.chromaColor && a.brightness == b.brightness &&
+           a.ambientLight == b.ambientLight && a.flickering == b.flickering && a.glowingLine == b.glowingLine &&
+           a.horizontalSync == b.horizontalSync && a.jitter == b.jitter && a.screenCurvature == b.screenCurvature &&
+           a.staticNoise == b.staticNoise && a.rasterization == b.rasterization &&
+           a.scanlinePeriod == b.scanlinePeriod && a.rasterizationIntensity == b.rasterizationIntensity &&
+           a.bloomRadiusHalfRes == b.bloomRadiusHalfRes && a.burnInHalfRes == b.burnInHalfRes &&
+           a.pixelScale == b.pixelScale && a.rgbShift == b.rgbShift && a.frame == b.frame &&
+           a.frameSize == b.frameSize && rgb(a.frameColor, b.frameColor) && a.frameShininess == b.frameShininess;
 }
 
 std::vector<float> bloomWeights(int radius) {

@@ -118,6 +118,70 @@ int main() {
         std::printf("cursor shapes block/underline/bar/hollow: ok\n");
         cairo_surface_destroy(s);
     }
+    // M2 HiDPI: a scale-2 painter has exactly twice the cell size, and its picture is the
+    // scale-1 picture at twice the resolution (downsampled 2x2 it matches closely).
+    {
+        GridPainter p2("DejaVu Sans Mono", 14, 2);
+        std::printf("scale 1 cell %dx%d, scale 2 cell %dx%d\n", painter.cellWidth(), painter.cellHeight(),
+                    p2.cellWidth(), p2.cellHeight());
+        if (p2.cellWidth() != 2 * painter.cellWidth() || p2.cellHeight() != 2 * painter.cellHeight() ||
+            p2.scale() != 2) {
+            std::fprintf(stderr, "FAIL: scale-2 cell size is not twice the scale-1 size\n");
+            ++fails;
+        }
+        cairo_surface_t* s2 = cairo_image_surface_create(CAIRO_FORMAT_RGB24, 2 * W, 2 * H);
+        cairo_t* c2 = cairo_create(s2);
+        p2.paintRows(c2, g, 2 * kMargin, 2 * kMargin, cur, bg, nullptr, 2 * W);
+        cairo_destroy(c2);
+        // 2x2 box average vs the scale-1 frame; text positions must agree, glyph shapes differ a bit
+        // (hinting at 28 px vs 14 px).
+        cairo_surface_flush(s2);
+        const uint8_t* d2 = cairo_image_surface_get_data(s2);
+        const int st2 = cairo_image_surface_get_stride(s2);
+        const auto f1 = pixels(fast);
+        const int st1 = cairo_image_surface_get_stride(fast);
+        long sum = 0, n = 0, ink1 = 0, ink2 = 0;
+        for (int y = 0; y < H; ++y)
+            for (int x = 0; x < W; ++x)
+                for (int c = 0; c < 3; ++c) {
+                    int v = 0;
+                    for (int dy = 0; dy < 2; ++dy)
+                        for (int dx = 0; dx < 2; ++dx) v += d2[(2 * y + dy) * st2 + (2 * x + dx) * 4 + c];
+                    v /= 4;
+                    const int a = f1[static_cast<size_t>(y) * st1 + x * 4 + c];
+                    sum += std::abs(v - a);
+                    ink1 += a;
+                    ink2 += v;
+                    ++n;
+                }
+        const double meanAbs = double(sum) / n, inkRatio = double(ink2) / std::max(1L, ink1);
+        std::printf("scale 2 downsampled vs scale 1: mean abs diff %.2f, ink ratio %.3f\n", meanAbs, inkRatio);
+        if (meanAbs > 6.0 || inkRatio < 0.85 || inkRatio > 1.15) {
+            std::fprintf(stderr, "FAIL: scale-2 picture does not match the scale-1 layout\n");
+            ++fails;
+        }
+        // Cursor shapes keep their logical thickness: the bar is 2*scale device px at least.
+        Grid cg;
+        cg.resize(1, 3);
+        cg.cursorRow = 0;
+        cg.cursorCol = 1;
+        cg.cursorShape = Grid::CursorShape::Bar;
+        const int cw = p2.cellWidth(), ch = p2.cellHeight();
+        cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_RGB24, 3 * cw, ch);
+        cairo_t* c = cairo_create(s);
+        p2.paintRows(c, cg, 0, 0, cur, bg, nullptr, 3 * cw);
+        cairo_destroy(c);
+        cairo_surface_flush(s);
+        int lit = 0;
+        for (int x = cw; x < 2 * cw; ++x) lit += cairo_image_surface_get_data(s)[(ch / 2) * cairo_image_surface_get_stride(s) + x * 4 + 1] > 100;
+        std::printf("scale 2 bar cursor: %d px wide\n", lit);
+        if (lit < 4) {
+            std::fprintf(stderr, "FAIL: scale-2 bar cursor is %d px wide\n", lit);
+            ++fails;
+        }
+        cairo_surface_destroy(s);
+        cairo_surface_destroy(s2);
+    }
     cairo_surface_destroy(ref);
     cairo_surface_destroy(fast);
     cairo_surface_destroy(full);

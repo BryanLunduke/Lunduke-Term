@@ -6,7 +6,8 @@
 //   lterm-m1-bench --tick-gl                   GL tick (no readback); set LP_NUM_THREADS outside
 //   lterm-m1-bench --compare                   CPU vs GL PSNR (golden sequence) at --size
 //   lterm-m1-bench --resize-loop N             N GL resizes, texture count + RSS, then PSNR
-//   common: --size WxH (1280x800) --profile ID (amber) --runs N
+//   common: --size WxH (1280x800) --profile ID (amber) --runs N --quality full|reduced|static (full)
+//           --frame (bezel on) --rgb-shift X
 #include "cpu_effects.hpp"
 #include "gl_effects.hpp"
 #include "grid_painter.hpp"
@@ -88,6 +89,9 @@ int main(int argc, char** argv) {
     int resizeLoop = 0, runs = 30;
     std::vector<int> threads = {1, 4, 8};
     std::string profileId = "amber";
+    EffectsQuality quality = EffectsQuality::Full;
+    bool frame = false;
+    float rgbShift = -1.0f;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : ""; };
@@ -99,7 +103,15 @@ int main(int argc, char** argv) {
         else if (a == "--threads") threads = parseList(next());
         else if (a == "--runs") runs = std::atoi(next());
         else if (a == "--profile") profileId = next();
+        else if (a == "--quality") {
+            if (!parseEffectsQuality(next(), quality) || quality == EffectsQuality::Auto) {
+                std::fprintf(stderr, "--quality must be full, reduced or static\n");
+                return 2;
+            }
+        }
         else if (a == "--size") std::sscanf(next(), "%dx%d", &W, &H);
+        else if (a == "--frame") frame = true;
+        else if (a == "--rgb-shift") rgbShift = static_cast<float>(std::atof(next()));
         else {
             std::fprintf(stderr, "unknown option %s\n", a.c_str());
             return 2;
@@ -110,7 +122,10 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "unknown profile %s\n", profileId.c_str());
         return 2;
     }
-    const EffectParams fx = prof->fx;
+    EffectParams base = prof->fx;
+    if (frame) base.frame = true;
+    if (rgbShift >= 0) base.rgbShift = rgbShift;
+    const EffectParams fx = applyEffectsQuality(base, quality);
     const FontPick pick = profileFont(*prof);
     const std::string family = pick.family;
     const int px = pick.px;
@@ -183,7 +198,7 @@ int main(int argc, char** argv) {
                 cpu.render(t + 10, out.data());
                 tick.push_back(ms(t0, Clock::now()));
             }
-            std::printf("cpu %s %dx%d threads=%d: content pass %.2f ms, tick %.2f ms\n", profileId.c_str(), W, H, th,
+            std::printf("cpu %s/%s %dx%d threads=%d: content pass %.2f ms, tick %.2f ms\n", profileId.c_str(), effectsQualityName(quality), W, H, th,
                         median(content), median(tick));
         }
     }
@@ -209,7 +224,7 @@ int main(int argc, char** argv) {
             tick.push_back(ms(t0, Clock::now()));
         }
         const char* lp = std::getenv("LP_NUM_THREADS");
-        std::printf("gl %s %dx%d LP_NUM_THREADS=%s (%s): content pass %.2f ms, tick %.2f ms\n", profileId.c_str(), W, H,
+        std::printf("gl %s/%s %dx%d LP_NUM_THREADS=%s (%s): content pass %.2f ms, tick %.2f ms\n", profileId.c_str(), effectsQualityName(quality), W, H,
                     lp ? lp : "default", gl.renderer().c_str(), median(content), median(tick));
     }
 

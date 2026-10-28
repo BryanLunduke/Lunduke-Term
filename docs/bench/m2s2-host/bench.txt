@@ -1,0 +1,48 @@
+$ --tick-gl --profile amber --quality full
+gl amber/full 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 27.56 ms, tick 7.80 ms
+$ --tick --threads 4 --profile amber --quality full
+cpu amber/full 1280x800 threads=4: content pass 16.58 ms, tick 14.84 ms
+$ --tick-gl --profile amber --quality reduced
+gl amber/reduced 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 20.80 ms, tick 6.71 ms
+$ --tick --threads 4 --profile amber --quality reduced
+cpu amber/reduced 1280x800 threads=4: content pass 13.94 ms, tick 10.60 ms
+$ --tick-gl --profile amber --quality static
+gl amber/static 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 19.42 ms, tick 4.76 ms
+$ --tick --threads 4 --profile amber --quality static
+cpu amber/static 1280x800 threads=4: content pass 16.96 ms, tick 7.01 ms
+$ --tick-gl --profile amber --frame --quality full
+gl amber/full 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 29.72 ms, tick 9.06 ms
+$ --tick --threads 4 --profile amber --frame --quality full
+cpu amber/full 1280x800 threads=4: content pass 17.75 ms, tick 15.36 ms
+$ --tick-gl --profile amber --frame --quality reduced
+gl amber/reduced 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 24.27 ms, tick 7.78 ms
+$ --tick --threads 4 --profile amber --frame --quality reduced
+cpu amber/reduced 1280x800 threads=4: content pass 17.85 ms, tick 13.51 ms
+$ --tick-gl --profile amber --frame --quality static
+gl amber/static 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 22.78 ms, tick 5.51 ms
+$ --tick --threads 4 --profile amber --frame --quality static
+cpu amber/static 1280x800 threads=4: content pass 14.94 ms, tick 6.80 ms
+$ --tick-gl --profile ibm-dos --quality full
+gl ibm-dos/full 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 29.52 ms, tick 8.08 ms
+$ --tick --threads 4 --profile ibm-dos --quality full
+cpu ibm-dos/full 1280x800 threads=4: content pass 22.04 ms, tick 15.52 ms
+$ --tick-gl --profile ibm-dos --quality reduced
+gl ibm-dos/reduced 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 21.38 ms, tick 6.24 ms
+$ --tick --threads 4 --profile ibm-dos --quality reduced
+cpu ibm-dos/reduced 1280x800 threads=4: content pass 19.18 ms, tick 11.23 ms
+$ --tick-gl --profile ibm-dos --quality static
+gl ibm-dos/static 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 20.63 ms, tick 4.64 ms
+$ --tick --threads 4 --profile ibm-dos --quality static
+cpu ibm-dos/static 1280x800 threads=4: content pass 19.13 ms, tick 6.28 ms
+$ --tick-gl --profile ibm-dos --rgb-shift 0 --quality full
+gl ibm-dos/full 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 25.88 ms, tick 7.26 ms
+$ --tick --threads 4 --profile ibm-dos --rgb-shift 0 --quality full
+cpu ibm-dos/full 1280x800 threads=4: content pass 19.62 ms, tick 16.12 ms
+$ --tick-gl --profile ibm-dos --rgb-shift 0 --quality reduced
+gl ibm-dos/reduced 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 18.89 ms, tick 5.85 ms
+$ --tick --threads 4 --profile ibm-dos --rgb-shift 0 --quality reduced
+cpu ibm-dos/reduced 1280x800 threads=4: content pass 17.63 ms, tick 13.83 ms
+$ --tick-gl --profile ibm-dos --rgb-shift 0 --quality static
+gl ibm-dos/static 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 17.82 ms, tick 4.56 ms
+$ --tick --threads 4 --profile ibm-dos --rgb-shift 0 --quality static
+cpu ibm-dos/static 1280x800 threads=4: content pass 13.69 ms, tick 5.84 ms

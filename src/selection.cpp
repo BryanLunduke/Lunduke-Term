@@ -91,12 +91,13 @@ std::string Selection::text(const LineSource& src) const {
 }
 
 bool pointToCell(double x, double y, int width, int height, float curvature, int marginX, int marginY, int cellW,
-                 int cellH, int rows, int cols, int& row, int& col) {
+                 int cellH, int rows, int cols, int& row, int& col, const FrameGeometry& frame) {
     bool inside = true;
-    if (curvature > 0.0f && width > 0 && height > 0) {
-        float su, sv;
-        barrel(static_cast<float>(x / width), static_cast<float>(y / height), curvature, su, sv);
-        if (su < 0 || su > 1 || sv < 0 || sv > 1) inside = false;
+    if ((curvature > 0.0f || frame.inset > 0.0f) && width > 0 && height > 0) {
+        float su, sv, lu, lv;
+        screenCoords(static_cast<float>(x / width), static_cast<float>(y / height), frame, curvature, su, sv, lu, lv);
+        if (lu < 0 || lu > 1 || lv < 0 || lv > 1) inside = false;
+        if (frame.inset > 0.0f && screenSdf(frame, lu, lv) > 0.0f) inside = false;
         x = su * width;
         y = sv * height;
     }
@@ -106,6 +107,26 @@ bool pointToCell(double x, double y, int width, int height, float curvature, int
     row = std::clamp(r, 0, std::max(0, rows - 1));
     col = std::clamp(c, 0, std::max(0, cols - 1));
     return inside;
+}
+
+GridLayout computeGridLayout(int devW, int devH, int scale, int cellW, int cellH, int marginMinPx, float marginFrac,
+                             int frameInset) {
+    const int s = std::max(1, scale);
+    const int fi = std::max(0, frameInset);
+    const int w = std::max(1, devW / s - 2 * fi), h = std::max(1, devH / s - 2 * fi);
+    const int cw = std::max(1, cellW / s), ch = std::max(1, cellH / s);
+    GridLayout g;
+    int mx = std::max(marginMinPx, static_cast<int>(w * marginFrac));
+    int my = std::max(marginMinPx, static_cast<int>(h * marginFrac));
+    g.cols = std::max(1, (w - 2 * mx) / cw);
+    g.rows = std::max(1, (h - 2 * my) / ch);
+    if (marginFrac > 0) {  // centre the grid inside the tube
+        mx = (w - g.cols * cw) / 2;
+        my = (h - g.rows * ch) / 2;
+    }
+    g.marginX = (mx + fi) * s;
+    g.marginY = (my + fi) * s;
+    return g;
 }
 
 }  // namespace lterm

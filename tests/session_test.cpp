@@ -195,6 +195,89 @@ static void testPointToCell() {
     CHECK(c < 8 && r < 3);  // flat mapping would give col 8, row 3
 }
 
+// M2 HiDPI: the layout and the mouse mapping at scale 2 equal the scale-1 ones.
+static void testScale2Mapping() {
+    for (float frac : {0.0f, 0.05f}) {
+        const GridLayout g1 = computeGridLayout(808, 464, 1, 10, 19, 4, frac);
+        const GridLayout g2 = computeGridLayout(1616, 928, 2, 20, 38, 4, frac);
+        CHECK_EQ(g1.rows, g2.rows);
+        CHECK_EQ(g1.cols, g2.cols);
+        CHECK_EQ(2 * g1.marginX, g2.marginX);
+        CHECK_EQ(2 * g1.marginY, g2.marginY);
+        if (frac == 0.0f) {
+            CHECK_EQ(g1.rows, 24);
+            CHECK_EQ(g1.cols, 80);
+        }
+        // Every logical pointer position (event coordinates) maps to the same cell; the view
+        // multiplies the event position by the scale before mapping.
+        for (float curv : {0.0f, 0.12f}) {
+            int bad = 0;
+            for (double y = 0.25; y < 464; y += 3.5)
+                for (double x = 0.25; x < 808; x += 3.5) {
+                    int r1, c1, r2, c2;
+                    const bool in1 = pointToCell(x, y, 808, 464, curv, g1.marginX, g1.marginY, 10, 19, g1.rows, g1.cols, r1, c1);
+                    const bool in2 = pointToCell(2 * x, 2 * y, 1616, 928, curv, g2.marginX, g2.marginY, 20, 38, g2.rows,
+                                                 g2.cols, r2, c2);
+                    if (in1 != in2 || r1 != r2 || c1 != c2) ++bad;
+                }
+            CHECK_EQ(bad, 0);
+        }
+    }
+    // Selection by mouse at scale 2: dragging over device pixels selects the same text.
+    VtermSession s(24, 80);
+    const char* t = "line 02: the quick brown fox\r\nline 03: jumps over the lazy dog";
+    s.feed(t, std::strlen(t));
+    const GridLayout g = computeGridLayout(1616, 928, 2, 20, 38, 4, 0.0f);
+    int r0, c0, r1, c1;
+    // logical (99, 13) .. (189, 32) -> device x2
+    pointToCell(2 * 99.0, 2 * 13.0, 1616, 928, 0.0f, g.marginX, g.marginY, 20, 38, g.rows, g.cols, r0, c0);
+    pointToCell(2 * 189.0, 2 * 32.0, 1616, 928, 0.0f, g.marginX, g.marginY, 20, 38, g.rows, g.cols, r1, c1);
+    Selection sel;
+    sel.begin(s, SelPos{s.topLine() + r0, c0}, SelectMode::Char);
+    sel.extend(s, SelPos{s.topLine() + r1, c1});
+    CHECK_EQ(sel.text(s), std::string("the quick brown fox\nline 03: jumps over"));
+}
+
+// M2 item 5: pointer mapping with the bezel, at scale 1 and 2 (same logical answers).
+static void testBezelMapping() {
+    EffectParams fx;
+    fx.frame = true;
+    fx.frameSize = 28;
+    fx.screenCurvature = 0.3f;
+    const float curv = fx.screenCurvature * 0.4f;
+    for (int scale : {1, 2}) {
+        EffectParams p = scaleEffectParams(fx, scale);
+        const int W = 808 * scale, H = 464 * scale;
+        const FrameGeometry g = frameGeometry(p, W, H);
+        CHECK_EQ(static_cast<int>(g.inset), 28 * scale);
+        const GridLayout lay = computeGridLayout(W, H, scale, 10 * scale, 19 * scale, 4, 0.0f, 28);
+        CHECK_EQ(lay.marginX, (4 + 28) * scale);
+        int r, c;
+        auto at = [&](double lx, double ly) {
+            return pointToCell(lx * scale, ly * scale, W, H, curv, lay.marginX, lay.marginY, 10 * scale, 19 * scale, lay.rows,
+                               lay.cols, r, c, g);
+        };
+        CHECK(!at(10, 232));                 // left bezel
+        CHECK(!at(404, 6));                  // top bezel
+        CHECK(!at(800, 460));                // outer corner
+        CHECK(!at(29.5, 29.5));              // just inside the inset but in the glass's rounded corner
+        CHECK(at(404, 232));                 // centre of the glass
+        CHECK(at(404, 232) && r == lay.rows / 2 && (c == lay.cols / 2 || c == lay.cols / 2 - 1));
+        // Off-screen points still give clamped cells (drags clamp to the edge).
+        at(1, 1);
+        CHECK_EQ(r, 0);
+        CHECK_EQ(c, 0);
+        at(807, 463);
+        CHECK_EQ(r, lay.rows - 1);
+        CHECK_EQ(c, lay.cols - 1);
+        // Without curvature the glass interior maps 1:1 to the pixel grid.
+        pointToCell((4 + 28 + 10 * 3 + 5) * scale, (4 + 28 + 19 * 2 + 9) * scale, W, H, 0.0f, lay.marginX, lay.marginY,
+                    10 * scale, 19 * scale, lay.rows, lay.cols, r, c, g);
+        CHECK_EQ(r, 2);
+        CHECK_EQ(c, 3);
+    }
+}
+
 static void testMouse() {
     VtermSession s(24, 80);
     // No mode: nothing is reported.
@@ -411,10 +494,24 @@ static void testPty() {
     }
 }
 
+// vttest 6.7: DECREQTPARM is answered (libvterm alone ignores CSI x); other CSI x forms are not.
+static void testReports() {
+    VtermSession s(24, 80);
+    const char* q = "\x1b[x\x1b[1x\x1b[5x";
+    s.feed(q, std::strlen(q));
+    CHECK_EQ(s.takeOutput(), std::string("\x1b[2;1;1;128;128;1;0x\x1b[3;1;1;128;128;1;0x"));
+    const char* da = "\x1b[c";
+    s.feed(da, std::strlen(da));
+    CHECK_EQ(s.takeOutput(), std::string("\x1b[?1;2c"));
+}
+
 int main() {
+    testReports();
     testScrollback();
     testSelection();
     testPointToCell();
+    testScale2Mapping();
+    testBezelMapping();
     testMouse();
     testPaste();
     testCursor();

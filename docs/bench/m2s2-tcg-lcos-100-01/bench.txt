@@ -1,0 +1,24 @@
+$ --tick-gl --profile amber  --quality full
+gl amber/full 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.6 (Core Profile) Mesa 26.1.6-1~bpo13+1): content pass 3372.53 ms, tick 2247.39 ms
+$ --tick --threads 4 --profile amber  --quality full
+cpu amber/full 1280x800 threads=4: content pass 701.34 ms, tick 410.40 ms
+$ --tick-gl --profile amber  --quality static
+gl amber/static 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.6 (Core Profile) Mesa 26.1.6-1~bpo13+1): content pass 2310.22 ms, tick 750.29 ms
+$ --tick --threads 4 --profile amber  --quality static
+cpu amber/static 1280x800 threads=4: content pass 625.87 ms, tick 215.32 ms
+$ --tick-gl --profile amber --frame --quality full
+gl amber/full 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.6 (Core Profile) Mesa 26.1.6-1~bpo13+1): content pass 3958.36 ms, tick 2412.06 ms
+$ --tick --threads 4 --profile amber --frame --quality full
+cpu amber/full 1280x800 threads=4: content pass 791.30 ms, tick 455.74 ms
+$ --tick-gl --profile amber --frame --quality static
+gl amber/static 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.6 (Core Profile) Mesa 26.1.6-1~bpo13+1): content pass 2839.83 ms, tick 816.40 ms
+$ --tick --threads 4 --profile amber --frame --quality static
+cpu amber/static 1280x800 threads=4: content pass 624.67 ms, tick 233.01 ms
+$ --tick-gl  --profile ibm-dos --rgb-shift 0.3524 --quality full
+gl ibm-dos/full 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.6 (Core Profile) Mesa 26.1.6-1~bpo13+1): content pass 4225.19 ms, tick 2248.08 ms
+$ --tick --threads 4  --profile ibm-dos --rgb-shift 0.3524 --quality full
+cpu ibm-dos/full 1280x800 threads=4: content pass 931.33 ms, tick 427.92 ms
+$ --tick-gl  --profile ibm-dos --rgb-shift 0.3524 --quality static
+gl ibm-dos/static 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.6 (Core Profile) Mesa 26.1.6-1~bpo13+1): content pass 2819.93 ms, tick 750.23 ms
+$ --tick --threads 4  --profile ibm-dos --rgb-shift 0.3524 --quality static
+cpu ibm-dos/static 1280x800 threads=4: content pass 800.36 ms, tick 201.97 ms

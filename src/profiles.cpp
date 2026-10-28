@@ -2,6 +2,7 @@
 #include "profiles.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 
 namespace lterm {
@@ -37,6 +38,29 @@ constexpr std::array<Color8, 16> kCga{{
     {0x00, 0x00, 0xaa}, {0xaa, 0x00, 0xaa}, {0x00, 0xaa, 0xaa}, {0xaa, 0xaa, 0xaa},
     {0x55, 0x55, 0x55}, {0xff, 0x55, 0x55}, {0x55, 0xff, 0x55}, {0xff, 0xff, 0x55},
     {0x55, 0x55, 0xff}, {0xff, 0x55, 0xff}, {0x55, 0xff, 0xff}, {0xff, 0xff, 0xff},
+}};
+
+// Palettes of the M2 CRT-style profiles (each profile has its own; values are ours).
+// "Vintage": warm, slightly washed-out phosphor-era colours (only brightness survives the tint).
+constexpr std::array<Color8, 16> kVintage{{
+    {0x00, 0x00, 0x00}, {0xb0, 0x3a, 0x2e}, {0x5f, 0x9e, 0x3c}, {0xc8, 0x9b, 0x3c},
+    {0x3d, 0x6a, 0x9e}, {0x8e, 0x5a, 0x8e}, {0x4a, 0x9a, 0x8f}, {0xc9, 0xc2, 0xb0},
+    {0x6e, 0x68, 0x5e}, {0xe0, 0x6c, 0x5a}, {0x9c, 0xd0, 0x6e}, {0xf0, 0xd0, 0x78},
+    {0x7a, 0xa6, 0xd8}, {0xc4, 0x90, 0xc4}, {0x86, 0xd0, 0xc4}, {0xf4, 0xef, 0xe0},
+}};
+// "Futuristic": cool, saturated colours around the Tango sky blue #729fcf (chroma 1 keeps hues).
+constexpr std::array<Color8, 16> kFuturistic{{
+    {0x00, 0x00, 0x00}, {0xe0, 0x44, 0x6a}, {0x3c, 0xd6, 0x9c}, {0xe8, 0xc8, 0x5a},
+    {0x4a, 0x7c, 0xd8}, {0xa8, 0x6c, 0xe0}, {0x2e, 0xc4, 0xd8}, {0xb8, 0xcc, 0xe4},
+    {0x5a, 0x6a, 0x80}, {0xff, 0x6e, 0x90}, {0x6c, 0xf2, 0xbe}, {0xff, 0xe4, 0x88},
+    {0x7c, 0xa8, 0xff}, {0xcc, 0x98, 0xff}, {0x6c, 0xe8, 0xf8}, {0xf0, 0xf6, 0xff},
+}};
+// "Paper white" (P4 white phosphor): neutral greys with a faint cool cast.
+constexpr std::array<Color8, 16> kPaperWhite{{
+    {0x00, 0x00, 0x00}, {0xb4, 0x4c, 0x4c}, {0x5c, 0xa0, 0x5c}, {0xb4, 0xa0, 0x50},
+    {0x50, 0x70, 0xb0}, {0x96, 0x64, 0xa0}, {0x50, 0xa0, 0xa8}, {0xd0, 0xd4, 0xdc},
+    {0x70, 0x74, 0x7c}, {0xe4, 0x78, 0x78}, {0x8c, 0xd4, 0x8c}, {0xe8, 0xd8, 0x88},
+    {0x88, 0xa8, 0xe8}, {0xc8, 0x98, 0xd4}, {0x88, 0xd8, 0xe0}, {0xf8, 0xfa, 0xff},
 }};
 
 // Monochrome phosphor palette: brightness is all that survives the tint, so give every colour
@@ -114,11 +138,17 @@ std::vector<Profile> makeProfiles() {
     amber.fontPx = 22;
     amber.marginFrac = 0.04f;
     amber.marginMinPx = 12;
+    // The bezel is an option on the monochrome tubes: dark warm plastic, a satin finish.
+    amber.bezelOption = true;
+    amber.fx.frameSize = 28.0f;
+    amber.fx.frameColor = hex(0x2a2622);
+    amber.fx.frameShininess = 0.5f;
     v.push_back(amber);
     v[0].fx = amber.fx;  // plain + effects toggled on = amber effects with the plain palette
     {
         Profile p = amber;  // "Monochrome Green": same values, green phosphor, no chroma
         p.id = "green";
+        p.fx.frameColor = hex(0x22262a);  // cooler grey next to the green phosphor
         p.label = "Green";
         p.fx.fontColor = hex(0x0ccc68);
         p.fx.chromaColor = 0.0f;
@@ -127,6 +157,7 @@ std::vector<Profile> makeProfiles() {
     {
         Profile p = amber;  // "Green Scanlines"-style: green with scanlines on
         p.id = "green-scanlines";
+        p.fx.frameColor = hex(0x22262a);
         p.label = "Green scanlines";
         p.fx.fontColor = hex(0x0ccc68);
         p.fx.chromaColor = 0.0f;
@@ -148,6 +179,8 @@ std::vector<Profile> makeProfiles() {
         p.fx.jitter = 0.1545f;
         p.fx.screenCurvature = 0.4f;
         p.fx.staticNoise = 0.0503f;
+        p.fx.rgbShift = 0.3524f;  // CRT 1.2.0 "IBM Dos" rbgShift
+        p.bezelOption = false;
         p.palette = legibleColourPalette(kCga);
         p.fg = Color8{0xaa, 0xaa, 0xaa};
         p.cursor = p.fg;
@@ -160,6 +193,7 @@ std::vector<Profile> makeProfiles() {
     {
         Profile p = amber;  // "IBM 3278": green, no animated effects at all (only burn-in)
         p.id = "ibm-3278";
+        p.bezelOption = false;
         p.label = "IBM 3278 (static)";
         p.fx.fontColor = hex(0x0ccc68);
         p.fx.chromaColor = 0.0f;
@@ -175,10 +209,116 @@ std::vector<Profile> makeProfiles() {
         setFonts(p, {{"IBM 3270", 0}, {"3270", 0}}, kTerminus);  // fonts-3270
         v.push_back(p);
     }
+    {
+        // cool-retro-term 1.2.0 "Vintage" tube values. CRT uses the PetMe (Commodore PET) font
+        // there, which is not free (see docs/FONTS.md); Terminus instead. Not supported: contrast
+        // 0.7473 (no contrast control) and margin 0.5.
+        Profile p = amber;
+        p.id = "vintage";
+        p.label = "Vintage";
+        p.fx.ambientLight = 0.5f;
+        p.fx.bloom = 0.4983f;
+        p.fx.brightness = 0.5014f;
+        p.fx.burnIn = 0.4983f;
+        p.fx.chromaColor = 0.0f;
+        p.fx.flickering = 0.9f;
+        p.fx.fontColor = hex(0x00ff3e);
+        p.fx.glowingLine = 0.3f;
+        p.fx.horizontalSync = 0.42f;
+        p.fx.jitter = 0.4f;
+        p.fx.rasterization = 1;
+        p.fx.rgbShift = 0.2969f;
+        p.fx.screenCurvature = 0.5f;
+        p.fx.staticNoise = 0.2969f;
+        p.fx.frameColor = hex(0x3b3328);  // old beige-brown plastic
+        p.palette = phosphorPalette(kVintage);
+        p.fg = Color8{0xf4, 0xef, 0xe0};
+        p.cursor = p.fg;
+        setFonts(p, {}, kTerminus);
+        v.push_back(p);
+    }
+    {
+        // cool-retro-term 1.2.0 "Futuristic": colour, flat glass, no scanlines. Not supported:
+        // saturationColor 0.4983, contrast 0.85, windowOpacity 0.7 (no translucent windows).
+        Profile p = amber;
+        p.id = "futuristic";
+        p.label = "Futuristic (colour)";
+        p.bezelOption = false;  // flat glass, frameMargin 0
+        p.fx.ambientLight = 0.0f;
+        p.fx.bloom = 0.5017f;
+        p.fx.brightness = 0.5014f;
+        p.fx.burnIn = 0.0955f;
+        p.fx.chromaColor = 1.0f;
+        p.fx.flickering = 0.2f;
+        p.fx.fontColor = hex(0x729fcf);
+        p.fx.glowingLine = 0.1476f;
+        p.fx.horizontalSync = 0.0f;
+        p.fx.jitter = 0.099f;
+        p.fx.rasterization = 0;
+        p.fx.rgbShift = 0.0f;
+        p.fx.screenCurvature = 0.0f;
+        p.fx.staticNoise = 0.0955f;
+        p.palette = legibleColourPalette(kFuturistic);
+        p.fg = Color8{0xb8, 0xcc, 0xe4};
+        p.cursor = Color8{0x6c, 0xe8, 0xf8};
+        p.minFgGrey = 0.30f;
+        p.marginFrac = 0.01f;  // CRT margin 0.1
+        setFonts(p, {}, kTerminus);
+        v.push_back(p);
+    }
+    {
+        // A white (P4) monochrome tube, a variation of CRT's monochrome profiles: amber's tube
+        // with a cool white phosphor, fine scanlines, less burn-in and noise.
+        Profile p = amber;
+        p.id = "paper-white";
+        p.label = "Paper white";
+        p.fx.fontColor = hex(0xdce6ff);
+        p.fx.chromaColor = 0.0f;
+        p.fx.bloom = 0.35f;
+        p.fx.burnIn = 0.15f;
+        p.fx.flickering = 0.05f;
+        p.fx.horizontalSync = 0.0f;
+        p.fx.jitter = 0.1f;
+        p.fx.staticNoise = 0.06f;
+        p.fx.screenCurvature = 0.2f;
+        p.fx.rasterization = 1;
+        p.fx.rasterizationIntensity = 0.5f;
+        p.fx.frameColor = hex(0xc8c4bc);  // light grey terminal case
+        p.fx.frameShininess = 0.3f;
+        p.palette = phosphorPalette(kPaperWhite);
+        p.fg = Color8{0xf8, 0xfa, 0xff};
+        p.cursor = p.fg;
+        setFonts(p, {}, kTerminus);
+        v.push_back(p);
+    }
     return v;
 }
 
 }  // namespace
+
+bool parseHexColor(const std::string& s, Rgb& out) {
+    std::string h = s;
+    if (!h.empty() && h[0] == '#') h.erase(0, 1);
+    if (h.size() != 6) return false;
+    for (char c : h)
+        if (!std::isxdigit(static_cast<unsigned char>(c))) return false;
+    out = hex(static_cast<uint32_t>(std::stoul(h, nullptr, 16)));
+    return true;
+}
+
+std::string applyTubeOverrides(Profile& p, const TubeOverrides& o) {
+    std::string msg;
+    if (o.frame >= 0) {
+        if (p.bezelOption) p.fx.frame = o.frame > 0;
+        else if (o.frame > 0) msg += "profile '" + p.id + "' has no bezel option; --frame ignored. ";
+    }
+    if (o.frameSize >= 0) p.fx.frameSize = std::min(200.0f, o.frameSize);
+    if (!o.frameColor.empty() && !parseHexColor(o.frameColor, p.fx.frameColor))
+        msg += "frame colour must be #rrggbb. ";
+    if (o.frameShininess >= 0) p.fx.frameShininess = std::min(1.0f, o.frameShininess);
+    if (o.rgbShift >= 0) p.fx.rgbShift = std::min(1.0f, o.rgbShift);
+    return msg;
+}
 
 const std::vector<Profile>& builtinProfiles() {
     static const std::vector<Profile> v = makeProfiles();

@@ -1,0 +1,39 @@
+Source: lunduke-terminal
+Section: x11
+Priority: optional
+Maintainer: Lunduke Journal <bryan@lunduke.com>
+Build-Depends: debhelper-compat (= 13),
+               meson (>= 0.56),
+               ninja-build,
+               pkgconf,
+               libgtkmm-3.0-dev (>= 3.24),
+               libvterm-dev (>= 0.3),
+               libepoxy-dev,
+               libegl-dev,
+               libfontconfig-dev,
+               libx11-dev,
+               desktop-file-utils,
+               xvfb <!nocheck>,
+               xauth <!nocheck>,
+               libgl1-mesa-dri <!nocheck>,
+               fonts-dejavu-core <!nocheck>
+Standards-Version: 4.7.0
+Homepage: https://lunduke.com
+Rules-Requires-Root: no
+
+Package: lunduke-terminal
+Architecture: any
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         fonts-dejavu-core | fonts-dejavu-mono
+Recommends: fonts-terminus | fonts-terminus-otb,
+            fonts-pc,
+            fonts-3270
+Suggests: fonts-hermit,
+          fonts-proggy
+Provides: x-terminal-emulator
+Description: retro CRT-style terminal emulator
+ Lunduke Terminal is a GTK 3 terminal emulator with the look of an old CRT
+ monitor: phosphor glow, scanlines, burn-in, curvature, RGB shift and an
+ optional monitor bezel. The effects run on OpenGL 3.3 with a C++ fallback.
+ The default profile is a plain terminal without effects.
