@@ -28,7 +28,7 @@ vterm_lib = static_library('lterm-vterm', 'src/vterm_session.cpp', 'src/selectio
   link_with : effects_lib, dependencies : [vterm_dep, util_dep, pangocairo_dep])
 
 executable('lunduke-terminal',
-  'src/main.cpp', 'src/terminal_view.cpp',
+  'src/main.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp',
   link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep],
   install : true)
@@ -84,7 +84,7 @@ test('search', executable('search_test', 'tests/search_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
   timeout : 60)
 # GTK-level fixes; AddressSanitizer makes a use-after-free fail loudly. Skips without $DISPLAY.
-view_test_exe = executable('view_test', 'tests/view_test.cpp', 'src/terminal_view.cpp',
+view_test_exe = executable('view_test', 'tests/view_test.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep, dependency('x11')],
   cpp_args : ['-fsanitize=address', '-fno-omit-frame-pointer'], link_args : ['-fsanitize=address'])

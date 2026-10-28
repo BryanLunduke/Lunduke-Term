@@ -9,14 +9,18 @@
 //                    [--cursor-blink|--no-cursor-blink]
 //                    [--frame|--no-frame] [--frame-size PX] [--frame-color #RRGGBB]
 //                    [--frame-shininess 0..1] [--rgb-shift 0..1]
-//                    [--list-profiles] [-e COMMAND ARGS...]
+//                    [-T|--title TITLE] [--list-profiles] [-e COMMAND ARGS...]
 // Settings (optional): $XDG_CONFIG_HOME/lunduke-terminal/settings.ini, group [terminal], keys
 // profile, effects (true/false), renderer, threads, effects-fps, max-fps, pause-unfocused,
 // effects-quality, cpu-budget (percent of one core, software rendering only, 0 = off),
 // font, font-px, scrollback-lines, login-shell, cwd, on-exit, bell (comma list of visual,
 // urgent, audible or none), cursor-shape, cursor-blink, word-chars, frame (true/false),
 // frame-size, frame-color, frame-shininess, rgb-shift. Command-line options win.
-#include "terminal_view.hpp"
+// The settings dialog (Ctrl+Shift+S) writes profile, font, font-px, effects-quality,
+// scrollback-lines and frame there ("Save as default"), keeping the other keys.
+// Keys: Ctrl+Shift+T new tab, Ctrl+Shift+W close tab, Ctrl+PgUp/PgDn switch tabs,
+// Ctrl+Shift+F search the scrollback, Ctrl+Shift+S settings.
+#include "terminal_window.hpp"
 
 #include <gtkmm.h>
 
@@ -154,62 +158,10 @@ int main(int argc, char** argv) {
     int gargc = 1;
     auto app = Gtk::Application::create(gargc, argv, "org.lunduke.LundukeTerminal", Gio::APPLICATION_NON_UNIQUE);
     Gtk::Window::set_default_icon_name("org.lunduke.LundukeTerminal");  // data/icons (meson install)
-    Gtk::Window win;
-    win.set_title(title);
+    lterm::TerminalWindow win(opts, title);
     win.set_default_size(w, h);
-    win.add_events(Gdk::VISIBILITY_NOTIFY_MASK | Gdk::STRUCTURE_MASK);
-    lterm::TerminalView view(opts);
-    win.add(view);
-    view.signalTitle.connect([&](const std::string& t) { win.set_title(t + " - Lunduke Terminal"); });
-    view.signalChildExited.connect([&] { win.hide(); });
-    view.signalExitStatus.connect([&](int status) {
-        char t[64];
-        if (WIFSIGNALED(status)) std::snprintf(t, sizeof t, "[killed: signal %d] ", WTERMSIG(status));
-        else std::snprintf(t, sizeof t, "[exited: %d] ", WIFEXITED(status) ? WEXITSTATUS(status) : -1);
-        win.set_title(t + win.get_title());
-    });
-    // Bell: urgency hint while the window is not focused; cleared when it gets focus.
-    view.signalBell.connect([&] {
-        if (!win.is_active()) win.set_urgency_hint(true);
-    });
-    view.signalBackend.connect([](const std::string& b) {
-        std::fprintf(stderr, "lunduke-terminal: %s\n", b.c_str());
-    });
-
-    // Pause the effects animation when the window is inactive, iconified or fully covered.
-    bool iconified = false, obscured = false, mapped = false;
-    auto updateVisible = [&] { view.setWindowVisible(mapped && !iconified && !obscured); };
-    win.property_is_active().signal_changed().connect([&] {
-        view.setWindowActive(win.is_active());
-        if (win.is_active()) win.set_urgency_hint(false);
-    });
-    win.signal_window_state_event().connect([&](GdkEventWindowState* e) {
-        iconified = (e->new_window_state & (GDK_WINDOW_STATE_ICONIFIED | GDK_WINDOW_STATE_WITHDRAWN)) != 0;
-        updateVisible();
-        return false;
-    });
-    win.signal_visibility_notify_event().connect([&](GdkEventVisibility* e) {
-        obscured = e->state == GDK_VISIBILITY_FULLY_OBSCURED;
-        updateVisible();
-        return false;
-    });
-    win.signal_map_event().connect([&](GdkEventAny*) {
-        mapped = true;
-        updateVisible();
-        return false;
-    });
-    win.signal_unmap_event().connect([&](GdkEventAny*) {
-        mapped = false;
-        updateVisible();
-        return false;
-    });
-
-    win.show_all();
-    view.setWindowActive(win.is_active());
-    if (!view.start()) {
-        std::fprintf(stderr, "lunduke-terminal: could not start the shell\n");
-        return 1;
-    }
+    win.show();
+    if (!win.newTab(true)) return 1;
     if (quitAfter > 0) Glib::signal_timeout().connect_once([&] { win.hide(); }, quitAfter);
     return app->run(win);
 }

@@ -4,11 +4,14 @@
 //   (b) scrollback-lines clamp in the view
 //   (d) closing the view while a clipboard request is pending
 //   (g) the child is reaped after the view hangs up on it
+// M2 stage 3: tabs, scrollback search (view + search bar), the settings dialog.
 #include "terminal_view.hpp"
+#include "terminal_window.hpp"
 
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <gdk/gdkx.h>
+#include <glib/gstdio.h>
 #include <gtkmm.h>
 
 #include <cerrno>
@@ -293,6 +296,265 @@ static void testBezelPointer(const char* renderer) {
     CHECK(w.view->selectionText() == std::string("alpha beta gamma").substr(0, c0 + 1));
 }
 
+// ---- M2 stage 3: tabs, search, settings dialog ----
+
+static GdkEventKey keyEv(guint keyval, guint state) {
+    GdkEventKey e{};
+    e.type = GDK_KEY_PRESS;
+    e.keyval = keyval;
+    e.state = state;
+    return e;
+}
+static const guint kCS = GDK_CONTROL_MASK | GDK_SHIFT_MASK;
+
+static void testTabs() {
+    setenv("SHELL", "/bin/sh", 1);
+    ViewOptions o;
+    o.profile = "amber";  // animated effects: hidden tabs must not tick
+    o.onExit = "close";
+    o.command = {"/bin/sh", "-c", "echo first tab; exec sleep 30"};
+    {
+        TerminalWindow w(o);
+        w.set_default_size(480, 320);
+        w.show();
+        CHECK(w.newTab(true) != nullptr);
+        pump(300);
+        CHECK(w.tabCount() == 1 && !w.tabsShown());
+        GdkEventKey e = keyEv(GDK_KEY_T, kCS);
+        CHECK(w.handleKey(&e));
+        pump(300);
+        CHECK(w.tabCount() == 2 && w.tabsShown() && w.currentIndex() == 1);
+        CHECK(w.view(0)->session().rowText(0).find("first tab") == 0);
+        CHECK(w.view(1)->session().rowText(0).find("first tab") == std::string::npos);  // a shell, not -e
+        // Only the shown tab is "visible"; the other one is paused (no effects tick).
+        CHECK(!w.view(0)->windowVisible() && !w.view(0)->animating());
+        e = keyEv(GDK_KEY_Page_Up, GDK_CONTROL_MASK);
+        CHECK(w.handleKey(&e));
+        pump(200);
+        CHECK(w.currentIndex() == 0);
+        CHECK(!w.view(1)->windowVisible() && !w.view(1)->animating());
+        e = keyEv(GDK_KEY_Page_Down, GDK_CONTROL_MASK);
+        CHECK(w.handleKey(&e));
+        pump(200);
+        CHECK(w.currentIndex() == 1);
+        // Ctrl+Shift+W closes the current tab; the tab bar goes with the second tab.
+        e = keyEv(GDK_KEY_W, kCS);
+        CHECK(w.handleKey(&e));
+        pump(200);
+        CHECK(w.tabCount() == 1 && !w.tabsShown() && w.currentIndex() == 0);
+        // A tab whose child exits closes itself (deferred: emitted from inside the view).
+        TerminalView* t2 = w.newTab();
+        CHECK(t2 != nullptr);
+        pump(300);
+        CHECK(w.tabCount() == 2);
+        if (t2) kill(t2->childPid(), SIGKILL);
+        for (int i = 0; i < 100 && w.tabCount() == 2; ++i) pump(20);
+        CHECK(w.tabCount() == 1);
+        // Closing the last tab hides the window.
+        TerminalView* last = w.view(0);
+        w.closeTab(last);
+        pump(100);
+        CHECK(w.tabCount() == 0 && !w.get_visible());
+    }
+    {
+        // Destroying a window with several live tabs (and an idle close pending) is clean.
+        TerminalWindow w(o);
+        w.show();
+        w.newTab(true);
+        w.newTab();
+        w.newTab();
+        pump(200);
+        CHECK(w.tabCount() == 3);
+        kill(w.view(2)->childPid(), SIGKILL);
+        pump(5);
+    }
+    pump(300);  // late idle callbacks must not touch the dead window (ASan)
+}
+
+static void testSearchView() {
+    ViewOptions o;
+    o.command = {"/bin/sh", "-c",
+                 "i=0; while [ $i -lt 200 ]; do echo row $i; i=$((i+1)); done; echo 'find ME here';"
+                 "i=0; while [ $i -lt 100 ]; do echo after $i; i=$((i+1)); done; echo 'ME again'; exec cat"};
+    Win w(o);
+    CHECK(w.view->start());
+    for (int i = 0; i < 100 && w.view->session().scrollbackSize() < 250; ++i) pump(20);
+    pump(200);
+    TerminalView& v = *w.view;
+    CHECK(v.setSearch("me", false) == 2);
+    CHECK(v.searchIndex() == 1);        // the newest one, on screen
+    CHECK(v.scrollOffset() == 0);
+    pump(100);
+    // Highlighted: the current match is orange, on the row that shows "ME again".
+    {
+        const auto& m = v.searchMatches()[1];
+        const long top = v.session().topLine() - v.scrollOffset();
+        const int row = static_cast<int>(m.start.line - top);
+        CHECK(row >= 0 && row < v.shownGrid().rows);
+        if (row >= 0 && row < v.shownGrid().rows) {
+            const Cell& c = v.shownGrid().at(row, m.start.col);
+            CHECK(c.bg == (Color8{0xf5, 0x79, 0x00}));
+            CHECK(c.text == "M");
+            CHECK(v.shownGrid().at(row, m.end.col + 1).bg != (Color8{0xf5, 0x79, 0x00}));
+        }
+    }
+    CHECK(v.searchStep(true));          // older: "find ME here", in history
+    CHECK(v.searchIndex() == 0);
+    CHECK(v.scrollOffset() > 0);
+    {
+        const auto& m = v.searchMatches()[0];
+        const long top = v.session().topLine() - v.scrollOffset();
+        CHECK(m.start.line >= top && m.start.line < top + v.session().rows());
+        pump(100);
+        const int row = static_cast<int>(m.start.line - top);
+        if (row >= 0 && row < v.shownGrid().rows) CHECK(v.shownGrid().at(row, m.start.col).bg == (Color8{0xf5, 0x79, 0x00}));
+    }
+    CHECK(v.searchStep(true) && v.searchIndex() == 1);   // wraps around to the newest
+    CHECK(v.searchStep(false) && v.searchIndex() == 0);  // and back
+    CHECK(v.setSearch("me", true) == 0);
+    CHECK(!v.searchStep(false));
+    CHECK(v.setSearch("ME", true) == 2);
+    CHECK(v.setSearch("row 1", false) >= 100);  // row 1, row 10.., row 100..
+    // Output while the search is open re-runs it (debounced).
+    CHECK(v.setSearch("zebra", false) == 0);
+    for (char ch : std::string("zebra\r")) v.session().sendChar(static_cast<unsigned char>(ch), VTERM_MOD_NONE);
+    v.session().flushWrites();
+    for (int i = 0; i < 100 && v.searchCount() == 0; ++i) pump(20);
+    CHECK(v.searchCount() >= 1);
+    v.clearSearch();
+    CHECK(v.searchCount() == 0 && v.searchIndex() == -1);
+    pump(100);
+    for (const Cell& c : v.shownGrid().cells) CHECK(c.bg != (Color8{0xf5, 0x79, 0x00}) && c.bg != (Color8{0xc4, 0xa0, 0x00}));
+    // A pending debounced refresh when the view goes away (ASan).
+    v.setSearch("zebra", false);
+    for (char ch : std::string("zebra\r")) v.session().sendChar(static_cast<unsigned char>(ch), VTERM_MOD_NONE);
+    v.session().flushWrites();
+    pump(60);
+    w.dropView();
+    pump(400);
+}
+
+static void testSearchBar() {
+    ViewOptions o;
+    o.command = {"/bin/sh", "-c", "echo alpha; echo beta ALPHA; exec sleep 30"};
+    TerminalWindow w(o);
+    w.set_default_size(480, 320);
+    w.show();
+    w.newTab(true);
+    pump(300);
+    GdkEventKey e = keyEv(GDK_KEY_F, kCS);
+    CHECK(w.handleKey(&e));
+    CHECK(w.searchShown());
+    w.searchEntry().set_text("alpha");
+    for (int i = 0; i < 50 && w.searchStatus().empty(); ++i) pump(20);  // search-changed is debounced
+    std::printf("search bar: '%s'\n", w.searchStatus().c_str());
+    CHECK(w.searchStatus() == "2 of 2");
+    w.searchEntry().activate();  // Enter: older match
+    pump(50);
+    CHECK(w.searchStatus() == "1 of 2");
+    w.searchCase().set_active(true);
+    pump(50);
+    CHECK(w.searchStatus() == "1 of 1");
+    w.searchEntry().set_text("nothing here");
+    for (int i = 0; i < 50 && w.searchStatus() != "No matches"; ++i) pump(20);
+    CHECK(w.searchStatus() == "No matches");
+    // Search follows the tab: a new tab gets the query re-run on its own scrollback.
+    w.searchEntry().set_text("alpha");
+    for (int i = 0; i < 50 && w.searchStatus() != "1 of 1"; ++i) pump(20);
+    w.newTab();
+    pump(400);
+    CHECK(w.view(0)->searchCount() == 0);  // the old tab's highlights are gone
+    CHECK(w.searchStatus() == "No matches");
+    w.hideSearch();
+    CHECK(!w.searchShown());
+    for (int i = 0; i < w.tabCount(); ++i) CHECK(w.view(i)->searchCount() == 0);
+}
+
+static void testSettingsDialog() {
+    const std::string dir = Glib::build_filename(Glib::get_tmp_dir(), "lterm-view-test-" + std::to_string(getpid()));
+    const std::string ini = Glib::build_filename(dir, "settings.ini");
+    g_mkdir_with_parents(dir.c_str(), 0700);
+    Glib::file_set_contents(ini, "# kept\n[terminal]\ncursor-shape=bar\nprofile=green\n");
+    ViewOptions o;
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    TerminalWindow w(o);
+    w.settingsFile = ini;
+    w.set_default_size(480, 320);
+    w.show();
+    w.newTab(true);
+    w.newTab();
+    pump(300);
+    GdkEventKey e = keyEv(GDK_KEY_S, kCS);
+    CHECK(w.handleKey(&e));
+    pump(100);
+    SettingsDialog* d = w.settingsDialog();
+    CHECK(d != nullptr && d->get_visible());
+    if (!d) return;
+    CHECK(d->profile.get_active_id() == "plain");
+    CHECK(!d->frame.get_sensitive());  // plain has no bezel option
+    d->profile.set_active_id("amber");
+    pump(100);
+    CHECK(d->frame.get_sensitive());
+    for (int i = 0; i < w.tabCount(); ++i) CHECK(w.view(i)->profile().id == "amber");
+    d->frame.set_active_id("1");
+    d->quality.set_active_id("static");
+    d->fontPx.set_value(19);
+    d->scrollback.set_value(500);
+    pump(300);
+    for (int i = 0; i < w.tabCount(); ++i) {
+        TerminalView& v = *w.view(i);
+        CHECK(v.options().tube.frame == 1);
+        CHECK(v.profile().id == "amber" && v.profile().fx.frame);
+        CHECK(v.effectsQuality() == EffectsQuality::Static);
+        CHECK(v.options().fontPx == 19);
+        CHECK(v.session().scrollbackLimit() == 500);
+    }
+    CHECK(w.view(w.currentIndex())->bezelActive());
+    d->font.set_active_id("DejaVu Sans Mono");
+    pump(100);
+    CHECK(w.view(0)->options().fontFamily == "DejaVu Sans Mono");
+    // New tabs get the dialog's settings.
+    TerminalView* t3 = w.newTab();
+    pump(200);
+    CHECK(t3 && t3->profile().id == "amber" && t3->options().fontPx == 19 && t3->session().scrollbackLimit() == 500);
+    // Save as default: the dialog's keys are written, the others kept.
+    d->save.clicked();
+    Glib::KeyFile kf;
+    try {
+        kf.load_from_file(ini);
+        CHECK(kf.get_string("terminal", "profile") == "amber");
+        CHECK(kf.get_string("terminal", "cursor-shape") == "bar");
+        CHECK(kf.get_boolean("terminal", "frame"));
+        CHECK(kf.get_integer("terminal", "font-px") == 19);
+        CHECK(kf.get_string("terminal", "font") == "DejaVu Sans Mono");
+        CHECK(kf.get_string("terminal", "effects-quality") == "static");
+        CHECK(kf.get_int64("terminal", "scrollback-lines") == 500);
+    } catch (const Glib::Error& err) {
+        std::fprintf(stderr, "settings.ini: %s\n", err.what().c_str());
+        ++failures;
+    }
+    std::string text;
+    try { text = Glib::file_get_contents(ini); } catch (...) {}
+    CHECK(text.find("# kept") != std::string::npos);
+    // "Profile default" drops the frame key again; plain keeps its plain look.
+    d->profile.set_active_id("plain");
+    d->frame.set_active_id("-1");
+    d->font.set_active_id("");
+    d->fontPx.set_value(0);
+    pump(200);
+    d->save.clicked();
+    try {
+        Glib::KeyFile k2;
+        k2.load_from_file(ini);
+        CHECK(!k2.has_key("terminal", "frame") && !k2.has_key("terminal", "font") && !k2.has_key("terminal", "font-px"));
+    } catch (...) { ++failures; }
+    CHECK(!w.view(0)->effectsOn() && !w.view(0)->bezelActive());
+    d->response(Gtk::RESPONSE_CLOSE);
+    CHECK(!d->get_visible());
+    g_unlink(ini.c_str());
+    g_rmdir(dir.c_str());
+}
+
 int main(int argc, char** argv) {
     if (!getenv("DISPLAY") || !*getenv("DISPLAY")) {
         std::printf("view test skipped: no DISPLAY\n");
@@ -308,6 +570,10 @@ int main(int argc, char** argv) {
     testScaleChange("amber");
     testBezelPointer("auto");
     testBezelPointer("cpu");
+    testTabs();
+    testSearchView();
+    testSearchBar();
+    testSettingsDialog();
     if (failures) {
         std::fprintf(stderr, "%d failure(s)\n", failures);
         return 1;
