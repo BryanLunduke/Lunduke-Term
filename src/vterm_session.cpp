@@ -6,6 +6,7 @@
 #include <cerrno>
 #include <csignal>
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
 #include <fcntl.h>
 #include <pwd.h>
@@ -121,6 +122,9 @@ VtermSession::VtermSession(int rows, int cols) : rows_(rows), cols_(cols) {
     cbs.sb_popline = &VtermSession::cbPopLine;
     cbs.sb_clear = &VtermSession::cbSbClear;
     vterm_screen_set_callbacks(screen_, &cbs, this);
+    static VTermStateFallbacks fbs{};
+    fbs.csi = &VtermSession::cbCsiFallback;
+    vterm_screen_set_unrecognised_fallbacks(screen_, &fbs, this);
     vterm_screen_enable_altscreen(screen_, 1);
     vterm_screen_enable_reflow(screen_, true);
     VTermColor fg, bg;
@@ -740,6 +744,23 @@ int VtermSession::cbBell(void* user) {
     auto* s = static_cast<VtermSession*>(user);
     if (s->onBell) s->onBell();
     return 1;
+}
+
+// CSI sequences libvterm does not know. DECREQTPARM (CSI 0 x / CSI 1 x, VT100): answer as
+// xterm does, "no parity, 8 bits, 38400 baud, clock multiplier 1, no STP flags".
+int VtermSession::cbCsiFallback(const char* leader, const long args[], int argcount, const char* intermed,
+                                char command, void* user) {
+    auto* s = static_cast<VtermSession*>(user);
+    if (command == 'x' && !leader && !intermed && argcount <= 1) {
+        const long a = argcount == 0 || CSI_ARG_IS_MISSING(args[0]) ? 0 : CSI_ARG(args[0]);
+        if (a == 0 || a == 1) {
+            char buf[32];
+            const int n = std::snprintf(buf, sizeof buf, "\x1b[%ld;1;1;128;128;1;0x", a + 2);
+            cbOutput(buf, static_cast<size_t>(n), s);
+            return 1;
+        }
+    }
+    return 0;
 }
 
 void VtermSession::cbOutput(const char* bytes, size_t len, void* user) {

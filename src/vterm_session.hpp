@@ -138,6 +138,8 @@ private:
     static int cbMoveCursor(VTermPos pos, VTermPos, int visible, void* user);
     static int cbSetTermProp(VTermProp prop, VTermValue* val, void* user);
     static int cbBell(void* user);
+    static int cbCsiFallback(const char* leader, const long args[], int argcount, const char* intermed, char command,
+                             void* user);
     static int cbPushLine(int cols, const VTermScreenCell* cells, void* user);
     static int cbPopLine(int cols, VTermScreenCell* cells, void* user);
     static int cbSbClear(void* user);

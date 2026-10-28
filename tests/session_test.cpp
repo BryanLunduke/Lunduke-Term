@@ -411,7 +411,19 @@ static void testPty() {
     }
 }
 
+// vttest 6.7: DECREQTPARM is answered (libvterm alone ignores CSI x); other CSI x forms are not.
+static void testReports() {
+    VtermSession s(24, 80);
+    const char* q = "\x1b[x\x1b[1x\x1b[5x";
+    s.feed(q, std::strlen(q));
+    CHECK_EQ(s.takeOutput(), std::string("\x1b[2;1;1;128;128;1;0x\x1b[3;1;1;128;128;1;0x"));
+    const char* da = "\x1b[c";
+    s.feed(da, std::strlen(da));
+    CHECK_EQ(s.takeOutput(), std::string("\x1b[?1;2c"));
+}
+
 int main() {
+    testReports();
     testScrollback();
     testSelection();
     testPointToCell();
