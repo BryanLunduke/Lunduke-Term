@@ -14,13 +14,17 @@ namespace lterm {
 
 class GridPainter {
 public:
-    GridPainter(const std::string& fontFamily, int pixelSize);
+    // pixelSize is in logical pixels. scale is the GTK scale factor (HiDPI): the cell metrics
+    // are measured at pixelSize and multiplied by scale, the glyphs are rasterised at
+    // pixelSize * scale, so a scale-2 grid is exactly the scale-1 grid at twice the resolution.
+    GridPainter(const std::string& fontFamily, int pixelSize, int scale = 1);
     ~GridPainter();
     GridPainter(const GridPainter&) = delete;
     GridPainter& operator=(const GridPainter&) = delete;
 
-    int cellWidth() const { return cellW_; }
-    int cellHeight() const { return cellH_; }
+    int cellWidth() const { return cellW_; }    // device pixels
+    int cellHeight() const { return cellH_; }   // device pixels
+    int scale() const { return scale_; }
     std::string resolvedFamily() const;
 
     // M0 reference renderer: one Pango layout per cell, straight onto an already cleared
@@ -59,6 +63,7 @@ private:
     PangoFontDescription* bold_ = nullptr;
     PangoContext* ctx_ = nullptr;
     int cellW_ = 8, cellH_ = 16, ascent_ = 12;
+    int scale_ = 1;
 };
 
 // Converts a Cairo ARGB32 surface (premultiplied, opaque here) to tightly packed RGBA8.

@@ -122,6 +122,15 @@ EffectParams applyEffectsQuality(const EffectParams& p, EffectsQuality resolved)
     return r;
 }
 
+EffectParams scaleEffectParams(const EffectParams& p, int scale) {
+    EffectParams r = p;
+    const int s = std::max(1, scale);
+    r.scanlinePeriod = p.scanlinePeriod * s;
+    r.bloomRadiusHalfRes = std::min(64, p.bloomRadiusHalfRes * s);
+    r.pixelScale = p.pixelScale * s;
+    return r;
+}
+
 bool sameEffectParams(const EffectParams& a, const EffectParams& b) {
     auto rgb = [](const Rgb& x, const Rgb& y) { return x.r == y.r && x.g == y.g && x.b == y.b; };
     return rgb(a.fontColor, b.fontColor) && rgb(a.backgroundColor, b.backgroundColor) && a.bloom == b.bloom &&
@@ -130,7 +139,8 @@ bool sameEffectParams(const EffectParams& a, const EffectParams& b) {
            a.horizontalSync == b.horizontalSync && a.jitter == b.jitter && a.screenCurvature == b.screenCurvature &&
            a.staticNoise == b.staticNoise && a.rasterization == b.rasterization &&
            a.scanlinePeriod == b.scanlinePeriod && a.rasterizationIntensity == b.rasterizationIntensity &&
-           a.bloomRadiusHalfRes == b.bloomRadiusHalfRes && a.burnInHalfRes == b.burnInHalfRes;
+           a.bloomRadiusHalfRes == b.bloomRadiusHalfRes && a.burnInHalfRes == b.burnInHalfRes &&
+           a.pixelScale == b.pixelScale;
 }
 
 std::vector<float> bloomWeights(int radius) {

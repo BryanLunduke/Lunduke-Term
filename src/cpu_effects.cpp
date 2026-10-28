@@ -232,7 +232,7 @@ void CpuEffects::renderTo(float timeMs, uint8_t* out, int stride, PixelOrder ord
     const float chroma = p_.chromaColor;
     const float vrx = w_ / p_.scanlinePeriod, vry = h_ / p_.scanlinePeriod;
     (void)vrx;
-    const float snx = (w_ * 0.75f) / kNoiseSize, sny = (h_ * 0.75f) / kNoiseSize;
+    const float snx = (w_ / p_.pixelScale * 0.75f) / kNoiseSize, sny = (h_ / p_.pixelScale * 0.75f) / kNoiseSize;
     const float* noise = noiseTexture().data();
     const bool useNoise = p_.jitter != 0.0f || p_.staticNoise != 0.0f;
     float noiseAmount = p_.staticNoise;

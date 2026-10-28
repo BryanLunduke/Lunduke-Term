@@ -2,6 +2,7 @@
 #include "cpu_effects.hpp"
 #include "synthetic_frame.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -124,6 +125,48 @@ int main() {
         full.render(1000.0f, o1.data());
         full.render(1517.0f, o2.data());
         CHECK(o1 != o2);  // control: full animates
+    }
+
+    // M2 HiDPI: the scale-2 picture (pixel-sized parameters scaled) is the scale-1 picture at
+    // twice the resolution: 2x2-averaged, it is close to the scale-1 output. Without the
+    // parameter scaling the scanlines and the bloom would be half as wide (control).
+    {
+        const EffectParams base = applyEffectsQuality(EffectParams{}, EffectsQuality::Static);  // scanlines on
+        const EffectParams p2 = scaleEffectParams(base, 2);
+        CHECK(p2.scanlinePeriod == 2 * base.scanlinePeriod && p2.pixelScale == 2.0f);
+        CHECK(p2.bloomRadiusHalfRes == std::min(64, 2 * base.bloomRadiusHalfRes));
+        CHECK(scaleEffectParams(EffectParams{}, 4).bloomRadiusHalfRes == 64);
+        const int w = 320, h = 200;
+        auto s1 = renderSyntheticFrame(w, h, 0, "DejaVu Sans Mono", 10);
+        auto s2 = renderSyntheticFrame(2 * w, 2 * h, 0, "DejaVu Sans Mono", 10, nullptr, 2);
+        auto run = [](const EffectParams& p, const std::vector<uint8_t>& src, int ww, int hh) {
+            CpuEffects e(p, 2);
+            e.resize(ww, hh);
+            e.setSource(src.data(), ww * 4, 1000.0f);
+            std::vector<uint8_t> o(static_cast<size_t>(ww) * hh * 4);
+            e.render(1000.0f, o.data());
+            return o;
+        };
+        const auto o1 = run(base, s1, w, h);
+        auto psnrHalf = [&](const std::vector<uint8_t>& o2) {
+            double sq = 0;
+            for (int y = 0; y < h; ++y)
+                for (int x = 0; x < w; ++x)
+                    for (int c = 0; c < 3; ++c) {
+                        int v = 0;
+                        for (int dy = 0; dy < 2; ++dy)
+                            for (int dx = 0; dx < 2; ++dx) v += o2[((2 * y + dy) * 2 * w + 2 * x + dx) * 4 + c];
+                        const double d = v / 4.0 - o1[(y * w + x) * 4 + c];
+                        sq += d * d;
+                    }
+            const double mse = sq / (w * h * 3.0);
+            return mse == 0 ? 99.0 : 10 * std::log10(255.0 * 255.0 / mse);
+        };
+        const double scaled = psnrHalf(run(p2, s2, 2 * w, 2 * h)), unscaled = psnrHalf(run(base, s2, 2 * w, 2 * h));
+        std::printf("scale 2 (2x2 average) vs scale 1, static + scanlines: PSNR %.2f dB (unscaled parameters %.2f dB)\n",
+                    scaled, unscaled);
+        CHECK(scaled > 24.0);
+        CHECK(scaled > unscaled + 1.0);
     }
 
     return failures ? 1 : 0;

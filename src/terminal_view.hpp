@@ -75,6 +75,11 @@ public:
     EffectsQuality effectsQuality() const { return quality_; }  // resolved (never Auto)
     bool softwareRendering() const { return software_; }
     double tickIntervalMs() const { return tickIntervalMs_; }
+    int scaleFactor() const { return scale_; }
+    int deviceWidth() const { return w_; }
+    int deviceHeight() const { return h_; }
+    // Test hook: the cell under a pointer position in logical (event) coordinates.
+    bool cellAtLogical(double x, double y, int& row, int& col) const { return cellAt(x, y, row, col); }
     const ViewStats& stats() const { return stats_; }
     int scrollOffset() const { return scrollOffset_; }
     const Selection& selection() const { return sel_; }
@@ -113,6 +118,9 @@ private:
     void chooseMode();
     void fallbackToCpu(const std::string& why);
     void layoutGrid();
+    void relayout(int logicalW, int logicalH);
+    void onScaleChanged();     // notify::scale-factor
+    void applyScale();
     void allocateSurfaces();
     bool updateContent();      // grid -> source image, changed rows only; true if anything changed
     void requestFrame();       // capped content frame
@@ -148,7 +156,9 @@ private:
     bool cpuOutValid_ = false;     // out_ holds the effects output of the current source
 
     Grid cur_, next_;
-    int w_ = 0, h_ = 0;
+    int w_ = 0, h_ = 0;        // device pixels (logical size * scale_)
+    int lw_ = 0, lh_ = 0;      // logical allocation
+    int scale_ = 1;            // GTK scale factor (HiDPI)
     int marginX_ = 0, marginY_ = 0;
     cairo_surface_t* src_ = nullptr;   // RGB24 source image (what the plain view shows)
     cairo_surface_t* out_ = nullptr;   // RGB24 C++ effects output

@@ -90,6 +90,7 @@ TerminalView::TerminalView(const ViewOptions& opts)
     gl_.signal_realize().connect(sigc::mem_fun(*this, &TerminalView::onGlRealize));
     gl_.signal_unrealize().connect(sigc::mem_fun(*this, &TerminalView::onGlUnrealize), false);
     gl_.signal_render().connect(sigc::mem_fun(*this, &TerminalView::onGlRender), false);
+    property_scale_factor().signal_changed().connect(sigc::mem_fun(*this, &TerminalView::onScaleChanged));
     applyProfile();
     chooseMode();
 }
@@ -264,7 +265,7 @@ void TerminalView::applyProfile() {
     if (!pick.monospace)
         std::fprintf(stderr, "lunduke-terminal: font '%s' is not monospaced\n", pick.family.c_str());
     const int px = opts_.fontPx > 0 ? opts_.fontPx : pick.px;
-    painter_.reset(new GridPainter(pick.family, px));
+    painter_.reset(new GridPainter(pick.family, px, scale_));  // px stays logical
     applyColors();
     cpu_.reset();
     glParamsStale_ = true;
@@ -441,23 +442,24 @@ bool TerminalView::onDraw(const Cairo::RefPtr<Cairo::Context>& cr) {
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - r0).count());
         }
         lastFrameMs_ = t;
-        cairo_set_source_surface(cr->cobj(), out_, 0, 0);
-    } else {
-        cairo_set_source_surface(cr->cobj(), src_, 0, 0);
     }
-    cairo_paint(cr->cobj());
+    // The surfaces are in device pixels; GTK's context is in logical ones (device scale).
+    cairo_t* c = cr->cobj();
+    cairo_save(c);
+    if (scale_ > 1) cairo_scale(c, 1.0 / scale_, 1.0 / scale_);
+    cairo_set_source_surface(c, mode_ == Mode::Cpu && cpu_ ? out_ : src_, 0, 0);
+    cairo_pattern_set_filter(cairo_get_source(c), CAIRO_FILTER_NEAREST);
+    cairo_paint(c);
+    cairo_restore(c);
     return true;
 }
 
 void TerminalView::layoutGrid() {
-    marginX_ = std::max(profile_.marginMinPx, static_cast<int>(w_ * profile_.marginFrac));
-    marginY_ = std::max(profile_.marginMinPx, static_cast<int>(h_ * profile_.marginFrac));
-    const int cols = std::max(1, (w_ - 2 * marginX_) / painter_->cellWidth());
-    const int rows = std::max(1, (h_ - 2 * marginY_) / painter_->cellHeight());
-    if (profile_.marginFrac > 0) {  // centre the grid inside the tube
-        marginX_ = (w_ - cols * painter_->cellWidth()) / 2;
-        marginY_ = (h_ - rows * painter_->cellHeight()) / 2;
-    }
+    const GridLayout g = computeGridLayout(w_, h_, scale_, painter_->cellWidth(), painter_->cellHeight(),
+                                           profile_.marginMinPx, profile_.marginFrac);
+    marginX_ = g.marginX;
+    marginY_ = g.marginY;
+    const int rows = g.rows, cols = g.cols;
     if (rows != session_->rows() || cols != session_->cols()) {
         session_->resize(rows, cols);
         sel_.clear();  // reflow moves text around
@@ -474,8 +476,28 @@ void TerminalView::allocateSurfaces() {
 
 void TerminalView::on_size_allocate(Gtk::Allocation& a) {
     Gtk::Box::on_size_allocate(a);
-    const int w = std::max(1, a.get_width()), h = std::max(1, a.get_height());
-    if (w == w_ && h == h_) return;
+    relayout(std::max(1, a.get_width()), std::max(1, a.get_height()));
+}
+
+// HiDPI: notify::scale-factor (moved to a monitor with another scale, GDK_SCALE) comes without
+// a new allocation, because the logical size stays the same.
+void TerminalView::onScaleChanged() {
+    if (lw_ > 0) relayout(lw_, lh_);
+}
+
+void TerminalView::relayout(int lw, int lh) {
+    const int scale = std::max(1, get_scale_factor());
+    const bool rescale = scale != scale_;
+    if (rescale) {
+        scale_ = scale;
+        w_ = h_ = 0;  // no layout at the old device size with the new cell size
+        applyScale();
+    }
+    lw_ = lw;
+    lh_ = lh;
+    // Everything below works in device pixels: the logical allocation times the GTK scale.
+    const int w = lw * scale_, h = lh * scale_;
+    if (w == w_ && h == h_ && !rescale) return;
     w_ = w;
     h_ = h;
     allocateSurfaces();
@@ -484,6 +506,13 @@ void TerminalView::on_size_allocate(Gtk::Allocation& a) {
     fullRepaint_ = contentDirty_ = effectsSourceStale_ = true;
     updateContent();
     if (mode_ == Mode::Gl) gl_.queue_render();
+    else if (rescale) area_.queue_draw();
+}
+
+void TerminalView::applyScale() {
+    // New glyph rasterisation and pixel-sized effect parameters; the caller resizes.
+    applyProfile();  // drops the C++ effects; chooseMode() makes new ones with the scaled parameters
+    chooseMode();
 }
 
 bool TerminalView::updateContent() {
@@ -560,7 +589,8 @@ bool TerminalView::updateContent() {
     stats_.paintMs.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
     lastContentMs_ = nowMs();
     if (mode_ == Mode::Plain) {
-        area_.queue_draw_area(0, y0, w_, y1 - y0);
+        const int ly0 = y0 / scale_, ly1 = (y1 + scale_ - 1) / scale_;  // logical
+        area_.queue_draw_area(0, ly0, lw_, ly1 - ly0);
         srcDirtyY0_ = srcDirtyY1_ = 0;  // the plain view reads src_ directly
     }
     return true;
@@ -623,7 +653,7 @@ void TerminalView::updateQuality() {
                 (mode_ == Mode::Gl && isSoftwareRendererName(glRenderer_));
     const EffectsQuality q =
         qualityDemoted_ ? EffectsQuality::Static : resolveEffectsQuality(opts_.effectsQuality, software_);
-    const EffectParams fx = applyEffectsQuality(profile_.fx, q);
+    const EffectParams fx = scaleEffectParams(applyEffectsQuality(profile_.fx, q), scale_);
     const bool changed = q != quality_ || !sameEffectParams(fx, fx_);
     quality_ = q;
     fx_ = fx;
@@ -786,7 +816,8 @@ void TerminalView::pasteClipboard(bool primary) {
 
 bool TerminalView::cellAt(double x, double y, int& row, int& col) const {
     const float curvature = effectsOn_ && mode_ != Mode::Plain ? fx_.screenCurvature * 0.4f : 0.0f;
-    return pointToCell(x, y, w_, h_, curvature, marginX_, marginY_, painter_->cellWidth(), painter_->cellHeight(),
+    // Event coordinates are logical pixels; the layout is in device pixels.
+    return pointToCell(x * scale_, y * scale_, w_, h_, curvature, marginX_, marginY_, painter_->cellWidth(), painter_->cellHeight(),
                        session_->rows(), session_->cols(), row, col);
 }
 
@@ -859,8 +890,9 @@ bool TerminalView::onMotion(GdkEventMotion* ev) {
     }
     if (selecting_ && (ev->state & GDK_BUTTON1_MASK)) {
         // Dragging past the top/bottom edge scrolls the history.
-        if (ev->y < marginY_) scrollBy(1);
-        else if (ev->y >= h_ - marginY_) scrollBy(-1);
+        const double dy = ev->y * scale_;
+        if (dy < marginY_) scrollBy(1);
+        else if (dy >= h_ - marginY_) scrollBy(-1);
         sel_.extend(*session_, SelPos{session_->topLine() - scrollOffset_ + row, col});
         selectionChanged();
         return true;

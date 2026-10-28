@@ -48,6 +48,10 @@ struct EffectParams {
     // The M0 golden comparison used full resolution; both are kept so the M0 numbers can be
     // reproduced.
     bool burnInHalfRes = true;
+    // M2 HiDPI: device pixels per logical pixel (the GTK scale factor). Every pixel-sized
+    // parameter above is in device pixels; scaleEffectParams() converts a logical profile. The
+    // noise texture is sampled per logical pixel, so the grain looks the same at any scale.
+    float pixelScale = 1.0f;
 
     // True when the picture changes on its own (noise, flicker, jitter, sync, glowing line),
     // i.e. the view needs an effects tick even when the terminal content is unchanged.
@@ -79,6 +83,9 @@ bool softwareRenderingForced();
 EffectsQuality resolveEffectsQuality(EffectsQuality q, bool softwareRendering);
 // The profile parameters for a resolved quality (Full returns p unchanged).
 EffectParams applyEffectsQuality(const EffectParams& p, EffectsQuality resolved);
+// HiDPI: scanline period and bloom radius times `scale` (radius capped at 64, the shader limit),
+// pixelScale = scale. The picture at scale 2 is then the scale-1 picture at twice the resolution.
+EffectParams scaleEffectParams(const EffectParams& p, int scale);
 bool sameEffectParams(const EffectParams& a, const EffectParams& b);
 
 // Byte order of 8-bit source/destination pixels. BGRA is Cairo's ARGB32/RGB24 in memory on a

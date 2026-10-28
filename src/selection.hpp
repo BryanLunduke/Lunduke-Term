@@ -65,4 +65,14 @@ private:
 bool pointToCell(double x, double y, int width, int height, float curvature, int marginX, int marginY, int cellW,
                  int cellH, int rows, int cols, int& row, int& col);
 
+// Where the grid goes inside a widget of devW x devH device pixels (HiDPI: logical size times
+// `scale`). Margins and the grid size are worked out in logical pixels and then multiplied by
+// the scale, so the same logical window gets the same rows/cols at every scale. cellW/cellH are
+// device pixels (GridPainter at that scale), marginMinPx is logical.
+struct GridLayout {
+    int marginX = 0, marginY = 0;  // device pixels
+    int rows = 1, cols = 1;
+};
+GridLayout computeGridLayout(int devW, int devH, int scale, int cellW, int cellH, int marginMinPx, float marginFrac);
+
 }  // namespace lterm

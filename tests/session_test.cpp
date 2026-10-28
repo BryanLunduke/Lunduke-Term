@@ -195,6 +195,49 @@ static void testPointToCell() {
     CHECK(c < 8 && r < 3);  // flat mapping would give col 8, row 3
 }
 
+// M2 HiDPI: the layout and the mouse mapping at scale 2 equal the scale-1 ones.
+static void testScale2Mapping() {
+    for (float frac : {0.0f, 0.05f}) {
+        const GridLayout g1 = computeGridLayout(808, 464, 1, 10, 19, 4, frac);
+        const GridLayout g2 = computeGridLayout(1616, 928, 2, 20, 38, 4, frac);
+        CHECK_EQ(g1.rows, g2.rows);
+        CHECK_EQ(g1.cols, g2.cols);
+        CHECK_EQ(2 * g1.marginX, g2.marginX);
+        CHECK_EQ(2 * g1.marginY, g2.marginY);
+        if (frac == 0.0f) {
+            CHECK_EQ(g1.rows, 24);
+            CHECK_EQ(g1.cols, 80);
+        }
+        // Every logical pointer position (event coordinates) maps to the same cell; the view
+        // multiplies the event position by the scale before mapping.
+        for (float curv : {0.0f, 0.12f}) {
+            int bad = 0;
+            for (double y = 0.25; y < 464; y += 3.5)
+                for (double x = 0.25; x < 808; x += 3.5) {
+                    int r1, c1, r2, c2;
+                    const bool in1 = pointToCell(x, y, 808, 464, curv, g1.marginX, g1.marginY, 10, 19, g1.rows, g1.cols, r1, c1);
+                    const bool in2 = pointToCell(2 * x, 2 * y, 1616, 928, curv, g2.marginX, g2.marginY, 20, 38, g2.rows,
+                                                 g2.cols, r2, c2);
+                    if (in1 != in2 || r1 != r2 || c1 != c2) ++bad;
+                }
+            CHECK_EQ(bad, 0);
+        }
+    }
+    // Selection by mouse at scale 2: dragging over device pixels selects the same text.
+    VtermSession s(24, 80);
+    const char* t = "line 02: the quick brown fox\r\nline 03: jumps over the lazy dog";
+    s.feed(t, std::strlen(t));
+    const GridLayout g = computeGridLayout(1616, 928, 2, 20, 38, 4, 0.0f);
+    int r0, c0, r1, c1;
+    // logical (99, 13) .. (189, 32) -> device x2
+    pointToCell(2 * 99.0, 2 * 13.0, 1616, 928, 0.0f, g.marginX, g.marginY, 20, 38, g.rows, g.cols, r0, c0);
+    pointToCell(2 * 189.0, 2 * 32.0, 1616, 928, 0.0f, g.marginX, g.marginY, 20, 38, g.rows, g.cols, r1, c1);
+    Selection sel;
+    sel.begin(s, SelPos{s.topLine() + r0, c0}, SelectMode::Char);
+    sel.extend(s, SelPos{s.topLine() + r1, c1});
+    CHECK_EQ(sel.text(s), std::string("the quick brown fox\nline 03: jumps over"));
+}
+
 static void testMouse() {
     VtermSession s(24, 80);
     // No mode: nothing is reported.
@@ -427,6 +470,7 @@ int main() {
     testScrollback();
     testSelection();
     testPointToCell();
+    testScale2Mapping();
     testMouse();
     testPaste();
     testCursor();

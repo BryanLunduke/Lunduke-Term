@@ -17,13 +17,13 @@ namespace {
 const int W = 640, H = 400;
 
 double compare(GlEffects& gl, const EffectParams& p, const std::vector<uint8_t>& a, const std::vector<uint8_t>& b,
-               int* maxd) {
+               int* maxd, int w = W, int h = H) {
     CpuEffects cpu(p, 2);
-    std::vector<uint8_t> oc(W * H * 4), og(W * H * 4);
+    std::vector<uint8_t> oc(w * h * 4), og(w * h * 4);
     for (EffectsPipeline* e : {static_cast<EffectsPipeline*>(&cpu), static_cast<EffectsPipeline*>(&gl)}) {
-        e->resize(W, H);
-        e->setSource(a.data(), W * 4, 1000.0f);
-        e->setSource(b.data(), W * 4, 1100.0f);
+        e->resize(w, h);
+        e->setSource(a.data(), w * 4, 1000.0f);
+        e->setSource(b.data(), w * 4, 1100.0f);
         e->render(1180.0f, e == &cpu ? oc.data() : og.data());
     }
     double sq = 0;
@@ -35,7 +35,7 @@ double compare(GlEffects& gl, const EffectParams& p, const std::vector<uint8_t>&
             mx = std::max(mx, d);
         }
     *maxd = mx;
-    const double mse = sq / (W * H * 3.0);
+    const double mse = sq / (w * h * 3.0);
     return mse == 0 ? 99.0 : 10 * std::log10(255.0 * 255.0 / mse);
 }
 }  // namespace
@@ -69,6 +69,22 @@ int main() {
             GlEffects gq(p);
             const double ps = compare(gq, p, a, b, &mx);
             std::printf("%s %s: PSNR %.2f dB, max diff %d\n", prof, effectsQualityName(q), ps, mx);
+            if (ps < 40.0) ++fails;
+        }
+    }
+
+    // M2 HiDPI: scale 2 (1280x800 device pixels, the 640x400 logical frame with the font
+    // rasterised at 28 px) with the pixel-sized parameters scaled, for every quality level.
+    for (const char* prof : {"amber", "green-scanlines"}) {
+        const Profile* pr = findProfile(prof);
+        if (!pr) continue;
+        const auto a2 = renderSyntheticFrame(2 * W, 2 * H, 0, "DejaVu Sans Mono", 14, nullptr, 2);
+        const auto b2 = renderSyntheticFrame(2 * W, 2 * H, 3, "DejaVu Sans Mono", 14, nullptr, 2);
+        for (EffectsQuality q : {EffectsQuality::Full, EffectsQuality::Reduced, EffectsQuality::Static}) {
+            const EffectParams p = scaleEffectParams(applyEffectsQuality(pr->fx, q), 2);
+            GlEffects gq(p);
+            const double ps = compare(gq, p, a2, b2, &mx, 2 * W, 2 * H);
+            std::printf("%s %s scale 2: PSNR %.2f dB, max diff %d\n", prof, effectsQualityName(q), ps, mx);
             if (ps < 40.0) ++fails;
         }
     }

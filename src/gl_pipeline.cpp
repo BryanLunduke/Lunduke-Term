@@ -276,7 +276,8 @@ void GlPipeline::render(float timeMs, unsigned fbo, bool flipY) {
     float noiseAmount = p_.staticNoise;
     if (p_.horizontalSync != 0.0f && p_.staticNoise != 0.0f) noiseAmount += fu.hsyncScale * 7.0f;
     u1("noiseAmount", noiseAmount);
-    glUniform2f(glGetUniformLocation(p, "noiseScale"), (w_ * 0.75f) / kNoiseSize, (h_ * 0.75f) / kNoiseSize);
+    glUniform2f(glGetUniformLocation(p, "noiseScale"), (w_ / p_.pixelScale * 0.75f) / kNoiseSize,
+                (h_ / p_.pixelScale * 0.75f) / kNoiseSize);
     glUniform2f(glGetUniformLocation(p, "noiseOffset"), fu.noiseOffsetX, fu.noiseOffsetY);
     u1("glowingLine", d_.glowingLine);
     u1("burnIn", p_.burnIn);

@@ -108,4 +108,22 @@ bool pointToCell(double x, double y, int width, int height, float curvature, int
     return inside;
 }
 
+GridLayout computeGridLayout(int devW, int devH, int scale, int cellW, int cellH, int marginMinPx, float marginFrac) {
+    const int s = std::max(1, scale);
+    const int w = devW / s, h = devH / s;
+    const int cw = std::max(1, cellW / s), ch = std::max(1, cellH / s);
+    GridLayout g;
+    int mx = std::max(marginMinPx, static_cast<int>(w * marginFrac));
+    int my = std::max(marginMinPx, static_cast<int>(h * marginFrac));
+    g.cols = std::max(1, (w - 2 * mx) / cw);
+    g.rows = std::max(1, (h - 2 * my) / ch);
+    if (marginFrac > 0) {  // centre the grid inside the tube
+        mx = (w - g.cols * cw) / 2;
+        my = (h - g.rows * ch) / 2;
+    }
+    g.marginX = mx * s;
+    g.marginY = my * s;
+    return g;
+}
+
 }  // namespace lterm

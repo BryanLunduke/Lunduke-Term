@@ -8,6 +8,7 @@
 
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
+#include <gdk/gdkx.h>
 #include <gtkmm.h>
 
 #include <cerrno>
@@ -199,6 +200,47 @@ static void testScrollbackClampView() {
     CHECK(w2.view->session().scrollbackLimit() == 0);
 }
 
+// M2 HiDPI: the GTK scale factor changes at run time (as on a move to a monitor with another
+// scale): the view follows notify::scale-factor, renders at device resolution and keeps the
+// same logical grid and mouse mapping.
+static void testScaleChange(const char* profile) {
+    GdkDisplay* dpy = gdk_display_get_default();
+    if (!GDK_IS_X11_DISPLAY(dpy)) {
+        std::printf("scale test skipped: not X11\n");
+        return;
+    }
+    ViewOptions o;
+    o.command = {"/bin/cat"};
+    o.profile = profile;
+    Win w(o);
+    w.win.resize(400, 240);
+    CHECK(w.view->start());
+    pump(200);
+    const int s0 = w.view->scaleFactor();
+    const int lw = w.view->get_allocated_width(), lh = w.view->get_allocated_height();
+    const int rows = w.view->session().rows(), cols = w.view->session().cols();
+    CHECK(w.view->deviceWidth() == lw * s0);
+    int r1, c1, r2, c2;
+    w.view->cellAtLogical(lw * 0.37, lh * 0.61, r1, c1);
+    gdk_x11_display_set_window_scale(dpy, 2 * s0);
+    for (int i = 0; i < 50 && w.view->scaleFactor() != 2 * s0; ++i) pump(20);
+    pump(100);
+    std::printf("%s (%s): scale %d -> %d: device %dx%d -> %dx%d, grid %dx%d -> %dx%d\n", profile,
+                w.view->backendName().c_str(), s0, w.view->scaleFactor(), lw * s0,
+                lh * s0, w.view->deviceWidth(), w.view->deviceHeight(), cols, rows, w.view->session().cols(),
+                w.view->session().rows());
+    CHECK(w.view->scaleFactor() == 2 * s0);
+    const int lw2 = w.view->get_allocated_width(), lh2 = w.view->get_allocated_height();
+    CHECK(lw2 == lw && lh2 == lh);  // same logical size
+    CHECK(w.view->deviceWidth() == lw2 * 2 * s0 && w.view->deviceHeight() == lh2 * 2 * s0);
+    CHECK(w.view->session().rows() == rows && w.view->session().cols() == cols);
+    w.view->cellAtLogical(lw * 0.37, lh * 0.61, r2, c2);
+    CHECK(r1 == r2 && c1 == c2);
+    gdk_x11_display_set_window_scale(dpy, s0);
+    for (int i = 0; i < 50 && w.view->scaleFactor() != s0; ++i) pump(20);
+    CHECK(w.view->scaleFactor() == s0 && w.view->deviceWidth() == lw * s0);
+}
+
 int main(int argc, char** argv) {
     if (!getenv("DISPLAY") || !*getenv("DISPLAY")) {
         std::printf("view test skipped: no DISPLAY\n");
@@ -210,6 +252,8 @@ int main(int argc, char** argv) {
     testScrollbackClampView();
     testClipboardAfterClose();
     testReapAfterHangup();
+    testScaleChange("plain");
+    testScaleChange("amber");
     if (failures) {
         std::fprintf(stderr, "%d failure(s)\n", failures);
         return 1;
