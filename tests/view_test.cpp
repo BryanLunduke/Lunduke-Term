@@ -662,6 +662,68 @@ static void testGovernor(const char* renderer) {
     CHECK(w.view->effectsQuality() == EffectsQuality::Full);
 }
 
+// M3 item 1e: a settings.ini that is not a valid key file no longer blocks Save: the dialog
+// warns, the old text is kept in settings.ini.corrupt and a fresh file is written atomically.
+static void testCorruptSettings() {
+    const std::string dir = Glib::build_filename(Glib::get_tmp_dir(), "lterm-corrupt-test-" + std::to_string(getpid()));
+    const std::string ini = Glib::build_filename(dir, "settings.ini");
+    g_mkdir_with_parents(dir.c_str(), 0700);
+    const std::string bad = "[terminal\nprofile=green\n\xff\xfe garbage\n";
+    Glib::file_set_contents(ini, bad);
+    ViewOptions o;
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    TerminalWindow w(o);
+    w.settingsFile = ini;
+    w.set_default_size(480, 320);
+    w.show();
+    w.newTab(true);
+    pump(200);
+    w.showSettings();
+    pump(100);
+    SettingsDialog* d = w.settingsDialog();
+    CHECK(d != nullptr);
+    if (!d) return;
+    d->profile.set_active_id("amber");
+    pump(100);
+    d->save.clicked();
+    pump(50);
+    const std::string st = d->status.get_text();
+    std::printf("corrupt settings: status '%s'\n", st.c_str());
+    CHECK(st.rfind("Warning:", 0) == 0);
+    CHECK(st.find("Saved") != std::string::npos);
+    try {
+        Glib::KeyFile kf;
+        kf.load_from_file(ini);
+        CHECK(kf.get_string("terminal", "profile") == "amber");
+    } catch (const Glib::Error& err) {
+        std::fprintf(stderr, "settings.ini after save: %s\n", err.what().c_str());
+        ++failures;
+    }
+    std::string kept;
+    try { kept = Glib::file_get_contents(ini + ".corrupt"); } catch (...) {}
+    CHECK(kept == bad);
+    // Saving again: no warning now. And nothing else (no temporary file) is left in the dir.
+    d->save.clicked();
+    CHECK(d->status.get_text().rfind("Saved to", 0) == 0);
+    int entries = 0;
+    if (GDir* gd = g_dir_open(dir.c_str(), 0, nullptr)) {
+        while (const char* n = g_dir_read_name(gd)) {
+            ++entries;
+            CHECK(std::string(n) == "settings.ini" || std::string(n) == "settings.ini.corrupt");
+        }
+        g_dir_close(gd);
+    }
+    CHECK(entries == 2);
+    // Still an error (not a warning) when the file cannot be written at all.
+    std::string err, warn;
+    CHECK(!saveSettings(o, "/proc/self/lterm-no-such/settings.ini", &err, &warn));
+    CHECK(!err.empty());
+    d->response(Gtk::RESPONSE_CLOSE);
+    g_unlink((ini + ".corrupt").c_str());
+    g_unlink(ini.c_str());
+    g_rmdir(dir.c_str());
+}
+
 static char procState(pid_t pid) {  // 0: gone
     char path[64];
     std::snprintf(path, sizeof path, "/proc/%d/stat", pid);
@@ -797,6 +859,7 @@ int main(int argc, char** argv) {
     testSearchBig();
     testSearchBar();
     testSettingsDialog();
+    testCorruptSettings();
     testTabClose();
     testTabIds();
     testGovernor("auto");

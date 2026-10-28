@@ -15,8 +15,11 @@
 namespace lterm {
 
 std::string settingsPath();  // $XDG_CONFIG_HOME/lunduke-terminal/settings.ini
-// Writes the settings dialog's keys into settings.ini, keeping every other key. False on error.
-bool saveSettings(const ViewOptions& o, const std::string& path, std::string* error = nullptr);
+// Writes the settings dialog's keys into settings.ini, keeping every other key; atomic (temp file
+// + rename). A file that is not a valid key file is replaced (its text kept in <path>.corrupt)
+// and *warning says so. False on error.
+bool saveSettings(const ViewOptions& o, const std::string& path, std::string* error = nullptr,
+                  std::string* warning = nullptr);
 
 class SettingsDialog;
 

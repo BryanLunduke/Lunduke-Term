@@ -15,11 +15,27 @@ std::string settingsPath() {
     return Glib::build_filename(Glib::get_user_config_dir(), "lunduke-terminal", "settings.ini");
 }
 
-bool saveSettings(const ViewOptions& o, const std::string& path, std::string* error) {
+bool saveSettings(const ViewOptions& o, const std::string& path, std::string* error, std::string* warning) {
     Glib::KeyFile kf;
-    try {
-        if (Glib::file_test(path, Glib::FILE_TEST_EXISTS))
+    if (warning) warning->clear();
+    // Keep every other key, unless the file cannot be read as a key file (M2: Save then failed
+    // for good). M3: warn, keep the unreadable text as <path>.corrupt and write a fresh file.
+    if (Glib::file_test(path, Glib::FILE_TEST_EXISTS)) {
+        try {
             kf.load_from_file(path, Glib::KEY_FILE_KEEP_COMMENTS);
+        } catch (const Glib::Error& e) {
+            std::string msg = path + " was not valid (" + e.what() + "); it was replaced";
+            try {
+                Glib::file_set_contents(path + ".corrupt", Glib::file_get_contents(path));
+                msg += ", the old text is in " + path + ".corrupt";
+            } catch (const Glib::Error&) {
+            }
+            if (warning) *warning = msg;
+            std::fprintf(stderr, "lunduke-terminal: %s\n", msg.c_str());
+            kf = Glib::KeyFile();
+        }
+    }
+    try {
         const char* g = "terminal";
         auto drop = [&](const char* k) {
             if (kf.has_group(g) && kf.has_key(g, k)) kf.remove_key(g, k);
@@ -38,7 +54,9 @@ bool saveSettings(const ViewOptions& o, const std::string& path, std::string* er
             if (error) *error = "cannot create " + dir;
             return false;
         }
-        kf.save_to_file(path);
+        // Atomic: g_file_set_contents() writes a temporary file in the same directory, then
+        // renames it over the old one, so a crash never leaves a half-written settings.ini.
+        Glib::file_set_contents(path, kf.to_data());
         return true;
     } catch (const Glib::Error& e) {
         if (error) *error = e.what();
@@ -494,7 +512,9 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     addRow("Scrollback lines", scrollback);
     addRow("Bezel (frame)", frame);
     status.set_halign(Gtk::ALIGN_START);
-    status.set_ellipsize(Pango::ELLIPSIZE_MIDDLE);
+    status.set_line_wrap(true);
+    status.set_max_width_chars(60);
+    status.set_xalign(0);
     grid->attach(save, 0, row, 1, 1);
     grid->attach(status, 1, row, 1, 1);
     get_content_area()->pack_start(*grid, true, true);
@@ -505,9 +525,10 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     fontPx.signal_value_changed().connect(sigc::mem_fun(*this, &SettingsDialog::changed));
     scrollback.signal_value_changed().connect(sigc::mem_fun(*this, &SettingsDialog::changed));
     save.signal_clicked().connect([this] {
-        std::string err;
-        if (saveSettings(options(), win_.settingsFile, &err)) status.set_text("Saved to " + win_.settingsFile);
-        else status.set_text("Not saved: " + err);
+        std::string err, warn;
+        if (!saveSettings(options(), win_.settingsFile, &err, &warn)) status.set_text("Not saved: " + err);
+        else if (!warn.empty()) status.set_text("Warning: " + warn + ". Saved.");
+        else status.set_text("Saved to " + win_.settingsFile);
     });
 }
 
