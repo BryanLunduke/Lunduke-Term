@@ -464,6 +464,11 @@ void VtermSession::feed(const char* bytes, size_t len) {
     vterm_screen_flush_damage(screen_);
 }
 
+void VtermSession::clearTopContinuation() {
+    if (const VTermLineInfo* li = vterm_state_get_lineinfo(state_, 0); li && li->continuation)
+        const_cast<VTermLineInfo*>(li)->continuation = 0;
+}
+
 void VtermSession::resize(int rows, int cols) {
     if (rows < 1) rows = 1;
     if (cols < 1) cols = 1;
@@ -480,6 +485,13 @@ void VtermSession::resize(int rows, int cols) {
     const std::string pen = csiState_ == 0 ? penSgr() : std::string();
     const bool swapPen = !pen.empty() && pen != "\x1b[m";
     if (swapPen) feedRaw("\x1b[m", 3);
+    // libvterm 0.3.3 reflow bug: when the top row is the continuation of a line that has
+    // already scrolled out, resize_buffer() walks back to row -1 looking for the start of the
+    // line and reads cells from before its buffer (heap garbage on screen, invalid UTF-8 handed
+    // to Pango, and an out-of-bounds read). The start lives in our scrollback, which keeps its
+    // own wrapped flag, so on screen row 0 can simply start a line for libvterm. The lineinfo
+    // array is libvterm's mutable state; only the const accessor is public.
+    clearTopContinuation();
     vterm_set_size(vt_, rows, cols);  // reflow + scrollback push/pop happen in here
     if (swapPen) feedRaw(pen.data(), pen.size());
     wrapSnapActive_ = false;
@@ -801,6 +813,10 @@ int VtermSession::cbSetTermProp(VTermProp prop, VTermValue* val, void* user) {
         s->mouseMode_ = val->number;
         break;
     case VTERM_PROP_ALTSCREEN:
+        // Still the primary screen's line info here (libvterm switches after this callback).
+        // A resize while the alternate screen is up reflows the primary too, so it must not
+        // be left with a continuation in row 0 either (see resize()).
+        if (val->boolean && !s->altScreen_) s->clearTopContinuation();
         s->altScreen_ = val->boolean;
         s->damaged_ = true;
         break;

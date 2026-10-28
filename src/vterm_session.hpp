@@ -149,6 +149,7 @@ private:
     static void cbOutput(const char* s, size_t len, void* user);
     void feedRaw(const char* bytes, size_t len);
     void snapshotWraps();  // see wrapSnap_
+    void clearTopContinuation();  // libvterm 0.3.3 reflow reads row -1 otherwise (see resize())
 
     VTerm* vt_ = nullptr;
     VTermScreen* screen_ = nullptr;
