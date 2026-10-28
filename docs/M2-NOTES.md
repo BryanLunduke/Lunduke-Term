@@ -340,5 +340,100 @@ compositing on the unquantised row floats fixed it.
   margins 47/38 (they include the bezel); bezel, top edge and corner map to no cell; a press and
   drag on the bezel selects nothing; a drag from row 0 of the glass onto the bezel corner clamps
   to column 0 and copies the start of "alpha beta gamma". (That a bezel press is not reported to
-  a mouse-tracking application follows from the same early return in `onButtonPress`, which runs before the reporting branch; it is not covered
-  by a test.)
+  a mouse-tracking application follows from the same early return in `onButtonPress`, which
+  runs before the reporting branch; it is not covered by a test.)
+- `effects_test` printed "OK" half-way, before the M2 blocks, which hid two wrong expectations
+  in the first item-5 version (3198a9c): the glass-centre SDF bound (the value is −180 px, the
+  smaller half extent) and a reflection point that assumed a flat glass edge (the default
+  curvature pulls the edge in to x≈29 at mid-height). The checks now find the warped edge, and
+  the flat case is checked against the exact value; "OK" is printed once at the end.
+
+### Item 5 cost: idle CPU and per-frame time
+
+Raw data: `docs/bench/m2s2-host/` (bench-s2-host.sh, bench.txt, idle.txt) and
+`docs/bench/m2s2-tcg-lcos-100-01/` (vm-s2.sh, run.sh, bench-s2.sh, bench.txt, idle.txt, status).
+Idle = the real `lunduke-terminal`, 1280×800, bash idle at a prompt, window focused, CPU =
+(utime+stime)/wall over 10 s (host after 18 s, TCG after 40 s), 100 % = one core. Bezel =
+`--profile amber --frame`; RGB shift = `--profile ibm-dos` (0.3524) vs `--rgb-shift 0`.
+
+**Idle CPU, host (Debian 13, llvmpipe, own Xvfb :43) — REAL** (governor tick interval in brackets)
+
+| Quality | amber | amber + bezel | ibm-dos RGB .3524 | ibm-dos RGB 0 |
+|---|---|---|---|---|
+| GL auto (→ reduced) | 18.6 % (207 ms) | 16.2 % (283 ms) | 17.5 % (206 ms) | 18.3 % (214 ms) |
+| GL full | 21.4 % (212 ms) | 21.2 % (247 ms) | 22.6 % (210 ms) | 21.6 % (206 ms) |
+| GL reduced | 16.7 % (225 ms) | 15.8 % (276 ms) | 17.2 % (231 ms) | 19.2 % (171 ms) |
+| GL static | 0.0 % | 0.0 % | 0.0 % | 0.0 % |
+| CPU 4 thr auto (→ reduced) | 16.4 % (265 ms) | 17.7 % (274 ms) | 20.5 % (244 ms) | 17.6 % (249 ms) |
+| CPU 4 thr full | 17.5 % (387 ms) | 20.5 % (388 ms) | 20.4 % (417 ms) | 20.3 % (302 ms) |
+| CPU 4 thr reduced | 16.6 % (289 ms) | 17.7 % (263 ms) | 20.7 % (279 ms) | 14.9 % (287 ms) |
+| CPU 4 thr static | 0.0 % | 0.0 % | 0.0 % | 0.0 % |
+
+The governor holds the budget, so the bezel shows up as a longer tick interval (GL 207 → 283 ms
+under auto) rather than as more CPU. The host was shared with other agents' work; the
+differences of 1–3 points between the RGB-shift columns are within run-to-run noise.
+
+**Idle CPU, TCG VM (LCOS 1.0 live ISO, `-accel tcg -smp 4 -snapshot`, llvmpipe) — REAL**
+
+| Quality | amber | amber + bezel | ibm-dos RGB .3524 |
+|---|---|---|---|
+| GL auto (→ static) | 0.0 % | 0.0 % | 0.0 % |
+| GL static | 0.0 % | 0.0 % | 0.0 % |
+| CPU 4 thr auto (→ static) | 0.0 % | 0.0 % | 0.0 % |
+| CPU 4 thr static | 0.0 % | 0.0 % | 0.0 % |
+
+The run took 19:00:43–19:16:19 UTC (14:00–14:16 CDT); the VM was stopped with QMP `quit` at
+14:17:56 CDT. Explicit full/reduced were not re-run on TCG (they were > 100 % already without
+the new effects, see stage 1).
+
+**Per frame, median ms (tick / content pass), 1280×800, 4 threads — REAL**
+
+| Case | host GL (LP 4) | host CPU | TCG GL | TCG CPU |
+|---|---|---|---|---|
+| amber full | 7.80 / 27.56 | 14.84 / 16.58 | 2247.39 / 3372.53 | 410.40 / 701.34 |
+| amber + bezel full | 9.06 / 29.72 | 15.36 / 17.75 | 2412.06 / 3958.36 | 455.74 / 791.30 |
+| amber reduced | 6.71 / 20.80 | 10.60 / 13.94 | — | — |
+| amber + bezel reduced | 7.78 / 24.27 | 13.51 / 17.85 | — | — |
+| amber static | 4.76 / 19.42 | 7.01 / 16.96 | 750.29 / 2310.22 | 215.32 / 625.87 |
+| amber + bezel static | 5.51 / 22.78 | 6.80 / 14.94 | 816.40 / 2839.83 | 233.01 / 624.67 |
+| ibm-dos RGB .3524 full | 8.08 / 29.52 | 15.52 / 22.04 | 2248.08 / 4225.19 | 427.92 / 931.33 |
+| ibm-dos RGB 0 full | 7.26 / 25.88 | 16.12 / 19.62 | — | — |
+| ibm-dos RGB .3524 static | 4.64 / 20.63 | 6.28 / 19.13 | 750.23 / 2819.93 | 201.97 / 800.36 |
+| ibm-dos RGB 0 static | 4.56 / 17.82 | 5.84 / 13.69 | — | — |
+
+In static mode the tick is the one dynamic pass after a content change; nothing runs while idle.
+
+**DERIVED** (ratios of the REAL medians above)
+
+| Metric | host GL | host CPU | TCG GL | TCG CPU |
+|---|---|---|---|---|
+| bezel / no bezel, tick, full | 1.16 | 1.03 | 1.07 | 1.11 |
+| bezel / no bezel, tick, static | 1.16 | 0.97 | 1.09 | 1.08 |
+| bezel / no bezel, content pass, full | 1.08 | 1.07 | 1.17 | 1.13 |
+| RGB .3524 / RGB 0, content pass, full | 1.14 | 1.12 | — | — |
+| RGB .3524 / RGB 0, content pass, static | 1.16 | 1.40 | — | — |
+| RGB .3524 / RGB 0, tick, static | 1.02 | 1.08 | — | — |
+
+The bezel costs about 10 % per tick (one premultiplied composite) and nothing when idle in
+static. The RGB shift costs 12–40 % of the content pass (three samples instead of one in the
+static pass) and nothing per tick.
+
+### Screenshots (`/workspace/lcos-app-reviews/terminal-m2/`, host, 1000×640 logical)
+
+- RGB shift: `s2-rgbshift-ibmdos-gl.png`, `s2-rgbshift-ibmdos-cpu.png` (full),
+  `s2-rgbshift-ibmdos-static-{gl,cpu}.png`, `s2-rgbshift-ibmdos-off.png` (`--rgb-shift 0`),
+  `s2-rgbshift-ibmdos-crop-x4.png` / `s2-rgbshift-ibmdos-off-crop-x4.png` (4× crops, fringes),
+  `s2-rgbshift-amber-static.png` (`--rgb-shift 0.3524` on amber), `s2-rgbshift-ibmdos-scale2.png`.
+- Bezel: `s2-bezel-amber-{gl,cpu}-full.png`, `s2-bezel-amber-gl-reduced.png`,
+  `s2-bezel-amber-{gl,cpu}-static.png`, `s2-bezel-green-gl-static.png`,
+  `s2-bezel-green-scanlines-gl-full.png`, `s2-bezel-amber-glossy-light.png` (size 44, #c8c0b0,
+  shininess 1), `s2-bezel-amber-matte.png` (shininess 0), `s2-bezel-amber-scale2-gl.png`,
+  `s2-bezel-amber-scale2-cpu-static.png`, `s2-bezel-plain-ignored.png`,
+  `s2-bezel-ibmdos-ignored.png` (`--frame` ignored with a warning).
+- Bezel mouse (xdotool): a drag that starts on the left bezel selects nothing, also when it
+  ends in the far corner (`s2-bezel-drag-from-bezel.png`, `s2-bezel-drag-clamped-corner.png`),
+  nor does a click / double-click on the top bezel (`s2-bezel-click-on-bezel.png`); a
+  double-click inside selects a word (`s2-bezel-doubleclick-inside.png`); a drag from the glass
+  out to the bezel corner clamps to the last cell (`s2-bezel-drag-inside-to-bezel-corner.png`),
+  and a later click on the bezel leaves that selection alone
+  (`s2-bezel-click-on-bezel-keeps-selection.png`).
