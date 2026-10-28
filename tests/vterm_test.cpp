@@ -89,6 +89,15 @@ int main() {
         feed(u, "\x1b(0q\x1b" "7\x1b" "c\x1b" "8q");
         CHECK(u.rowText(0) == " q");
     }
+    // vttest 11.8.7.3: private mode 47 switches to/from the alternate screen.
+    {
+        VtermSession a(3, 10);
+        feed(a, "main\x1b[?4");
+        feed(a, "7hALT");
+        CHECK(a.altScreen() && a.rowText(0) == "    ALT");
+        feed(a, "\x1b[?47l");
+        CHECK(!a.altScreen() && a.rowText(0) == "main");
+    }
     // DECSCNM: libvterm reverses the cells itself; the grid must come out light exactly once.
     {
         VtermSession r(2, 10);

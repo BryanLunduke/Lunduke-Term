@@ -374,6 +374,12 @@ void VtermSession::feed(const char* bytes, size_t len) {
                     feedRaw(bytes + start, i + 1 - start);
                     wrapSnapActive_ = false;
                     done = i + 1;
+                } else if ((c == 'h' || c == 'l') && csiParams_ == "?47") {
+                    // xterm's original alternate screen; libvterm only knows 1047/1049. Feed
+                    // the (ignored) original, then its libvterm equivalent.
+                    feedRaw(bytes + done, i + 1 - done);
+                    done = i + 1;
+                    feedRaw(c == 'h' ? "\x1b[?1047h" : "\x1b[?1047l", 8);
                 } else if ((c == 'h' || c == 'l') && (csiParams_ == "?1048" || csiParams_ == "?1049")) {
                     if (c == 'h') savedCs_ = cs_;
                     else {
