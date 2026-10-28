@@ -161,6 +161,16 @@ private:
     int scanState_ = 0;
     int csiState_ = 0;    // feed(): 0 ground, 1 after ESC, 2 inside CSI
     long csiStart_ = -1;  // index of the ESC of the open CSI in the current chunk
+    // libvterm's DECSC/DECRC (ESC 7/8, CSI ?1048/?1049) do not save the character set state
+    // (G0/G1 designations, SO/SI), which a VT100 does; feed() tracks it and restores it.
+    struct Charsets {
+        char g0 = 'B', g1 = 'B';
+        bool shifted = false;  // SO: G1 invoked into GL
+    };
+    Charsets cs_, savedCs_;
+    int escTarget_ = 0;       // feed() state 3: 0 = G0, 1 = G1 being designated
+    std::string csiParams_;   // parameters of the open CSI (bounded)
+    void restoreCharsets();
     // Continuation flags of the screen rows, taken just before an operation that may push
     // several lines to the scrollback at once (CSI S, CSI M, resize). libvterm shifts its line
     // info before the pushes, which loses the flags of all but the last pushed row.

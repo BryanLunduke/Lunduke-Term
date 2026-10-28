@@ -173,6 +173,7 @@ private:
     sigc::connection writeWatch_, bellTimer_, blink_;
     double lastBellMs_ = -1e9;
     bool bellFlash_ = false;
+    bool inverseShown_ = false;  // margins currently painted for reverse video
     bool blinkOff_ = false;
     bool lastAlt_ = false;
     ViewStats stats_;

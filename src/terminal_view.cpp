@@ -502,8 +502,16 @@ bool TerminalView::updateContent() {
                     std::swap(cell.fg, cell.bg);
                 }
     }
-    if (session_->reverseVideo() != bellFlash_)
+    // DECSCNM: libvterm already reverses every cell (attrs.reverse ^ global reverse), so only the
+    // margins need it here. The visual bell inverts the cells and the margins.
+    if (bellFlash_)
         for (Cell& cell : next_.cells) std::swap(cell.fg, cell.bg);
+    const bool inverse = session_->reverseVideo() != bellFlash_;
+    if (inverse != inverseShown_) {
+        inverseShown_ = inverse;
+        fullRepaint_ = true;
+    }
+    const Color8 clearColor = inverse ? profile_.fg : profile_.bg;
     const int shape = session_->cursorShape();
     if (shape == VTERM_PROP_CURSORSHAPE_UNDERLINE) next_.cursorShape = Grid::CursorShape::Underline;
     else if (shape == VTERM_PROP_CURSORSHAPE_BAR_LEFT) next_.cursorShape = Grid::CursorShape::Bar;
@@ -527,10 +535,10 @@ bool TerminalView::updateContent() {
     if (n == 0 && !full) return false;
     cairo_t* c = cairo_create(src_);
     if (full) {
-        cairo_set_source_rgb(c, profile_.bg.r / 255.0, profile_.bg.g / 255.0, profile_.bg.b / 255.0);
+        cairo_set_source_rgb(c, clearColor.r / 255.0, clearColor.g / 255.0, clearColor.b / 255.0);
         cairo_paint(c);
     }
-    painter_->paintRows(c, next_, marginX_, marginY_, profile_.cursor, profile_.bg, full ? nullptr : &rows, w_);
+    painter_->paintRows(c, next_, marginX_, marginY_, inverse ? profile_.bg : profile_.cursor, clearColor, full ? nullptr : &rows, w_);
     cairo_destroy(c);
     std::swap(cur_, next_);
     fullRepaint_ = false;

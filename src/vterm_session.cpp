@@ -323,6 +323,12 @@ void VtermSession::snapshotWraps() {
 // Feeds the bytes to libvterm, but every CSI S (scroll up) and CSI M (delete lines) on its own,
 // with the line continuation flags saved just before it, so lines that leave the screen
 // several at a time keep their soft-wrap flag (see cbPushLine).
+void VtermSession::restoreCharsets() {
+    cs_ = savedCs_;
+    char seq[8] = {0x1b, '(', cs_.g0, 0x1b, ')', cs_.g1, static_cast<char>(cs_.shifted ? 0x0e : 0x0f), 0};
+    feedRaw(seq, 7);
+}
+
 void VtermSession::feed(const char* bytes, size_t len) {
     size_t done = 0;
     for (size_t i = 0; i < len; ++i) {
@@ -332,12 +338,26 @@ void VtermSession::feed(const char* bytes, size_t len) {
             if (c == 0x1b) {
                 csiState_ = 1;
                 csiStart_ = static_cast<long>(i);
-            }
+            } else if (c == 0x0e) cs_.shifted = true;
+            else if (c == 0x0f) cs_.shifted = false;
             break;  // (8-bit CSI 0x9B is not a control in UTF-8 mode, which we always use)
         case 1:
-            if (c == '[') csiState_ = 2;
-            else if (c == 0x1b) csiStart_ = static_cast<long>(i);
-            else csiState_ = 0;
+            if (c == '[') {
+                csiState_ = 2;
+                csiParams_.clear();
+            } else if (c == 0x1b) csiStart_ = static_cast<long>(i);
+            else if (c == '(' || c == ')') {
+                escTarget_ = c == '(' ? 0 : 1;
+                csiState_ = 3;
+            } else {
+                if (c == '7') savedCs_ = cs_;
+                else if (c == '8') {
+                    feedRaw(bytes + done, i + 1 - done);
+                    done = i + 1;
+                    restoreCharsets();
+                } else if (c == 'c') cs_ = savedCs_ = Charsets{};  // RIS
+                csiState_ = 0;
+            }
             break;
         case 2:
             if (c >= 0x40 && c <= 0x7e) {  // final byte
@@ -350,6 +370,13 @@ void VtermSession::feed(const char* bytes, size_t len) {
                     feedRaw(bytes + start, i + 1 - start);
                     wrapSnapActive_ = false;
                     done = i + 1;
+                } else if ((c == 'h' || c == 'l') && (csiParams_ == "?1048" || csiParams_ == "?1049")) {
+                    if (c == 'h') savedCs_ = cs_;
+                    else {
+                        feedRaw(bytes + done, i + 1 - done);
+                        done = i + 1;
+                        restoreCharsets();
+                    }
                 }
                 csiState_ = 0;
             } else if (c == 0x1b) {
@@ -357,6 +384,19 @@ void VtermSession::feed(const char* bytes, size_t len) {
                 csiStart_ = static_cast<long>(i);
             } else if (c == 0x18 || c == 0x1a) {
                 csiState_ = 0;  // CAN / SUB abort the sequence; other C0 controls do not end it
+            } else if (csiParams_.size() < 16) {
+                csiParams_ += c;
+            }
+            break;
+        case 3:  // ESC ( / ESC ) : intermediates, then the final byte names the set
+            if (c >= 0x30 && c <= 0x7e) {
+                (escTarget_ ? cs_.g1 : cs_.g0) = c;
+                csiState_ = 0;
+            } else if (c == 0x1b) {
+                csiState_ = 1;
+                csiStart_ = static_cast<long>(i);
+            } else if (c < 0x20 || c > 0x2f) {
+                csiState_ = 0;
             }
             break;
         }
