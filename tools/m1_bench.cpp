@@ -7,6 +7,7 @@
 //   lterm-m1-bench --compare                   CPU vs GL PSNR (golden sequence) at --size
 //   lterm-m1-bench --resize-loop N             N GL resizes, texture count + RSS, then PSNR
 //   common: --size WxH (1280x800) --profile ID (amber) --runs N --quality full|reduced|static (full)
+//           --frame (bezel on) --rgb-shift X
 #include "cpu_effects.hpp"
 #include "gl_effects.hpp"
 #include "grid_painter.hpp"
@@ -89,6 +90,8 @@ int main(int argc, char** argv) {
     std::vector<int> threads = {1, 4, 8};
     std::string profileId = "amber";
     EffectsQuality quality = EffectsQuality::Full;
+    bool frame = false;
+    float rgbShift = -1.0f;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : ""; };
@@ -107,6 +110,8 @@ int main(int argc, char** argv) {
             }
         }
         else if (a == "--size") std::sscanf(next(), "%dx%d", &W, &H);
+        else if (a == "--frame") frame = true;
+        else if (a == "--rgb-shift") rgbShift = static_cast<float>(std::atof(next()));
         else {
             std::fprintf(stderr, "unknown option %s\n", a.c_str());
             return 2;
@@ -117,7 +122,10 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "unknown profile %s\n", profileId.c_str());
         return 2;
     }
-    const EffectParams fx = applyEffectsQuality(prof->fx, quality);
+    EffectParams base = prof->fx;
+    if (frame) base.frame = true;
+    if (rgbShift >= 0) base.rgbShift = rgbShift;
+    const EffectParams fx = applyEffectsQuality(base, quality);
     const FontPick pick = profileFont(*prof);
     const std::string family = pick.family;
     const int px = pick.px;
