@@ -206,3 +206,47 @@ All in `/workspace/lcos-app-reviews/terminal-m2/`:
 ## Tests
 
 `meson test -C build` (DISPLAY = own Xvfb :43): 9/9 OK (profiles, painter, fonts, effects, vterm, session, fixes, gl-match, view).
+
+# M2 stage 2
+
+## Item 3: vttest, vim, htop, mc (own Xvfb :43 + xfwm4, XTEST via xdotool)
+
+Terminal: `build/lunduke-terminal --size 808x464 --profile plain` (80×24, TERM=xterm-256color).
+Programs from Debian trixie .debs unpacked into `/workspace/lterm-tools/root` (not installed):
+vttest 2.7 (20241208), vim 9.1.1230, htop 3.4.1, mc 4.8.33. Scripts: `tools/app-check/`.
+
+| Program | What was exercised | Result | Bug found |
+|---|---|---|---|
+| vttest 1 | box / E-frame (CUP, HVP, CUF, CUB, CUU, CUD, IND, RI, NEL, ED, EL, DECALN), DECAWM autowrap with BS/TAB/LF at the margin, controls inside CSI, leading zeros — 80 columns | pass | — |
+| vttest 1, 2, 8 | the 132-column passes (DECCOLM) | not supported: the window is not resized, so the 132-column screens draw wrapped in 80 columns. Same as xterm's default (`allowC132` off) and VTE | none fixed (documented) |
+| vttest 2 | DECAWM, TBC/HTS tab stops, DECSCNM light/dark background, DECSTBM soft and jump scroll (region 12–13 and 1–24, up/down), DECOM, SGR pattern (bold/underline/blink/negative), DECSC/DECRC | pass after fixes | **DECSCNM had no visible effect**: libvterm already reverses every cell for `?5h` and the view swapped them back. Fixed: the view now only inverts the margins (and the cursor colour) (3e7f6cb). **DECRC did not restore the character sets** (libvterm saves only position/pen/cursor modes): `line:`/`diamonds:` rows showed `qqqqq` / `` ````` ``. Fixed: `feed()` tracks G0/G1/SO-SI, saves them on ESC 7 / `?1048h` / `?1049h`, restores on ESC 8 / `?1048l` / `?1049l` (3e7f6cb). Open: SGR 5 blink is drawn as plain text |
+| vttest 3 | character sets B, A (£), 0 (DEC graphics), 1, 2 as G0 (SI) and G1 (SO) | pass | — |
+| vttest 6 | ENQ (empty answerback, as xterm), LNM set/reset (CR LF / CR), DSR 5 and 6 (incl. origin mode), DA (`?1;2c`), DA2 (`>0;100;0c`), DA3, DECREQTPARM 0 and 1 | pass after fix; DA3 not answered (VT420) | **DECREQTPARM (CSI x) was not answered** ("Bad format"). Fixed: CSI fallback answers `2;1;1;128;128;1;0x` / `3;…` like xterm (0426251) |
+| vttest 8 | IL/DL accordion, IRM insert mode, DCH, ICH, staggered DL — 80 columns | pass (132-column pass: see DECCOLM) | — |
+| vttest 11.5 | ISO 6429 HPA, CBT, CHA, CHT, HPR, VPA, CNL, CPL, VPR | pass | — |
+| vttest 11.6 | 8×8 colour matrix (bright off/on), SGR 0 reset, BCE with ED/EL and with ECH/indexing | pass (palette black is the profile's dark grey; margins keep the default background, as xterm's internal border) | — |
+| vttest 11.8 | set window title (OSC), mouse: X10, normal tracking, button-event tracking (press/release, cell coordinates checked), alternate screen 47 / 1047 / 1049 | 1049 pass; 47 pass after fix; 1047 "cursor save/restore failed" | **private mode 47 was ignored** (libvterm knows 1047/1049 only). Fixed: `?47h/l` also feeds `?1047h/l` (2ff2c87). Open: libvterm has one DECSC slot shared by both screens (xterm keeps one per screen), so the 47/1047 tests that DECSC on both screens report the alternate screen's position |
+| vim 9.1 | `syntax on` colours (C++), alt screen enter/leave, `mouse=a` click (cursor to 13,16 = screen col 20 − 4 gutter), drag → visual mode, wheel scroll, window resize 80×24 → 100×31 (`&columns &lines`), bracketed paste (Shift+Insert, `autoindent`, no staircase) | pass after fix | **After a resize inside vim, the shell screen came back with the blanks in reverse video** (`s2-vim-after-quit-before-fix.png`): libvterm fills cells created by resize/reflow with the *current* pen (vim's reverse status line), on the main screen too. Fixed: resize with the default pen, then restore the application's pen (only between escape sequences) (241ffd7) |
+| htop 3.4.1 | colours/meters, mouse click on a process row, wheel, resize 80×24 → 100×31, F1 help, quit (alt screen restored) | pass | — |
+| mc 4.8.33 | two panels, line drawing (frames, tees, corners), colours, mouse click in both panels, wheel, menubar click, resize, F10 click in the button bar | pass | — (only mc's own "sfs.ini not found" warnings from the unpacked, non-installed data dir) |
+
+New tests: `vterm` (DECSC/DECRC charsets incl. split chunks and `?1048`, RIS, mode 47, DECSCNM
+cell colours, resize pen on main/alt screen) and `session` (`testReports`: DECREQTPARM, DA). The
+resize-pen test fails without the fix (checked by stashing `src/`).
+
+Screenshots (`/workspace/lcos-app-reviews/terminal-m2/`): `s2-vttest-1-border.png`,
+`s2-vttest-1-autowrap.png`, `s2-vttest-1-132col.png`, `s2-vttest-2-sgr-light{,-before}.png`,
+`s2-vttest-2-decsc{,-before}.png`, `s2-vttest-3-charsets.png`, `s2-vttest-6-decreqtparm.png`,
+`s2-vttest-8-accordion.png`, `s2-vttest-11-hpa.png`, `s2-vttest-11-colors.png`,
+`s2-vttest-11-mouse.png`, `s2-vttest-11-altscreen-1049.png`, `s2-vim.png`,
+`s2-vim-resize-paste.png`, `s2-vim-after-quit{,-before-fix}.png`, `s2-htop.png`,
+`s2-htop-mouse.png`, `s2-htop-resized.png`, `s2-mc.png`, `s2-mc-menu.png`, `s2-mc-resized.png`.
+
+### CI
+
+`.github/workflows/ci.yml`: jobs `build-test` (debian:trixie container, apt build deps, meson
+setup/compile, `xvfb-run -a meson test`) and `sanitizers` (`-Db_sanitize=address,undefined`,
+`--timeout-multiplier 4`). Validated with yamllint 1.37.1 (default rules, line length 120) and a
+PyYAML load; every apt package name was checked against the trixie `Packages` index. The same
+steps were run locally: release `xvfb-run -a meson test` 9/9 OK, ASan+UBSan build 9/9 OK, no
+`runtime error` in the log. **The workflow has not run on GitHub yet.** See `docs/TESTING.md`.

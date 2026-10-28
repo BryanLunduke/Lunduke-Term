@@ -1,0 +1,7 @@
+set nocompatible
+syntax on
+set mouse=a
+set autoindent
+set number
+set ruler
+set laststatus=2
