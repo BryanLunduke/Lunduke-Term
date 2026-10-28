@@ -80,7 +80,6 @@ int main() {
         CHECK(ghost <= 1);  // long after: gone
     }
 
-    if (failures == 0) std::printf("effects_test: OK\n");
     // M2 effects quality.
     {
         EffectsQuality q;
@@ -178,7 +177,8 @@ int main() {
         p.frameSize = 20;
         const FrameGeometry g = frameGeometry(p, 640, 400);
         CHECK(g.inset == 20.0f && g.innerW == 600.0f && g.radius == 12.0f);
-        CHECK(screenSdf(g, 0.5f, 0.5f) < -190.0f);
+        // Centre of the glass: minus the smaller half extent, (400 - 2 * 20) / 2 = 180 px.
+        CHECK(std::fabs(screenSdf(g, 0.5f, 0.5f) + 180.0f) < 1e-3f);
         CHECK(std::fabs(screenSdf(g, 0.0f, 0.5f)) < 1e-3f);
         CHECK(screenSdf(g, 0.0f, 0.0f) > 4.0f);  // rounded corner: outside the glass
         // Static layer: opaque frame at the window edge, empty in the middle of the glass,
@@ -189,8 +189,25 @@ int main() {
         CHECK(at(base, 2, 200)[3] == 1.0f);
         CHECK(at(base, 320, 300)[3] == 0.0f && at(base, 320, 300)[0] == 0.0f);
         CHECK(at(base, 200, 90)[3] == 0.0f && at(base, 200, 90)[0] > 0.01f);
-        CHECK(at(refl, 15, 200)[0] > 0.05f);  // reflection weight next to the glass
         CHECK(at(refl, 320, 200)[0] == 0.0f);
+        // Reflection weight: strongest on the bezel right next to the glass and falling off
+        // outwards. The default curvature (0.3) pulls the glass edge in at mid-height, so find
+        // the edge on row 200 instead of assuming the flat inset (x = 20).
+        {
+            int edge = -1;
+            for (int x = 0; x < 320 && edge < 0; ++x)
+                if (at(base, x, 200)[3] < 1.0f) edge = x;  // first pixel not fully covered by the frame
+            CHECK(edge > 20 && edge < 40);
+            CHECK(at(refl, edge - 1, 200)[0] > 0.05f);
+            for (int x = 1; x < edge; ++x) CHECK(at(refl, x - 1, 200)[0] <= at(refl, x, 200)[0]);
+            // Flat glass: the edge is the inset, and 4.5 px out the weight is .5 * .45 * exp(-4.5 / 6).
+            EffectParams f = p;
+            f.screenCurvature = 0.0f;
+            std::vector<float> fb(base.size()), fr(base.size());
+            frameLayerRows(f, 640, 400, 0, 400, fb.data(), fr.data());
+            CHECK(at(fb, 19, 200)[3] == 1.0f && at(fb, 20, 200)[3] < 1.0f);
+            CHECK(std::fabs(at(fr, 15, 200)[0] - 0.5f * 0.45f * std::exp(-4.5f / 6.0f)) < 1e-3f);
+        }
         // Reflection: a bright column just inside the glass shows up mirrored on the bezel.
         EffectParams q = p;
         q.staticNoise = q.jitter = q.flickering = q.horizontalSync = q.glowingLine = q.burnIn = 0.0f;
@@ -230,5 +247,6 @@ int main() {
         std::printf("rgb shift fringes: left %d,%d,%d right %d,%d,%d\n", lft[0], lft[1], lft[2], rgt[0], rgt[1], rgt[2]);
         CHECK(lft[0] > lft[2] && rgt[2] > rgt[0]);
     }
+    std::printf(failures ? "effects_test: %d FAILED\n" : "effects_test: OK\n", failures);
     return failures ? 1 : 0;
 }
