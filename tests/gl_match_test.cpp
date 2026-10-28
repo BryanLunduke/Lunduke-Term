@@ -95,7 +95,11 @@ int main() {
     const Variant variants[] = {{"ibm-dos rgb", "ibm-dos", false, -1.0f},
                                 {"amber bezel", "amber", true, -1.0f},
                                 {"green-scanlines bezel", "green-scanlines", true, -1.0f},
-                                {"amber bezel+rgb", "amber", true, 0.3524f}};
+                                {"amber bezel+rgb", "amber", true, 0.3524f},
+                                // M2 stage 3 profiles (vintage: scanlines + rgb shift + bezel)
+                                {"vintage bezel", "vintage", true, -1.0f},
+                                {"futuristic", "futuristic", false, -1.0f},
+                                {"paper-white bezel", "paper-white", true, -1.0f}};
     for (int scale : {1, 2}) {
         const auto a2 = renderSyntheticFrame(scale * W, scale * H, 0, "DejaVu Sans Mono", 14, nullptr, scale);
         const auto b2 = renderSyntheticFrame(scale * W, scale * H, 3, "DejaVu Sans Mono", 14, nullptr, scale);
