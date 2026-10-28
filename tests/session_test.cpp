@@ -48,7 +48,7 @@ static std::string esc(const std::string& s) {
     }
     return o;
 }
-static std::string esc(const char* s) { return esc(std::string(s)); }
+[[maybe_unused]] static std::string esc(const char* s) { return esc(std::string(s)); }
 static std::string esc(long v) { return std::to_string(v); }
 static std::string esc(int v) { return std::to_string(v); }
 static std::string esc(size_t v) { return std::to_string(v); }
@@ -335,9 +335,11 @@ static void testEnvironment() {
 // Runs the session until the child exits; returns the wait status.
 static int runToExit(VtermSession& s, std::string* transcript) {
     int status = -1;
-    for (int i = 0; i < 500; ++i) {
+    // Bounded by time, not by iterations: once the child has closed the PTY, poll() returns at
+    // once with POLLHUP, and a few hundred iterations can pass before the child is reapable.
+    for (int i = 0; i < 1000; ++i) {
         pollfd p{s.masterFd(), POLLIN, 0};
-        poll(&p, 1, 20);
+        if (poll(&p, 1, 20) > 0 && (p.revents & (POLLHUP | POLLERR))) usleep(10000);
         s.readAvailable();
         pid_t r = waitpid(s.childPid(), &status, WNOHANG);
         if (r == s.childPid()) {
