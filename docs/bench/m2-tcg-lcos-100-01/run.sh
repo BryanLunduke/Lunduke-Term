@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Runs inside the LCOS 1.0 live guest (TCG). Payload disk mounted at /t. M2 stage 1.
 export LD_LIBRARY_PATH=/t/lib FONTCONFIG_FILE=/t/fonts.conf DISPLAY=:0 XAUTHORITY=/home/lcos/.Xauthority
 export PATH=/t/bin:$PATH

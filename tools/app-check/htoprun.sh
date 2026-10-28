@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 start_term --size 808x464 --profile ${PROF:-plain} -e bash --norc --noprofile
 echo "WIN=$WIN TPID=$TPID" > $S2/cur.env

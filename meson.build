@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 project('lunduke-terminal', 'cpp',
   version : '0.0.1',
   license : 'GPL-3.0-or-later',

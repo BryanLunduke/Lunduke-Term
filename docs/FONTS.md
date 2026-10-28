@@ -95,7 +95,6 @@ at integer multiples of their design size.
 
 | Future profile | Font (package) | Size hint |
 |---|---|---|
-| c64 | `C-64` (fonts-sixtyfour) | multiples of 8 px |
 | amiga | `Amiga` (fonts-amiga) | multiples of 8 px |
 | atari-800 | `"Atari800"` (fonts-atarismall) | multiples of 8 px |
 | atari-st | `Atari` (fonts-atarist) | 16 px |
