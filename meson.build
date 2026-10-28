@@ -24,7 +24,7 @@ effects_lib = static_library('lterm-effects',
 gl_lib = static_library('lterm-gl', 'src/gl_effects.cpp', 'src/gl_pipeline.cpp',
   link_with : effects_lib, dependencies : [epoxy_dep, egl_dep])
 
-vterm_lib = static_library('lterm-vterm', 'src/vterm_session.cpp', 'src/selection.cpp',
+vterm_lib = static_library('lterm-vterm', 'src/vterm_session.cpp', 'src/selection.cpp', 'src/search.cpp',
   link_with : effects_lib, dependencies : [vterm_dep, util_dep, pangocairo_dep])
 
 executable('lunduke-terminal',
@@ -78,6 +78,9 @@ test('session', executable('session_test', 'tests/session_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
   timeout : 60)
 test('fixes', executable('fixes_test', 'tests/fixes_test.cpp',
+  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
+  timeout : 60)
+test('search', executable('search_test', 'tests/search_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
   timeout : 60)
 # GTK-level fixes; AddressSanitizer makes a use-after-free fail loudly. Skips without $DISPLAY.
