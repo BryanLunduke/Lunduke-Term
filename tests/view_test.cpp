@@ -716,6 +716,67 @@ static void testTabClose() {
     }
 }
 
+// M3 item 1d: deferred closes use tab ids (run under ASan: a stale pointer would show).
+static void testTabIds() {
+    ViewOptions o;
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    {   // The close button clicked twice: one close.
+        TerminalWindow w(o);
+        w.show();
+        for (int i = 0; i < 4; ++i) w.newTab(true);
+        pump(200);
+        TerminalView* v1 = w.view(1);
+        Gtk::Button* b = w.closeButton(v1);
+        CHECK(b && w.tabId(v1) != 0);
+        if (b) {
+            b->clicked();
+            b->clicked();
+        }
+        pump(100);
+        CHECK(w.tabCount() == 3);
+        CHECK(w.tabId(v1) == 0);
+        // A deferred close for a tab that is closed (and maybe replaced at the same address)
+        // before it runs: the new tab survives.
+        TerminalView* v = w.view(1);
+        w.closeButton(v)->clicked();  // deferred
+        w.closeTab(v);                // closed right away
+        TerminalView* nv = w.newTab(true);
+        const bool sameAddress = nv == v;
+        pump(100);
+        CHECK(w.tabCount() == 3);
+        CHECK(nv && w.tabId(nv) != 0);
+        // Close while a close is in progress: a handler that runs while the page goes away
+        // closes the same tab and another one.
+        TerminalView* a = w.view(0);
+        TerminalView* other = w.view(2);
+        a->signal_unmap().connect([&w, a, other] {
+            w.closeTab(a);      // already out of the window: nothing
+            w.closeTab(other);  // deferred until the first close is done
+        });
+        w.setCurrent(0);
+        pump(50);
+        w.closeTab(a);
+        CHECK(w.tabId(other) != 0);  // not yet
+        pump(100);
+        CHECK(w.tabCount() == 1);
+        CHECK(w.tabId(other) == 0);
+        std::printf("tab ids: double click -> 1 close, late close after reuse%s -> new tab kept, nested close ok\n",
+                    sameAddress ? " (same address)" : "");
+        // Reordered tabs: page numbers and views agree.
+        TerminalView* x = w.newTab(true);
+        TerminalView* y = w.newTab(true);
+        pump(100);
+        w.reorderForTest(y, 0);
+        CHECK(w.view(0) == y);
+        w.setCurrent(0);
+        pump(50);
+        CHECK(w.currentView() == y && y->windowVisible() && !x->windowVisible());
+        w.closeButton(y)->clicked();  // pending when the window goes away
+    }
+    pump(100);  // the idle close must not touch the destroyed window
+    CHECK(waitFor([&] { return TerminalView::pendingReaps() == 0; }, 5000));
+}
+
 int main(int argc, char** argv) {
     if (!getenv("DISPLAY") || !*getenv("DISPLAY")) {
         std::printf("view test skipped: no DISPLAY\n");
@@ -737,6 +798,7 @@ int main(int argc, char** argv) {
     testSearchBar();
     testSettingsDialog();
     testTabClose();
+    testTabIds();
     testGovernor("auto");
     testGovernor("cpu");
     if (failures) {

@@ -111,8 +111,8 @@ TerminalWindow::TerminalWindow(const ViewOptions& opts, const std::string& title
 
     nb_.signal_switch_page().connect([this](Gtk::Widget*, guint num) {
         // The search follows the shown tab.
-        for (int i = 0; i < tabCount(); ++i)
-            if (i != static_cast<int>(num)) tabs_[i]->view->clearSearch();
+        for (auto& t : tabs_)
+            if (nb_.page_num(*t->view) != static_cast<int>(num)) t->view->clearSearch();
         // Deferred: the page is not current yet. mem_fun: dropped if the window goes first.
         Glib::signal_idle().connect_once(sigc::mem_fun(*this, &TerminalWindow::afterSwitch));
     });
@@ -153,8 +153,9 @@ TerminalWindow::~TerminalWindow() {
     settings_.reset();
     // Views first (they hang up their shells), while the notebook still exists.
     while (!tabs_.empty()) {
-        nb_.remove_page(*tabs_.back()->view);
+        std::unique_ptr<Tab> dead = std::move(tabs_.back());
         tabs_.pop_back();
+        nb_.remove_page(*dead->view);
     }
 }
 
@@ -164,9 +165,43 @@ int TerminalWindow::indexOf(const TerminalView* v) const {
     return -1;
 }
 
-TerminalView* TerminalWindow::currentView() {
-    const int i = nb_.get_current_page();
-    return view(i);
+// Notebook page -> tab. Tabs are reorderable, so the page number is not the index in tabs_
+// (M2 mixed the two up after a drag). A page being removed is no longer in tabs_.
+TerminalWindow::Tab* TerminalWindow::tabAtPage(int page) const {
+    const Gtk::Widget* w = page >= 0 ? nb_.get_nth_page(page) : nullptr;
+    if (!w) return nullptr;
+    for (const auto& t : tabs_)
+        if (t->view.get() == w) return t.get();
+    return nullptr;
+}
+
+TerminalView* TerminalWindow::view(int page) {
+    Tab* t = tabAtPage(page);
+    return t ? t->view.get() : nullptr;
+}
+
+TerminalView* TerminalWindow::currentView() { return view(nb_.get_current_page()); }
+
+TerminalWindow::Tab* TerminalWindow::tabById(unsigned long id) const {
+    for (const auto& t : tabs_)
+        if (t->id == id) return t.get();
+    return nullptr;
+}
+
+unsigned long TerminalWindow::tabId(const TerminalView* v) const {
+    const int i = indexOf(v);
+    return i < 0 ? 0 : tabs_[i]->id;
+}
+
+void TerminalWindow::closeTabLater(unsigned long id) {
+    // mem_fun on the window (a sigc::trackable): the idle callback is dropped if the window
+    // goes first. The id, not the view pointer: a closed tab's address may be reused by a new
+    // tab before the idle callback runs.
+    Glib::signal_idle().connect_once(sigc::bind(sigc::mem_fun(*this, &TerminalWindow::closeTabById), id));
+}
+
+void TerminalWindow::closeTabById(unsigned long id) {
+    if (Tab* t = tabById(id)) closeTab(t->view.get());
 }
 
 TerminalView* TerminalWindow::newTab(bool first) {
@@ -186,6 +221,8 @@ TerminalView* TerminalWindow::newTab(bool first) {
         }
     }
     auto tab = std::make_unique<Tab>();
+    tab->id = nextTabId_++;
+    const unsigned long id = tab->id;
     tab->view = std::make_unique<TerminalView>(o);
     TerminalView* v = tab->view.get();
     tab->text.set_text(baseTitle_);
@@ -200,9 +237,7 @@ TerminalView* TerminalWindow::newTab(bool first) {
     tab->label.pack_start(tab->close, false, false);
     tab->label.show_all();
     // Deferred: the button lives in the tab that is closed.
-    tab->close.signal_clicked().connect([this, v] {
-        Glib::signal_idle().connect_once(sigc::bind(sigc::mem_fun(*this, &TerminalWindow::closeTab), v));
-    });
+    tab->close.signal_clicked().connect([this, id] { closeTabLater(id); });
 
     v->signalTitle.connect([this, v](const std::string& t) {
         const int i = indexOf(v);
@@ -214,9 +249,7 @@ TerminalView* TerminalWindow::newTab(bool first) {
     });
     // The child exited (and is not held): close the tab. Deferred, because this is emitted from
     // inside the view (its child watch or key handler).
-    v->signalChildExited.connect([this, v] {
-        Glib::signal_idle().connect_once(sigc::bind(sigc::mem_fun(*this, &TerminalWindow::closeTab), v));
-    });
+    v->signalChildExited.connect([this, id] { closeTabLater(id); });
     v->signalExitStatus.connect([this, v](int status) {
         const int i = indexOf(v);
         if (i < 0) return;
@@ -254,8 +287,18 @@ TerminalView* TerminalWindow::newTab(bool first) {
 void TerminalWindow::closeTab(TerminalView* v) {
     const int i = indexOf(v);
     if (i < 0 || closing_) return;
-    nb_.remove_page(*v);
-    tabs_.erase(tabs_.begin() + i);  // the view's destructor hangs up its shell
+    if (closingTab_) {  // called from inside another close (a signal while a view goes away)
+        closeTabLater(tabs_[i]->id);
+        return;
+    }
+    closingTab_ = true;
+    // Out of tabs_ first: anything that runs while the page and the view go away (switch-page,
+    // the view's signals) no longer finds this tab.
+    std::unique_ptr<Tab> dead = std::move(tabs_[i]);
+    tabs_.erase(tabs_.begin() + i);
+    nb_.remove_page(*dead->view);
+    dead.reset();  // the view's destructor hangs up its shell (without waiting)
+    closingTab_ = false;
     nb_.set_show_tabs(tabCount() > 1);
     if (tabs_.empty()) {
         hide();  // the last tab closes the window (and ends Gtk::Application::run)
@@ -276,16 +319,17 @@ void TerminalWindow::afterSwitch() {
 void TerminalWindow::updateVisibility() {
     const int cur = nb_.get_current_page();
     const bool shown = mapped_ && !iconified_ && !obscured_;
-    for (int i = 0; i < tabCount(); ++i) {
-        tabs_[i]->view->setWindowVisible(shown && i == cur);
-        tabs_[i]->view->setWindowActive(is_active() && i == cur);
+    for (auto& t : tabs_) {
+        const bool current = nb_.page_num(*t->view) == cur;
+        t->view->setWindowVisible(shown && current);
+        t->view->setWindowActive(is_active() && current);
     }
 }
 
 void TerminalWindow::updateTitle() {
-    const int i = nb_.get_current_page();
-    if (i < 0 || i >= tabCount() || tabs_[i]->title.empty()) set_title(baseTitle_);
-    else set_title(tabs_[i]->title + " - Lunduke Terminal");
+    const Tab* t = tabAtPage(nb_.get_current_page());
+    if (!t || t->title.empty()) set_title(baseTitle_);
+    else set_title(t->title + " - Lunduke Terminal");
 }
 
 // ---- search ----

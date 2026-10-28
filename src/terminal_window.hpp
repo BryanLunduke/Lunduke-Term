@@ -29,7 +29,17 @@ public:
     void closeTab(TerminalView* v);
     int tabCount() const { return static_cast<int>(tabs_.size()); }
     TerminalView* currentView();
-    TerminalView* view(int i) { return i >= 0 && i < tabCount() ? tabs_[i]->view.get() : nullptr; }
+    TerminalView* view(int page);  // by notebook page (tabs are reorderable)
+    // M3 item 1d: tabs have ids; deferred closes (close button, child exit) use the id, so a
+    // close that arrives late or twice finds nothing instead of a dangling or reused pointer.
+    unsigned long tabId(const TerminalView* v) const;  // 0: not a tab of this window
+    void closeTabById(unsigned long id);
+    void closeTabLater(unsigned long id);
+    void reorderForTest(TerminalView* v, int page) { nb_.reorder_child(*v, page); }
+    Gtk::Button* closeButton(const TerminalView* v) {  // tests
+        const int i = indexOf(v);
+        return i < 0 ? nullptr : &tabs_[i]->close;
+    }
     int currentIndex() const { return nb_.get_current_page(); }
     void setCurrent(int i) { nb_.set_current_page(i); }
     bool tabsShown() const { return nb_.get_show_tabs(); }
@@ -57,7 +67,10 @@ private:
         Gtk::Label text;
         Gtk::Button close;
         std::string title;
+        unsigned long id = 0;
     };
+    Tab* tabAtPage(int page) const;
+    Tab* tabById(unsigned long id) const;
     void afterSwitch();
     void updateVisibility();
     void updateTitle();
@@ -78,6 +91,8 @@ private:
     std::unique_ptr<SettingsDialog> settings_;
     bool iconified_ = false, obscured_ = false, mapped_ = false;
     bool closing_ = false;
+    bool closingTab_ = false;
+    unsigned long nextTabId_ = 1;
 };
 
 class SettingsDialog : public Gtk::Dialog {
