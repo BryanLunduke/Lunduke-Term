@@ -434,6 +434,54 @@ static void testSearchView() {
     pump(400);
 }
 
+// M3 1(a): a 100 000-line scrollback. Typing must not block the main loop: the cache is built in
+// short idle slices (the query is pending meanwhile), then each keystroke is a quick find().
+static void testSearchBig() {
+    ViewOptions o;
+    o.scrollbackLines = 100000;
+    Win w(o);
+    TerminalView& v = *w.view;
+    std::string chunk;
+    for (int i = 0; i < 100000; ++i) {
+        chunk += "[" + std::to_string(i) + "] build step" + (i % 1000 == 500 ? " Needle" : "") + "\r\n";
+        if (chunk.size() > 65536) {
+            v.session().feed(chunk);
+            chunk.clear();
+        }
+    }
+    v.session().feed(chunk);
+    CHECK(v.session().scrollbackSize() >= 99000);
+    v.resetSearchStats();
+    v.prepareSearch(false);  // the search bar opened
+    CHECK(v.setSearch("n", false) == 0 && v.searchPending());  // not cached yet: pending, no block
+    const double first = v.searchMaxMainMs();
+    int turns = 0;
+    for (; turns < 2000 && v.searchPending(); ++turns) pump(2);
+    CHECK(!v.searchPending());
+    const int n1 = v.searchCount();
+    double worstKey = 0;
+    for (const char* q : {"ne", "nee", "need", "needl", "needle"}) {
+        v.resetSearchStats();
+        v.setSearch(q, false);
+        CHECK(!v.searchPending());
+        worstKey = std::max(worstKey, v.searchMaxMainMs());
+    }
+    std::printf("view search, 100000 lines (ASan build): first keystroke %.2f ms (pending, %d turns), "
+                "worst later keystroke %.2f ms, 'n' %d / 'needle' %d matches\n",
+                first, turns, worstKey, n1, v.searchCount());
+    CHECK(v.searchCount() == 100);
+    CHECK(v.searchIndex() == 99);
+    CHECK(v.searchStep(true) && v.searchIndex() == 98);  // Enter: older
+    CHECK(v.searchStep(false) && v.searchIndex() == 99); // Shift+Enter: newer
+    CHECK(first < 100.0);    // bounded slice (4 ms nominal; ASan and a loaded box get slack)
+    CHECK(worstKey < 200.0);
+    // A query that is still pending when the view goes away (ASan: the idle worker must stop).
+    v.clearSearch();
+    CHECK(v.setSearch("needle", false) == 0 && v.searchPending());
+    w.dropView();
+    pump(100);
+}
+
 static void testSearchBar() {
     ViewOptions o;
     o.command = {"/bin/sh", "-c", "echo alpha; echo beta ALPHA; exec sleep 30"};
@@ -572,6 +620,7 @@ int main(int argc, char** argv) {
     testBezelPointer("cpu");
     testTabs();
     testSearchView();
+    testSearchBig();
     testSearchBar();
     testSettingsDialog();
     if (failures) {

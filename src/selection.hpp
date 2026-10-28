@@ -5,6 +5,7 @@
 
 #include "effects.hpp"
 
+#include <cstdint>
 #include <string>
 
 namespace lterm {
@@ -19,6 +20,13 @@ public:
     virtual std::string cellText(long line, int col) const = 0;  // "" = blank
     virtual int cellWidth(long line, int col) const = 0;         // 0 = right half of a wide char
     virtual bool wrapped(long line) const = 0;                   // soft-wrapped into line + 1
+    // For caches (search): lines in [firstLine(), stableEnd()) do not change while they exist
+    // (scrollback), until contentEpoch() changes (history cleared, lines popped back, resize).
+    virtual long stableEnd() const { return firstLine(); }
+    virtual unsigned long contentEpoch() const { return 0; }
+    // Code points of a cell (at most max) and its width (0 = right half of a wide character).
+    // The default goes through cellText()/cellWidth(); sources may do it without allocating.
+    virtual int cellChars(long line, int col, uint32_t* out, int max, int* width) const;
 };
 
 struct SelPos {

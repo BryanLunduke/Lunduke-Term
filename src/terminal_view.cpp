@@ -111,6 +111,7 @@ TerminalView::~TerminalView() {
     }
     writeWatch_.disconnect();
     searchRefresh_.disconnect();
+    searchWork_.disconnect();
     bellTimer_.disconnect();
     blink_.disconnect();
     io_.disconnect();
@@ -1058,25 +1059,96 @@ bool TerminalView::onKey(GdkEventKey* ev) {
 
 // ---- M2 stage 3: search ----
 
+namespace {
+constexpr long long kSearchSliceUs = 4000;  // longest main-thread piece of a search
+}
+
+void TerminalView::noteSearchTime(gint64 t0) {
+    searchMaxMainMs_ = std::max(searchMaxMainMs_, (g_get_monotonic_time() - t0) / 1000.0);
+}
+
+bool TerminalView::searchIndexStep(long long deadlineUs) {
+    return searchIndex_.update(*session_, searchCase_, deadlineUs);
+}
+
+void TerminalView::startSearchWork() {
+    if (searchWork_.connected()) return;
+    // Below redraws and input: a slice runs only when the main loop has nothing else to do.
+    searchWork_ = Glib::signal_idle().connect(sigc::mem_fun(*this, &TerminalView::onSearchWork),
+                                              Glib::PRIORITY_DEFAULT_IDLE);
+}
+
+bool TerminalView::onSearchWork() {
+    const gint64 t0 = g_get_monotonic_time();
+    if (!searchIndexStep(t0 + kSearchSliceUs)) {
+        noteSearchTime(t0);
+        return true;  // more next turn
+    }
+    if (searchPending_) {
+        searchPending_ = false;
+        finishSearch(pendingKeep_);
+    }
+    noteSearchTime(t0);
+    return false;
+}
+
+void TerminalView::prepareSearch(bool caseSensitive) {
+    if (searchQuery_.empty()) searchCase_ = caseSensitive;
+    if (!searchIndex_.complete(*session_, searchCase_)) startSearchWork();
+}
+
 int TerminalView::setSearch(const std::string& query, bool caseSensitive) {
+    const gint64 t0 = g_get_monotonic_time();
     searchQuery_ = query;
     searchCase_ = caseSensitive;
     searchRefresh_.disconnect();
-    matches_ = findAll(*session_, query, caseSensitive);
+    if (!query.empty() && !searchIndexStep(t0 + kSearchSliceUs)) {
+        // The cache is not complete yet (big scrollback, search just opened): finish from idle.
+        searchPending_ = true;
+        pendingKeep_ = false;
+        matches_.clear();
+        matchIndex_ = -1;
+        startSearchWork();
+        contentDirty_ = true;
+        requestFrame();
+        signalSearchChanged.emit();
+        noteSearchTime(t0);
+        return 0;
+    }
+    searchPending_ = false;
+    finishSearch(false);
+    noteSearchTime(t0);
+    return searchCount();
+}
+
+void TerminalView::finishSearch(bool keepCurrent) {
+    const bool had = keepCurrent && matchIndex_ >= 0 && matchIndex_ < searchCount();
+    const SelPos cur = had ? matches_[matchIndex_].start : SelPos{};
+    matches_ = searchQuery_.empty() ? std::vector<SearchMatch>{} : searchIndex_.find(*session_, searchQuery_);
     if (session_->altScreen()) {  // full-screen apps: only what is on the screen
         const long top = session_->topLine();
         matches_.erase(std::remove_if(matches_.begin(), matches_.end(),
                                       [top](const SearchMatch& m) { return m.start.line < top; }),
                        matches_.end());
     }
-    // Start at the newest match at or above the bottom of what is shown.
-    const SelPos from{session_->topLine() - scrollOffset_ + session_->rows(), 0};
-    matchIndex_ = stepMatch(matches_, from, true);
-    if (matchIndex_ >= 0) revealMatch(matchIndex_);
+    if (!keepCurrent) {
+        // Start at the newest match at or above the bottom of what is shown.
+        const SelPos from{session_->topLine() - scrollOffset_ + session_->rows(), 0};
+        matchIndex_ = stepMatch(matches_, from, true);
+        if (matchIndex_ >= 0) revealMatch(matchIndex_);
+    } else {
+        matchIndex_ = -1;
+        if (had)
+            for (int i = 0; i < searchCount(); ++i)
+                if (!(matches_[i].start < cur)) {  // the same match, or the next one if it went away
+                    matchIndex_ = i;
+                    break;
+                }
+        if (matchIndex_ < 0 && !matches_.empty()) matchIndex_ = searchCount() - 1;
+    }
     contentDirty_ = true;
     requestFrame();
     signalSearchChanged.emit();
-    return searchCount();
 }
 
 bool TerminalView::searchStep(bool backward) {
@@ -1093,7 +1165,10 @@ bool TerminalView::searchStep(bool backward) {
 
 void TerminalView::clearSearch() {
     searchRefresh_.disconnect();
-    const bool had = !matches_.empty() || !searchQuery_.empty();
+    searchWork_.disconnect();
+    searchIndex_.reset();  // the cache is rebuilt when the search bar opens again
+    const bool had = !matches_.empty() || !searchQuery_.empty() || searchPending_;
+    searchPending_ = false;
     searchQuery_.clear();
     matches_.clear();
     matchIndex_ = -1;
@@ -1105,26 +1180,21 @@ void TerminalView::clearSearch() {
 
 void TerminalView::refreshSearch() {
     if (searchQuery_.empty()) return;
-    const bool had = matchIndex_ >= 0 && matchIndex_ < searchCount();
-    const SelPos cur = had ? matches_[matchIndex_].start : SelPos{};
-    matches_ = findAll(*session_, searchQuery_, searchCase_);
-    if (session_->altScreen()) {
-        const long top = session_->topLine();
-        matches_.erase(std::remove_if(matches_.begin(), matches_.end(),
-                                      [top](const SearchMatch& m) { return m.start.line < top; }),
-                       matches_.end());
+    const gint64 t0 = g_get_monotonic_time();
+    if (!searchIndexStep(t0 + kSearchSliceUs)) {  // e.g. after a reflow: rebuilt from idle
+        if (!searchPending_) pendingKeep_ = true;
+        searchPending_ = true;
+        startSearchWork();
+        noteSearchTime(t0);
+        return;
     }
-    matchIndex_ = -1;
-    if (had)
-        for (int i = 0; i < searchCount(); ++i)
-            if (!(matches_[i].start < cur)) {  // the same match, or the next one if it went away
-                matchIndex_ = i;
-                break;
-            }
-    if (matchIndex_ < 0 && !matches_.empty()) matchIndex_ = searchCount() - 1;
-    contentDirty_ = true;
-    requestFrame();
-    signalSearchChanged.emit();
+    if (searchPending_) {
+        searchPending_ = false;
+        finishSearch(pendingKeep_);
+    } else {
+        finishSearch(true);
+    }
+    noteSearchTime(t0);
 }
 
 void TerminalView::revealMatch(int index) {

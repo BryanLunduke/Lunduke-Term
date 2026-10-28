@@ -9,6 +9,21 @@
 
 namespace lterm {
 
+int LineSource::cellChars(long line, int col, uint32_t* out, int max, int* width) const {
+    *width = cellWidth(line, col);
+    const std::string t = cellText(line, col);
+    int n = 0;
+    for (size_t i = 0; i < t.size() && n < max;) {
+        const unsigned char c = static_cast<unsigned char>(t[i]);
+        const int len = c < 0x80 ? 1 : (c >> 5) == 6 ? 2 : (c >> 4) == 14 ? 3 : (c >> 3) == 30 ? 4 : 1;
+        uint32_t cp = len == 1 ? c : c & (0x7f >> len);
+        for (int k = 1; k < len && i + k < t.size(); ++k) cp = (cp << 6) | (static_cast<unsigned char>(t[i + k]) & 0x3f);
+        out[n++] = cp;
+        i += static_cast<size_t>(len);
+    }
+    return n;
+}
+
 bool Selection::isWord(const std::string& ch) const {
     if (ch.empty()) return false;
     unsigned char c = static_cast<unsigned char>(ch[0]);

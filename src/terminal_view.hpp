@@ -106,6 +106,13 @@ public:
     int searchIndex() const { return matchIndex_; }  // -1: none
     const std::vector<SearchMatch>& searchMatches() const { return matches_; }
     sigc::signal<void> signalSearchChanged;  // matches or the current match changed
+    // M3: the search runs on a cache (SearchIndex) that is built in <= 4 ms idle slices; a query
+    // typed before the cache is complete is pending (searchPending(), count 0) and finishes from
+    // the idle worker. prepareSearch() starts building it ahead (the search bar opened).
+    void prepareSearch(bool caseSensitive);
+    bool searchPending() const { return searchPending_; }
+    double searchMaxMainMs() const { return searchMaxMainMs_; }  // longest main-thread search step
+    void resetSearchStats() { searchMaxMainMs_ = 0; }
     // Settings dialog: live changes (all keep the session and its scrollback).
     const ViewOptions& options() const { return opts_; }
     void setFont(const std::string& family, int px);  // "" / 0: the profile's
@@ -229,6 +236,15 @@ private:
     std::vector<SearchMatch> matches_;
     int matchIndex_ = -1;
     sigc::connection searchRefresh_;
+    SearchIndex searchIndex_;
+    bool searchPending_ = false, pendingKeep_ = false;
+    sigc::connection searchWork_;
+    double searchMaxMainMs_ = 0;
+    bool searchIndexStep(long long deadlineUs);  // true: cache complete
+    void startSearchWork();
+    bool onSearchWork();
+    void finishSearch(bool keepCurrent);
+    void noteSearchTime(gint64 t0);
     // Async callbacks (clipboard requests) hold a weak_ptr to this; it expires in the
     // destructor, so a reply that arrives after the window closed is ignored.
     std::shared_ptr<char> alive_ = std::make_shared<char>(0);

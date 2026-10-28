@@ -107,6 +107,9 @@ public:
     std::string cellText(long line, int col) const override;
     int cellWidth(long line, int col) const override;
     bool wrapped(long line) const override;
+    long stableEnd() const override { return pushed_; }  // the scrollback
+    unsigned long contentEpoch() const override { return epoch_; }
+    int cellChars(long line, int col, uint32_t* out, int max, int* width) const override;
 
     // Terminal properties set by the application.
     int cursorShape() const { return cursorShape_; }  // VTERM_PROP_CURSORSHAPE_*, 0 = not set
@@ -191,6 +194,7 @@ private:
     std::deque<SbLine> sb_;
     size_t sbLimit_ = 10000;
     long pushed_ = 0;  // lines ever pushed to the scrollback (minus popped)
+    unsigned long epoch_ = 0;  // bumped when scrollback lines are popped/cleared or on resize
 };
 
 }  // namespace lterm

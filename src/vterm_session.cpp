@@ -469,6 +469,7 @@ void VtermSession::resize(int rows, int cols) {
     if (cols < 1) cols = 1;
     if (rows == rows_ && cols == cols_) return;
     snapshotWraps();  // shrinking pushes the top rows to the scrollback, several at once
+    ++epoch_;         // reflow: search caches start over
     rows_ = rows;
     cols_ = cols;
     // libvterm fills the cells a resize/reflow creates with the *current* pen, which in a
@@ -627,6 +628,26 @@ std::string VtermSession::cellText(long line, int col) const {
     return s;
 }
 
+int VtermSession::cellChars(long line, int col, uint32_t* out, int max, int* width) const {
+    VTermScreenCell vc;
+    if (!getCell(line, col, vc)) {
+        *width = 1;
+        return 0;
+    }
+    if (col > 0) {
+        VTermScreenCell prev;
+        if (getCell(line, col - 1, prev) && prev.width == 2) {
+            *width = 0;
+            return 0;
+        }
+    }
+    *width = vc.width;
+    int n = 0;
+    for (int i = 0; i < VTERM_MAX_CHARS_PER_CELL && n < max && vc.chars[i] && vc.chars[i] != 0xFFFFFFFFu; ++i)
+        out[n++] = vc.chars[i];
+    return n;
+}
+
 int VtermSession::cellWidth(long line, int col) const {
     VTermScreenCell vc;
     if (col > 0 && getCell(line, col - 1, vc) && vc.width == 2) return 0;
@@ -690,12 +711,14 @@ int VtermSession::cbPopLine(int cols, VTermScreenCell* cells, void* user) {
         cells[c] = c < static_cast<int>(l.cells.size()) ? l.cells[static_cast<size_t>(c)] : blank;
     s->sb_.pop_back();
     --s->pushed_;
+    ++s->epoch_;
     return 1;
 }
 
 int VtermSession::cbSbClear(void* user) {
     auto* s = static_cast<VtermSession*>(user);
     s->sb_.clear();
+    ++s->epoch_;
     s->damaged_ = true;
     return 1;
 }

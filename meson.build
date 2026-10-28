@@ -60,6 +60,10 @@ executable('lterm-m1-bench', 'tools/m1_bench.cpp',
   include_directories : inc,
   link_with : [effects_lib, gl_lib],
   dependencies : [pangocairo_dep, epoxy_dep, threads_dep])
+executable('lterm-m3-bench', 'tools/m3_bench.cpp',
+  include_directories : inc,
+  link_with : [vterm_lib, effects_lib],
+  dependencies : [vterm_dep, pangocairo_dep])
 test('effects', executable('effects_test', 'tests/effects_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]))
 test('profiles', executable('profiles_test', 'tests/profiles_test.cpp',

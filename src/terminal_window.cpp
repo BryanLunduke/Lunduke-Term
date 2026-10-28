@@ -305,7 +305,10 @@ void TerminalWindow::hideSearch() {
 
 void TerminalWindow::runSearch() {
     if (!searchShown()) return;
-    if (auto* v = currentView()) v->setSearch(entry_.get_text(), case_.get_active());
+    if (auto* v = currentView()) {
+        v->prepareSearch(case_.get_active());  // start the cache even before the first letter
+        v->setSearch(entry_.get_text(), case_.get_active());
+    }
     updateSearchStatus();
 }
 
@@ -313,6 +316,10 @@ void TerminalWindow::updateSearchStatus() {
     TerminalView* v = currentView();
     if (!v || entry_.get_text().empty()) {
         count_.set_text("");
+        return;
+    }
+    if (v->searchPending()) {
+        count_.set_text("Searching\u2026");
         return;
     }
     if (v->searchCount() == 0) {
