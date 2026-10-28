@@ -110,6 +110,7 @@ TerminalView::~TerminalView() {
         if (left > 0) g_child_watch_add(left, [](GPid pid, gint, gpointer) { g_spawn_close_pid(pid); }, nullptr);
     }
     writeWatch_.disconnect();
+    searchRefresh_.disconnect();
     bellTimer_.disconnect();
     blink_.disconnect();
     io_.disconnect();
@@ -475,6 +476,7 @@ void TerminalView::layoutGrid() {
         session_->resize(rows, cols);
         sel_.clear();  // reflow moves text around
         scrollOffset_ = std::min(scrollOffset_, static_cast<int>(session_->scrollbackSize()));
+        if (!searchQuery_.empty()) refreshSearch();  // reflow moved the matches too
     }
 }
 
@@ -541,6 +543,25 @@ bool TerminalView::updateContent() {
                     cell.selected = true;
                     std::swap(cell.fg, cell.bg);
                 }
+    }
+    // Search matches: Tango yellow, the current one orange (dark text on both).
+    if (!matches_.empty()) {
+        const long top = session_->topLine() - scrollOffset_, bottom = top + next_.rows;
+        auto it = std::lower_bound(matches_.begin(), matches_.end(), top,
+                                   [](const SearchMatch& m, long line) { return m.end.line < line; });
+        for (; it != matches_.end() && it->start.line < bottom; ++it) {
+            const bool current = (it - matches_.begin()) == matchIndex_;
+            const Color8 bg = current ? Color8{0xf5, 0x79, 0x00} : Color8{0xc4, 0xa0, 0x00};
+            for (long l = std::max(top, it->start.line); l <= std::min(bottom - 1, it->end.line); ++l) {
+                const int c0 = l == it->start.line ? it->start.col : 0;
+                const int c1 = l == it->end.line ? it->end.col : next_.cols - 1;
+                for (int c = std::max(0, c0); c <= std::min(next_.cols - 1, c1); ++c) {
+                    Cell& cell = next_.at(static_cast<int>(l - top), c);
+                    cell.bg = bg;
+                    cell.fg = Color8{0, 0, 0};
+                }
+            }
+        }
     }
     // DECSCNM: libvterm already reverses every cell (attrs.reverse ^ global reverse), so only the
     // margins need it here. The visual bell inverts the cells and the margins.
@@ -756,6 +777,13 @@ bool TerminalView::onPtyIo(Glib::IOCondition) {
     }
     if (session_->takeDamage()) {
         contentDirty_ = true;
+        if (!searchQuery_.empty() && !searchRefresh_.connected())  // debounced: 250 ms after output
+            searchRefresh_ = Glib::signal_timeout().connect(
+                [this] {
+                    refreshSearch();
+                    return false;
+                },
+                250);
         requestFrame();
         updateBlink();  // DECSCUSR / ?12 may have changed blinking
         // Output overwrote the selected text (clear, an editor redraw): drop the selection. A
@@ -1026,6 +1054,134 @@ bool TerminalView::onKey(GdkEventKey* ev) {
         return true;
     }
     return false;
+}
+
+// ---- M2 stage 3: search ----
+
+int TerminalView::setSearch(const std::string& query, bool caseSensitive) {
+    searchQuery_ = query;
+    searchCase_ = caseSensitive;
+    searchRefresh_.disconnect();
+    matches_ = findAll(*session_, query, caseSensitive);
+    if (session_->altScreen()) {  // full-screen apps: only what is on the screen
+        const long top = session_->topLine();
+        matches_.erase(std::remove_if(matches_.begin(), matches_.end(),
+                                      [top](const SearchMatch& m) { return m.start.line < top; }),
+                       matches_.end());
+    }
+    // Start at the newest match at or above the bottom of what is shown.
+    const SelPos from{session_->topLine() - scrollOffset_ + session_->rows(), 0};
+    matchIndex_ = stepMatch(matches_, from, true);
+    if (matchIndex_ >= 0) revealMatch(matchIndex_);
+    contentDirty_ = true;
+    requestFrame();
+    signalSearchChanged.emit();
+    return searchCount();
+}
+
+bool TerminalView::searchStep(bool backward) {
+    if (matches_.empty()) return false;
+    const SelPos from = matchIndex_ >= 0 ? matches_[matchIndex_].start
+                                         : SelPos{session_->topLine() - scrollOffset_ + session_->rows(), 0};
+    matchIndex_ = stepMatch(matches_, from, backward);
+    revealMatch(matchIndex_);
+    contentDirty_ = true;
+    requestFrame();
+    signalSearchChanged.emit();
+    return true;
+}
+
+void TerminalView::clearSearch() {
+    searchRefresh_.disconnect();
+    const bool had = !matches_.empty() || !searchQuery_.empty();
+    searchQuery_.clear();
+    matches_.clear();
+    matchIndex_ = -1;
+    if (!had) return;
+    contentDirty_ = true;
+    requestFrame();
+    signalSearchChanged.emit();
+}
+
+void TerminalView::refreshSearch() {
+    if (searchQuery_.empty()) return;
+    const bool had = matchIndex_ >= 0 && matchIndex_ < searchCount();
+    const SelPos cur = had ? matches_[matchIndex_].start : SelPos{};
+    matches_ = findAll(*session_, searchQuery_, searchCase_);
+    if (session_->altScreen()) {
+        const long top = session_->topLine();
+        matches_.erase(std::remove_if(matches_.begin(), matches_.end(),
+                                      [top](const SearchMatch& m) { return m.start.line < top; }),
+                       matches_.end());
+    }
+    matchIndex_ = -1;
+    if (had)
+        for (int i = 0; i < searchCount(); ++i)
+            if (!(matches_[i].start < cur)) {  // the same match, or the next one if it went away
+                matchIndex_ = i;
+                break;
+            }
+    if (matchIndex_ < 0 && !matches_.empty()) matchIndex_ = searchCount() - 1;
+    contentDirty_ = true;
+    requestFrame();
+    signalSearchChanged.emit();
+}
+
+void TerminalView::revealMatch(int index) {
+    if (index < 0 || index >= searchCount()) return;
+    const SearchMatch& m = matches_[index];
+    const int rows = session_->rows();
+    const long top = session_->topLine() - scrollOffset_;
+    if (m.start.line >= top && m.end.line < top + rows) return;
+    const long newTop = m.start.line - rows / 3;
+    const long off = std::clamp<long>(session_->topLine() - newTop, 0, static_cast<long>(session_->scrollbackSize()));
+    scrollBy(static_cast<int>(off) - scrollOffset_);
+}
+
+void TerminalView::grabTerminalFocus() {
+    if (mode_ == Mode::Gl) gl_.grab_focus();
+    else area_.grab_focus();
+}
+
+bool TerminalView::terminalHasFocus() const { return area_.has_focus() || gl_.has_focus(); }
+
+// ---- M2 stage 3: live settings ----
+
+void TerminalView::setFont(const std::string& family, int px) {
+    if (family == opts_.fontFamily && px == opts_.fontPx) return;
+    opts_.fontFamily = family;
+    opts_.fontPx = std::max(0, px);
+    applyProfile();  // new painter, cell size and grid
+    chooseMode();
+    updateContent();
+    requestFrame();
+}
+
+void TerminalView::setEffectsQuality(EffectsQuality q) {
+    opts_.effectsQuality = q;
+    qualityDemoted_ = false;  // an explicit choice; auto may demote again
+    updateQuality();
+    if (w_ > 0) layoutGrid();
+    fullRepaint_ = contentDirty_ = effectsSourceStale_ = true;
+    updateContent();
+    requestFrame();
+    updateAnimation();
+    signalBackend.emit(backendName());
+}
+
+void TerminalView::setScrollbackLines(long long lines) {
+    opts_.scrollbackLines = lines;
+    session_->setScrollbackLimit(clampScrollbackLines(lines));
+    scrollOffset_ = std::min(scrollOffset_, static_cast<int>(session_->scrollbackSize()));
+    if (sel_.active() && sel_.start().line < session_->firstLine()) sel_.clear();
+    if (!searchQuery_.empty()) refreshSearch();
+    contentDirty_ = true;
+    requestFrame();
+}
+
+void TerminalView::setFrame(int frame) {
+    opts_.tube.frame = frame;
+    setProfile(profile_.id);  // re-applies the tube overrides
 }
 
 }  // namespace lterm

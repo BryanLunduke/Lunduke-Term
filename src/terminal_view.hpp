@@ -5,6 +5,7 @@
 #include "gl_pipeline.hpp"
 #include "grid_painter.hpp"
 #include "profiles.hpp"
+#include "search.hpp"
 #include "vterm_session.hpp"
 
 #include <gtkmm.h>
@@ -94,6 +95,30 @@ public:
     std::string selectionText() const { return sel_.text(*session_); }
     void copyClipboard();
     void pasteClipboard(bool primary);
+
+    // M2 stage 3: scrollback search. setSearch() finds every match (history + screen), highlights
+    // them and goes to the newest one; searchStep() moves to the next/previous one (wrapping) and
+    // scrolls it into view. Output that arrives while a search is open re-runs it (debounced).
+    int setSearch(const std::string& query, bool caseSensitive);
+    bool searchStep(bool backward);
+    void clearSearch();
+    int searchCount() const { return static_cast<int>(matches_.size()); }
+    int searchIndex() const { return matchIndex_; }  // -1: none
+    const std::vector<SearchMatch>& searchMatches() const { return matches_; }
+    sigc::signal<void> signalSearchChanged;  // matches or the current match changed
+    // Settings dialog: live changes (all keep the session and its scrollback).
+    const ViewOptions& options() const { return opts_; }
+    void setFont(const std::string& family, int px);  // "" / 0: the profile's
+    void setEffectsQuality(EffectsQuality q);
+    void setScrollbackLines(long long lines);
+    void setFrame(int frame);  // -1 profile default, 0 off, 1 on (only profiles with a bezel option)
+    pid_t childPid() const { return session_->childPid(); }
+    void grabTerminalFocus();
+    // Test hooks: the last composed grid (what is painted), the pause state.
+    const Grid& shownGrid() const { return cur_; }
+    bool windowVisible() const { return visible_; }
+    bool animating() const { return tick_.connected(); }
+    bool terminalHasFocus() const;
 
 protected:
     void on_size_allocate(Gtk::Allocation& a) override;
@@ -196,6 +221,14 @@ private:
     bool blinkOff_ = false;
     bool lastAlt_ = false;
     ViewStats stats_;
+    // Search state
+    void refreshSearch();         // re-run the query, keep the current match where it was
+    void revealMatch(int index);  // scroll so the match is visible
+    std::string searchQuery_;
+    bool searchCase_ = false;
+    std::vector<SearchMatch> matches_;
+    int matchIndex_ = -1;
+    sigc::connection searchRefresh_;
     // Async callbacks (clipboard requests) hold a weak_ptr to this; it expires in the
     // destructor, so a reply that arrives after the window closed is ignored.
     std::shared_ptr<char> alive_ = std::make_shared<char>(0);
