@@ -15,9 +15,13 @@
 #include <gtkmm.h>
 
 #include <cerrno>
+#include <chrono>
 #include <cstdio>
+#include <functional>
 #include <cstdlib>
 #include <cstring>
+#include <vector>
+#include <algorithm>
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/prctl.h>
@@ -603,6 +607,61 @@ static void testSettingsDialog() {
     g_rmdir(dir.c_str());
 }
 
+// M3 item 1b: the governor measures only the effects pass. A long burst of output keeps amber
+// auto animating at its level; an (injected) expensive renderer demotes it to static, and once
+// rendering is cheap again a probe brings auto back up.
+static bool waitFor(const std::function<bool()>& f, int ms) {
+    for (int t = 0; t < ms && !f(); t += 20) pump(20);
+    return f();
+}
+
+static void testGovernor(const char* renderer) {
+    ViewOptions o;
+    o.profile = "amber";
+    o.renderer = renderer;
+    o.pauseWhenUnfocused = false;
+    o.command = {"/bin/sh", "-c", "seq 1 400000; sleep 60"};
+    Win w(o);
+    w.view->governor().configure([&] {
+        GovernorConfig c = w.view->governor().config();
+        c.firstProbeMs = 1500;
+        return c;
+    }());
+    CHECK(w.view->start());
+    pump(300);
+    const EffectsQuality level = w.view->effectsQuality();
+    CHECK(w.view->softwareRendering());
+    CHECK(level == EffectsQuality::Reduced);
+    // Heavy output (seq) for a few seconds: no demotion, still animating.
+    const auto t0 = std::chrono::steady_clock::now();
+    pump(4000);
+    std::printf("governor %s (%s): after 4 s of output: quality %s, demoted %d, tick %.0f ms, frame %.1f ms\n",
+                renderer, w.view->backendName().c_str(), effectsQualityName(w.view->effectsQuality()),
+                w.view->qualityDemoted(), w.view->tickIntervalMs(), w.view->governor().lastFrameMs());
+    CHECK(!w.view->qualityDemoted());
+    CHECK(w.view->effectsQuality() == level);
+    CHECK(w.view->animating());
+    // A renderer that needs 400 ms per frame: over budget even at 1 fps -> static.
+    w.view->setRenderCostForTest(400);
+    CHECK(waitFor([&] { return w.view->qualityDemoted(); }, 8000));
+    CHECK(w.view->effectsQuality() == EffectsQuality::Static);
+    CHECK(!w.view->animating());
+    const double demotedAt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    // Load drops: the probe after 1.5 s brings auto back, and it stays.
+    w.view->setRenderCostForTest(0);
+    CHECK(waitFor([&] { return !w.view->qualityDemoted(); }, 4000));
+    CHECK(w.view->effectsQuality() == level);
+    CHECK(waitFor([&] { return w.view->governor().state() == EffectsGovernor::State::Normal; }, 6000));
+    CHECK(!w.view->qualityDemoted());
+    CHECK(w.view->animating());
+    CHECK(waitFor([&] { return w.view->tickIntervalMs() <= w.view->governor().config().baseIntervalMs; }, 15000));
+    std::printf("governor %s: demoted at %.1f s, back to %s, tick %.0f ms\n", renderer, demotedAt,
+                effectsQualityName(w.view->effectsQuality()), w.view->tickIntervalMs());
+    // An explicit choice clears the state.
+    w.view->setEffectsQuality(EffectsQuality::Full);
+    CHECK(w.view->effectsQuality() == EffectsQuality::Full);
+}
+
 int main(int argc, char** argv) {
     if (!getenv("DISPLAY") || !*getenv("DISPLAY")) {
         std::printf("view test skipped: no DISPLAY\n");
@@ -623,6 +682,8 @@ int main(int argc, char** argv) {
     testSearchBig();
     testSearchBar();
     testSettingsDialog();
+    testGovernor("auto");
+    testGovernor("cpu");
     if (failures) {
         std::fprintf(stderr, "%d failure(s)\n", failures);
         return 1;

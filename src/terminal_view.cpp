@@ -14,6 +14,12 @@
 
 namespace lterm {
 
+static double processCpuMs() {
+    timespec ts{};
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
+}
+
 namespace {
 VTermModifier modsOf(guint state) {
     int m = VTERM_MOD_NONE;
@@ -86,6 +92,25 @@ TerminalView::TerminalView(const ViewOptions& opts)
         w->set_vexpand(true);
         pack_start(*w, true, true);
     }
+    // M3 governor: an effects frame's cost is the process CPU time of a frame-clock paint cycle
+    // in which this view drew (before-paint .. after-paint: layout, the effects pass with
+    // llvmpipe's or the C++ fallback's threads, GtkGLArea's readback, the blit), minus the
+    // source upload. Parsing terminal output and painting glyphs happen outside it.
+    area_.signal_draw().connect(sigc::mem_fun(*this, &TerminalView::onPaintBegin), false);
+    gl_.signal_draw().connect(sigc::mem_fun(*this, &TerminalView::onPaintBegin), false);
+    signal_realize().connect([this] {
+        disconnectAfterPaint();
+        if (GdkFrameClock* fc = gtk_widget_get_frame_clock(GTK_WIDGET(gobj()))) {
+            afterPaintClock_ = GDK_FRAME_CLOCK(g_object_ref(fc));
+            beforePaintId_ = g_signal_connect(fc, "before-paint", G_CALLBACK(+[](GdkFrameClock*, gpointer self) {
+                static_cast<TerminalView*>(self)->onBeforePaint();
+            }), this);
+            afterPaintId_ = g_signal_connect(fc, "after-paint", G_CALLBACK(+[](GdkFrameClock*, gpointer self) {
+                static_cast<TerminalView*>(self)->onAfterPaint();
+            }), this);
+        }
+    });
+    signal_unrealize().connect([this] { disconnectAfterPaint(); }, false);
     area_.signal_draw().connect(sigc::mem_fun(*this, &TerminalView::onDraw));
     gl_.set_required_version(3, 3);
     gl_.set_has_alpha(false);
@@ -112,6 +137,8 @@ TerminalView::~TerminalView() {
     writeWatch_.disconnect();
     searchRefresh_.disconnect();
     searchWork_.disconnect();
+    probeTimer_.disconnect();
+    disconnectAfterPaint();
     bellTimer_.disconnect();
     blink_.disconnect();
     io_.disconnect();
@@ -398,9 +425,11 @@ bool TerminalView::onGlRender(const Glib::RefPtr<Gdk::GLContext>&) {
         const auto e0 = std::chrono::steady_clock::now();
         cairo_surface_flush(src_);
         const int y0 = effectsSourceStale_ ? 0 : srcDirtyY0_, y1 = effectsSourceStale_ ? h_ : srcDirtyY1_;
+        const double u0 = frameCpu0_ >= 0 ? processCpuMs() : 0;
         glPipe_->updateSource(cairo_image_surface_get_data(src_), cairo_image_surface_get_stride(src_),
                               PixelOrder::BGRA, static_cast<float>(t), y0, y1);
         if (opts_.stats) glFinish();
+        if (frameCpu0_ >= 0) uploadCpuMs_ += processCpuMs() - u0;
         stats_.effectsSourceMs.push_back(
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - e0).count());
         effectsSourceStale_ = false;
@@ -426,8 +455,10 @@ bool TerminalView::onDraw(const Cairo::RefPtr<Cairo::Context>& cr) {
             const auto e0 = std::chrono::steady_clock::now();
             cairo_surface_flush(src_);
             const int y0 = effectsSourceStale_ ? 0 : srcDirtyY0_, y1 = effectsSourceStale_ ? h_ : srcDirtyY1_;
+            const double u0 = frameCpu0_ >= 0 ? processCpuMs() : 0;
             cpu_->updateSource(cairo_image_surface_get_data(src_), cairo_image_surface_get_stride(src_),
                                PixelOrder::BGRA, static_cast<float>(t), y0, y1);
+            if (frameCpu0_ >= 0) uploadCpuMs_ += processCpuMs() - u0;
             stats_.effectsSourceMs.push_back(
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - e0).count());
             effectsSourceStale_ = false;
@@ -662,17 +693,11 @@ double TerminalView::baseTickIntervalMs() const {
     return quality_ == EffectsQuality::Reduced ? 2.0 * base : base;  // reduced: half-rate animation
 }
 
-static double processCpuMs() {
-    timespec ts{};
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
-    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
-}
 
 void TerminalView::updateAnimation() {
     const bool want = animationWanted();
     if (want && !tick_.connected()) {
-        govWall0_ = nowMs();
-        govCpu0_ = processCpuMs();
+        gov_.restart(nowMs());
         tick_ = Glib::signal_timeout().connect(sigc::mem_fun(*this, &TerminalView::onTick),
                                                static_cast<unsigned>(tickIntervalMs_ + 0.5));
     } else if (!want && tick_.connected()) {
@@ -691,6 +716,11 @@ void TerminalView::updateQuality() {
     quality_ = q;
     fx_ = fx;
     tickIntervalMs_ = baseTickIntervalMs();
+    GovernorConfig gc = gov_.config();
+    gc.budget = opts_.cpuBudget;
+    gc.baseIntervalMs = tickIntervalMs_;
+    gov_.configure(gc);
+    gov_.restart(nowMs());
     if (!changed) return;
     if (cpu_) {
         cpu_.reset(new CpuEffects(fx_, opts_.threads));
@@ -702,36 +732,85 @@ void TerminalView::updateQuality() {
     if (tick_.connected()) tick_.disconnect();  // restarted at the new rate by updateAnimation()
 }
 
+bool TerminalView::governed() const {
+    return software_ && opts_.cpuBudget > 0 && quality_ != EffectsQuality::Static && mode_ != Mode::Plain;
+}
+
+void TerminalView::onBeforePaint() {
+    frameCpu0_ = governed() ? processCpuMs() : -1;
+    uploadCpuMs_ = 0;
+    painted_ = false;
+}
+
+bool TerminalView::onPaintBegin(const Cairo::RefPtr<Cairo::Context>&) {
+    painted_ = true;
+    return false;  // the widget's own handler draws
+}
+
+void TerminalView::disconnectAfterPaint() {
+    if (afterPaintClock_) {
+        g_signal_handler_disconnect(afterPaintClock_, beforePaintId_);
+        g_signal_handler_disconnect(afterPaintClock_, afterPaintId_);
+        g_object_unref(afterPaintClock_);
+        afterPaintClock_ = nullptr;
+        afterPaintId_ = beforePaintId_ = 0;
+    }
+}
+
+void TerminalView::onAfterPaint() {
+    if (frameCpu0_ < 0 || !painted_) return;
+    const double cost = processCpuMs() - frameCpu0_ - uploadCpuMs_;
+    frameCpu0_ = -1;
+    painted_ = false;
+    if (governed()) gov_.addFrame(cost + testRenderCostMs_);
+}
+
 bool TerminalView::governTick() {
-    if (!software_ || opts_.cpuBudget <= 0 || quality_ == EffectsQuality::Static) return false;
-    const double wall = nowMs(), cpu = processCpuMs();
-    const double dWall = wall - govWall0_;
-    if (dWall < 1000.0) return false;  // one-second windows
-    const double load = (cpu - govCpu0_) / dWall;  // cores
-    govWall0_ = wall;
-    govCpu0_ = cpu;
-    const double budget = opts_.cpuBudget, maxInterval = 1000.0;
+    if (!governed()) return false;
     double next = tickIntervalMs_;
-    if (load > budget) next = std::min(maxInterval, tickIntervalMs_ * (load / budget) * 1.05);
-    else if (load < 0.6 * budget) next = std::max(baseTickIntervalMs(), tickIntervalMs_ * 0.85);
-    if (load > budget && tickIntervalMs_ >= maxInterval && opts_.effectsQuality == EffectsQuality::Auto) {
+    const EffectsGovernor::Action a = gov_.evaluate(nowMs(), next);
+    if (a == EffectsGovernor::Action::Demote) {
+        if (opts_.effectsQuality != EffectsQuality::Auto) return false;  // explicit: stays at 1 fps
         // Even one frame per second costs more than the budget (e.g. llvmpipe in a VM without
-        // KVM): stop animating and show the static picture.
-        std::fprintf(stderr, "lunduke-terminal: animation needs %.0f%% of a core at 1 fps; effects-quality auto -> static\n",
-                     load * 100.0);
+        // KVM): stop animating and show the static picture; probe again later.
+        gov_.demoted(nowMs());
+        std::fprintf(stderr,
+                     "lunduke-terminal: animation needs %.0f%% of a core at 1 fps (%.0f ms per frame); "
+                     "effects-quality auto -> static, retry in %.1f s\n",
+                     gov_.lastLoad() * 100.0, gov_.lastFrameMs(), gov_.probeDelayMs() / 1000.0);
         qualityDemoted_ = true;
         updateQuality();
         signalBackend.emit(backendName());
         if (mode_ == Mode::Gl) gl_.queue_render();
         else if (mode_ == Mode::Cpu) area_.queue_draw();
+        probeTimer_.disconnect();
+        probeTimer_ = Glib::signal_timeout().connect(sigc::mem_fun(*this, &TerminalView::onProbeTimer), 250);
         return true;  // updateQuality() stopped the timer
     }
-    if (std::fabs(next - tickIntervalMs_) > 0.05 * tickIntervalMs_) {
+    if (a == EffectsGovernor::Action::Interval) {
         tickIntervalMs_ = next;
         tick_ = Glib::signal_timeout().connect(sigc::mem_fun(*this, &TerminalView::onTick),
                                                static_cast<unsigned>(tickIntervalMs_ + 0.5));
         return true;  // the caller's timer source ends; the new one takes over
     }
+    return false;
+}
+
+bool TerminalView::onProbeTimer() {
+    if (!qualityDemoted_) return false;
+    if (!gov_.probeDue(nowMs())) return true;
+    // Try the auto level again; the governor demotes once more (with a longer wait) if it
+    // is still too expensive.
+    qualityDemoted_ = false;
+    gov_.startProbe(nowMs());
+    std::fprintf(stderr, "lunduke-terminal: effects-quality auto: probing the animation again\n");
+    updateQuality();
+    if (w_ > 0) layoutGrid();
+    fullRepaint_ = contentDirty_ = effectsSourceStale_ = true;
+    updateContent();
+    requestFrame();
+    updateAnimation();
+    signalBackend.emit(backendName());
     return false;
 }
 
@@ -1230,6 +1309,8 @@ void TerminalView::setFont(const std::string& family, int px) {
 void TerminalView::setEffectsQuality(EffectsQuality q) {
     opts_.effectsQuality = q;
     qualityDemoted_ = false;  // an explicit choice; auto may demote again
+    gov_.reset();
+    probeTimer_.disconnect();
     updateQuality();
     if (w_ > 0) layoutGrid();
     fullRepaint_ = contentDirty_ = effectsSourceStale_ = true;

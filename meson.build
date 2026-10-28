@@ -18,7 +18,7 @@ inc = include_directories('src')
 effects_lib = static_library('lterm-effects',
   'src/effects.cpp', 'src/cpu_effects.cpp', 'src/thread_pool.cpp',
   'src/grid_painter.cpp', 'src/synthetic_frame.cpp', 'src/profiles.cpp',
-  'src/font_resolve.cpp',
+  'src/font_resolve.cpp', 'src/effects_governor.cpp',
   dependencies : [pangocairo_dep, threads_dep, fontconfig_dep])
 
 gl_lib = static_library('lterm-gl', 'src/gl_effects.cpp', 'src/gl_pipeline.cpp',
@@ -65,6 +65,8 @@ executable('lterm-m3-bench', 'tools/m3_bench.cpp',
   link_with : [vterm_lib, effects_lib],
   dependencies : [vterm_dep, pangocairo_dep])
 test('effects', executable('effects_test', 'tests/effects_test.cpp',
+  include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]))
+test('governor', executable('governor_test', 'tests/governor_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]))
 test('profiles', executable('profiles_test', 'tests/profiles_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]))

@@ -5,6 +5,7 @@
 #include "gl_pipeline.hpp"
 #include "grid_painter.hpp"
 #include "profiles.hpp"
+#include "effects_governor.hpp"
 #include "search.hpp"
 #include "vterm_session.hpp"
 
@@ -26,7 +27,8 @@ struct ViewOptions {
     // M2: auto (reduced on software rendering) | full | reduced | static, see effects.hpp
     EffectsQuality effectsQuality = EffectsQuality::Auto;
     // Software rendering only: tick slower until the animation uses at most this fraction of
-    // one core (process CPU time, so llvmpipe's threads count). 0 disables the governor.
+    // one core. M3: measured as the process CPU time spent painting the effects frame (so
+    // llvmpipe's or the C++ fallback's threads count, terminal output does not). 0: no governor.
     double cpuBudget = 0.25;
     bool pauseWhenUnfocused = true; // stop the animation (not content updates) when inactive
     std::string fontFamily;         // empty: the profile's
@@ -126,6 +128,11 @@ public:
     bool windowVisible() const { return visible_; }
     bool animating() const { return tick_.connected(); }
     bool terminalHasFocus() const;
+    // M3 governor (see effects_governor.hpp). Test hooks: the governor (probe delays), extra
+    // cost added to every measured effects frame (simulates a slow renderer).
+    EffectsGovernor& governor() { return gov_; }
+    bool qualityDemoted() const { return qualityDemoted_; }
+    void setRenderCostForTest(double ms) { testRenderCostMs_ = ms; }
 
 protected:
     void on_size_allocate(Gtk::Allocation& a) override;
@@ -193,7 +200,19 @@ private:
     bool software_ = false;
     bool qualityDemoted_ = false;  // auto fell back to static: the budget was out of reach
     double tickIntervalMs_ = 50;
-    double govWall0_ = 0, govCpu0_ = 0;
+    EffectsGovernor gov_;
+    sigc::connection probeTimer_;
+    double testRenderCostMs_ = 0;
+    bool governed() const;           // the governor is active for the current renderer/quality
+    bool onPaintBegin(const Cairo::RefPtr<Cairo::Context>&);
+    void onBeforePaint();
+    void onAfterPaint();
+    void disconnectAfterPaint();
+    GdkFrameClock* afterPaintClock_ = nullptr;
+    gulong beforePaintId_ = 0, afterPaintId_ = 0;
+    bool painted_ = false;
+    double frameCpu0_ = -1, uploadCpuMs_ = 0;
+    bool onProbeTimer();
     bool cpuOutValid_ = false;     // out_ holds the effects output of the current source
 
     Grid cur_, next_;
