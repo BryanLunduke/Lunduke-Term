@@ -437,3 +437,12 @@ static pass) and nothing per tick.
   out to the bezel corner clamps to the last cell (`s2-bezel-drag-inside-to-bezel-corner.png`),
   and a later click on the bezel leaves that selection alone
   (`s2-bezel-click-on-bezel-keeps-selection.png`).
+
+## Stage 2 tests (3198a9c and later)
+
+- Release `build/`, DISPLAY = own Xvfb :43 and again under `xvfb-run -a -s "-screen 0 1280x1024x24"`
+  (the CI step): 9/9 OK — profiles, vterm, fonts, painter, session, effects, fixes, gl-match, view.
+- ASan + UBSan `build-san/` (debug, `-Db_sanitize=address,undefined`, `detect_leaks=0`,
+  `halt_on_error=1`, `--timeout-multiplier 4`): 9/9 OK, no `runtime error` / AddressSanitizer
+  report in the log.
+- `docs/ci/ci.yml`: yamllint clean (default rules, line length 120). It has not run on GitHub.
