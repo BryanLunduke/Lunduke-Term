@@ -91,3 +91,114 @@ main loop is left to run the child watch. The process is exiting, so init reaps 
 | after 50 resizes | 106.98 dB | 1 |
 
 The test requires ≥ 40 dB. "99.00" is the test's value for an identical image (MSE 0).
+
+## Benchmarks
+
+Raw data:
+- `docs/bench/m2-host/` (bench.txt, idle.txt, system.txt, psnr.txt);
+- `docs/bench/m2-tcg-lcos-100-01/` (bench.txt, idle.txt, system.txt, env.txt, status, plus the
+  `vm.sh` and `run.sh` that produced them).
+
+Script: `tools/bench-m2.sh`.
+
+- **Idle runs:** the real `lunduke-terminal`, 1280×800, amber, with bash idle at a prompt and
+  the window focused. CPU is (utime+stime)/wall from `/proc` over 10 s after a warm-up (host
+  30 s, TCG 40 s), and 100 % = one core.
+- **BEFORE** is `--effects-quality full --cpu-budget 0`, which reproduces M1's behaviour (full
+  effects at 20 fps, no governor).
+- **REAL** means measured. **DERIVED** means computed from REAL numbers.
+
+### Host: Debian 13, llvmpipe (Mesa 26.1), own Xvfb :43 + xfwm4 — REAL
+
+**Idle CPU, amber focused**
+
+| Case | GL | CPU fallback (4 threads) |
+|---|---|---|
+| BEFORE (M1: full, no governor) | 96.2 % | 133.0 % |
+| auto (→ reduced on llvmpipe) | 16.2 % (re-run 16.7 %) | 20.0 % |
+| full | 22.6 % | 21.5 % |
+| reduced | 16.2 % | 20.5 % |
+| static | 0.0 % | 0.0 % |
+| plain, ibm-3278 | 0.0 % | 0.0 % |
+
+The governor settled at a tick interval of about 230–240 ms (4–4.4 fps) for GL auto/reduced.
+
+**Per frame, median ms (tick / content pass)**
+
+| Quality | CPU 4 thr | GL LP 1 | GL LP 2 | GL LP 4 |
+|---|---|---|---|---|
+| full | 19.57 / 23.44 | 32.42 / 103.85 | 18.36 / 59.83 | 10.07 / 36.03 |
+| reduced | 15.07 / 20.97 | 25.81 / 72.68 | 13.36 / 39.48 | 7.32 / 25.24 |
+| static | 8.56 / 21.80 | 22.65 / 85.45 | 9.95 / 36.69 | 5.45 / 22.54 |
+
+In static mode the "tick" is the single dynamic pass after a content change; nothing runs while
+idle. Caveat: some host re-runs overlapped with the TCG VM, which used 4 host threads.
+
+### TCG VM: LCOS 1.0 live ISO, `qemu-system-x86_64 -accel tcg -smp 4 -snapshot`, llvmpipe (Mesa 26.1.6), XLibre — REAL
+
+The run was 17:43:48–17:57:36 UTC (12:43–12:57 CDT). The VM was stopped with QMP `quit` at
+12:58:58 CDT.
+
+**Idle CPU, amber focused (xdotool)**
+
+| Case | GL | CPU fallback (4 threads) |
+|---|---|---|
+| BEFORE (M1: full, no governor) | 325.6 % | 290.2 % |
+| auto | **0.0 %** (demoted: "needs 320 % of a core at 1 fps; auto -> static") | **0.0 %** (demoted: "needs 106 % at 1 fps") |
+| full (explicit) | 327.4 % (governor at 1000 ms) | 155.7 % (1000 ms) |
+| reduced (explicit) | 327.0 % (1000 ms) | 120.5 % (1000 ms) |
+| static | 0.0 % | 0.0 % |
+| plain, ibm-3278 | 0.0 % | 0.0 % |
+
+For M1 comparison, M1-BENCHMARKS gives the M1 build in the same kind of VM at GL 395.7 % (LP 4)
+and CPU 357.3 % (4 threads).
+
+**Per frame, median ms (tick / content pass), 1280×800, 4 threads**
+
+| Quality | CPU | GL |
+|---|---|---|
+| full | 646.57 / 1043.49 | 2584.65 / 3938.24 |
+| reduced | 452.62 / 745.70 | 1485.22 / 2737.51 |
+| static | 189.30 / 664.74 | 737.91 / 2365.94 |
+
+On TCG, one GL tick of full or reduced amber takes 1.5–2.6 s of wall time on all 4 vCPUs. That
+is longer than the 1000 ms maximum interval, so frames run back to back and an explicit
+`full`/`reduced` cannot get under the budget. This is by design: explicit levels are honoured
+and only `auto` demotes. The default `auto` reaches 0 % idle by switching to static. It costs
+one 0.74 s (GL) or 0.19 s (CPU) dynamic pass per content change, on top of the content pass.
+
+### DERIVED
+
+| Metric | Host | TCG |
+|---|---|---|
+| Idle CPU, amber GL default (`auto`) vs BEFORE | 96.2 → 16.2 % (−83 %) | 325.6 → 0.0 % (−100 %) |
+| Idle CPU, amber CPU fallback `auto` vs BEFORE | 133.0 → 20.0 % (−85 %) | 290.2 → 0.0 % (−100 %) |
+| GL tick, reduced / full | 0.73 (LP 4) | 0.57 |
+| GL tick, static / full | 0.54 (LP 4) | 0.29 |
+| CPU tick, reduced / full | 0.77 | 0.70 |
+| CPU tick, static / full | 0.44 | 0.29 |
+| TCG slowdown vs host, full tick | — | GL ×257 (LP 4), CPU ×33 |
+
+The goal of ≤ 25 % of one core at idle is met on the host (auto 16 %, full 23 %) and on TCG
+(auto 0 %).
+
+## Screenshots (host, fixed binaries, 1280×800, `tools/m2-shot.sh`)
+
+All in `/workspace/lcos-app-reviews/terminal-m2/`:
+- `s1-amber-full.png`, `s1-amber-reduced.png`, `s1-amber-static.png`;
+- `s1-amber-full-reduced-static.png`: the three side by side, labelled;
+- `s1-amber-zoom-corner-full-reduced-static.png`: a crop of the top-left corner (noise, bloom,
+  warp).
+
+## Problems / open points
+
+- (f) above: a full-region scroll in libvterm erases without pushing to scrollback.
+- In TCG screenshots taken during the run, the amber GL window sometimes showed only a painted
+  top band. This is consistent with a 2.4–3.9 s content pass still in progress (llvmpipe tiles)
+  when the screenshot was taken. It was not investigated further and the static path was not
+  re-checked visually inside the VM. On the host, all three levels paint fully.
+- The first TCG VM boot (12:33 CDT) was stopped with QMP quit before benchmarking, because the
+  static-mode black-window bug (039690e) was found then. The payload was rebuilt and the VM
+  rebooted (pid 131297, 12:38:40 CDT).
+- Explicit `full`/`reduced` on very slow software rendering stay above the budget (see TCG).
+  Only `auto` demotes.
