@@ -1,5 +1,6 @@
 lunduke-terminal (0.0.1) UNRELEASED; urgency=medium
 
   * Packaging prep (M2): not built, not uploaded.
+  * M3: original icon (CC0-1.0) replaces the M2 placeholder. Still not built.
 
  -- Lunduke Journal <bryan@lunduke.com>  Wed, 28 Oct 2026 15:00:00 -0500

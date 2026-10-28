@@ -25,7 +25,7 @@ monitor bezel for `amber`, `green` and `green-scanlines` (rounded glass, shaded 
 highlight and the screen's glow reflected on the frame; pre-rendered, so it costs nothing when idle).
 Stage 3: three more CRT 1.2.0-derived profiles (`vintage`, `futuristic`, `paper-white`, each with its
 own palette and licence-clean fonts only), tabs, scrollback search with highlighting, a settings
-dialog, and packaging prep (`.desktop`, AppStream metainfo, icon placeholder, `meson install`,
+dialog, and packaging prep (`.desktop`, AppStream metainfo, icon, `meson install`,
 an unbuilt `debian/`; see [`docs/PACKAGING.md`](docs/PACKAGING.md)). The default stays `plain`.
 
 M3 item 1 (see [`docs/M3-NOTES.md`](docs/M3-NOTES.md)): the search does not block typing (an idle-built
