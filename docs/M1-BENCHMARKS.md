@@ -140,7 +140,7 @@ Plain has no effects, so the repaint is its whole frame cost.
   reach the requested fps. A tick takes 0.5–7.6 s at 1280×800, so `--effects-fps 10` makes no
   difference.
 - The static and plain profiles stay at 0 % idle. A full plain repaint takes about 90 ms, so
-  typing is usable but sluggish. That is TCG; a real machine is ~35× faster on this path.
+  typing is usable but sluggish. That is TCG; the host is ~35× faster on this path.
 
 ## DERIVED — TCG slowdown versus the host (not measurements)
 
@@ -168,7 +168,7 @@ They are not measurements of an old machine.
 
 1. **`plain` default.** It costs 0 % at idle and 2.6 ms per full repaint even on the host, so it
    is fine on any machine, TCG included.
-2. **Animated CRT profiles on software GL.** Use them when there are ≥2 modern cores (≤ 26 ms per
+2. **Animated CRT profiles on software GL.** Use them when there are ≥2 modern cores (≈26 ms per
    tick at 1280×800 without AVX). On very weak CPUs or emulators they saturate. M2 should split
    static and dynamic passes and auto-lower the fps (see M1-NOTES M2 list).
 3. **No AVX** costs llvmpipe ~1.5× and our CPU path ~nothing.
