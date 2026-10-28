@@ -98,12 +98,188 @@ the Debian maintainer scripts. The commit message lists what was skipped and why
 
 The c64 row is gone from `docs/FONTS.md`.
 
+# Item 2: measurements in a VM and on the host
+
+Raw data is in `docs/bench/m3-item2/`. Labels: **REAL** means measured here and the raw output is
+committed. **DERIVED** means computed from REAL data. **NOT MEASURED** means exactly that.
+
+## No GPU on this box
+
+REAL (`gpu-check.txt`): there is no `/dev/dri`, no `/sys/class/drm`, no `lspci`, and no PCI
+display-class device. `glxinfo -B` reports llvmpipe (LLVM 19.1.7), Mesa 25.0.7, "Accelerated: no".
+Every GL number below is llvmpipe software rendering. Nothing here was measured on a GPU, so these
+notes make no GPU claims.
+
+## qemu
+
+REAL (`qemu-options.txt`): qemu 10.0.13.
+- The only displays are `none` and `curses`.
+- `egl-headless` and `sdl` are not available, and with no render node there is no virgl.
+- `virtio-vga` in 2D mode starts.
+- Both runs used `-accel tcg`. `/dev/kvm` exists but was not used.
+
+The ISO `lcos-live-100-01.iso` was only booted, never modified. Its sha256 was
+`33fc871b…4706e61` before and after both runs (`iso-sha256.txt`).
+
+## VM run 1: LCOS 1.0.0, std VGA, TCG, 4 vCPU, 2 GB
+
+Guest details (`vm-std-vga/env.txt`): kernel 7.2.6-lunduke, XLibre X server, bochs-drm. The build
+was M3 at 69598c8, copied in and run as the live user. Script: `vm-std-vga/m3-vm.sh`.
+
+REAL idle CPU (`vm-std-vga/idle.txt`). Measurement starts 40 s after launch. Process % is of one
+vCPU; guest % is of all 4 vCPUs.
+
+| Run | Process | Guest busy |
+|---|---|---|
+| No terminal (baseline, 20 s; it overlapped QMP typing on tty2) | n/a | 30.4 % |
+| plain (default), 20 s | 0.0 % | 29.0 % |
+| amber, GL, auto, 60 s | 72.2 % | 44.9 % |
+| amber, CPU, auto, 60 s | 16.7 % | 14.0 % |
+
+The guest baseline is noisy, which is why the plain run shows less guest load than the baseline.
+
+Under TCG, the governor did what it should with both renderers.
+- **amber GL:** each probe reported `animation needs 366–393% of a core at 1 fps (3656–3926 ms per
+  frame)`.
+- **amber CPU:** each probe reported 71–81 % (707–806 ms per frame).
+- **Both:** auto dropped to static and backed off 10/20/40/80 s.
+
+The GL probes are expensive: about 4 s of CPU each on llvmpipe under TCG. Most of the 72.2 % is
+those probes, so on a machine like this the CPU renderer is the cheaper fallback (finding, no
+change made).
+
+REAL close bench in the guest (`vm-std-vga/close.txt`, 9 closes each):
+
+| Child | Median | Max | Total | All children gone |
+|---|---|---|---|---|
+| `sh` | 6.63 ms | 126.55 ms | 183.49 ms | 1 ms after the last close |
+| `bash -i` | 4.81 ms | 8.26 ms | 50.38 ms | 1 ms after |
+| `trap '' HUP` | 5.17 ms | 10.54 ms | 56.01 ms | 2006 ms after (the 2 s SIGKILL) |
+
+REAL interactive checks:
+- **Tabs:** with 3 shells, one tab close left 2 shells (`children-before/after-close.txt`). There
+  were no zombies (`zombies.txt` is empty).
+- **Corrupt settings.ini:** "Save as default" replaced it and kept the old text as
+  `settings.ini.corrupt`. The new file is `profile=plain`, `effects-quality=auto`,
+  `scrollback-lines=10000` (`settings-files.txt`).
+
+Screenshots, in `/workspace/lcos-app-reviews/terminal-m3/`:
+- `m3-vm-idle-plain-default.png`
+- `m3-vm-idle-amber-cpu-auto-warmup.png`
+- `m3-vm-settings-open.png`
+- `m3-vm-close-bench-tabs.png`
+
+NOT CAPTURED: amber-GL idle, search, 3 tabs, tabs after close, settings saved. My screenshot
+watcher held the single QMP socket and hung, so those moments were missed. The numbers above come
+from the in-guest logs, not from screenshots.
+
+## VM run 2: virtio-vga (2D)
+
+REAL (`vm-virtio-vga/`): the guest booted to the desktop on `-vga none -device virtio-vga`. The
+kernel showed `virtio_gpudrmfb`, `/dev/dri/card0` and `renderD128`. The guest's GL is still
+software, because there is no virgl on the host.
+
+Screenshots:
+- `m3-vm-virtio-vga-desktop.png`
+- `m3-vm-virtio-vga-tty-drm.png`
+
+NOT MEASURED: the terminal runs in this VM.
+- Writing the script into the image with `debugfs -w` produced inodes with bad metadata_csum, so
+  the guest could not read them.
+- QMP typing garbled the fallback command (a stuck shift).
+- The retyped launch was rejected by the agent's safety review ("error occurred while
+  classifying"), including on an approval retry.
+
+The VM was shut down over QMP.
+
+## Host profile matrix (llvmpipe)
+
+REAL (`host/matrix-before-reflow-fix.txt`, `host/matrix.sh`):
+- Xvfb :44 at 1024x640, `LIBGL_ALWAYS_SOFTWARE=1`, `effects-quality=auto`.
+- 20 s warm-up, then 20 s of process CPU (% of one core).
+- Build 69598c8, before the reflow fix below.
+
+| Profile | GL | CPU renderer |
+|---|---|---|
+| plain | 0.0 % | 0.0 % |
+| amber | 16.7 % | 19.2 % |
+| green | 16.5 % | 21.2 % |
+| green-scanlines | 18.2 % | 19.2 % |
+| ibm-dos | 20.1 % | 16.4 % |
+| ibm-3278 (static) | 0.0 % | 0.0 % |
+| vintage | 20.6 % | 16.4 % |
+| futuristic | 17.2 % | 22.4 % |
+| paper-white | 17.6 % | 21.2 % |
+
+All animated profiles stayed at `reduced`, with the tick between 120 and 214 ms. None demoted to
+static on the host. The "badutf" column (21 and 9 for plain) led to the finding below.
+
+## Soak: 600 s, amber GL, llvmpipe
+
+REAL (`host/soak/soak-amber-gl.csv`, `host/soak.sh`): build f197952 (with the fix), Xvfb :44 with
+no WM, heavy `seq` output the whole time.
+- Each cycle opens 3 tabs (typing in them), closes 3, and resizes 700x400 → 1200x760 → 500x300 →
+  1024x640.
+- In total: 249 tab opens and 249 closes, plus 332 resizes. 250 backend lines in the log = the
+  first window plus 249 tabs.
+
+| t | RSS | fds | threads | children |
+|---|---|---|---|---|
+| 0 s | 221.7 MB | 12 | 23 | 1 |
+| 29 s | 485.9 MB | 12 | 22 | 1 |
+| 87 s | 489.8 MB | 12 | 22 | 1 |
+| 290 s | 502.1 MB (max) | 12 | 22 | 1 |
+| 602 s | 500.0 MB | 12 | 22 | 1 |
+
+- Memory: RSS rises in the first half-minute (llvmpipe buffers, glyph cache, 10000-line
+  scrollback under constant output), then levels off. From 87 s to the end it grew by 10.2 MB
+  (DERIVED), and it did not grow over the last 300 s.
+- fds stayed at 12.
+- There were 0 zombies and 0 invalid-UTF-8 warnings.
+
+NOT MEASURED: textures. `--stats` has no texture counter and llvmpipe has no per-process GPU memory
+to read, so RSS, which includes llvmpipe's texture memory, is the only proxy.
+
+## libvterm 0.3.3 reflow: out-of-bounds read, mitigated locally
+
+The plain-profile warnings (`Invalid UTF-8 string passed to pango_layout_set_text()`) come from the
+system libvterm 0.3.3, not from our code.
+
+The bug: in `screen.c` `resize_buffer`, the reflow loop
+`while (REFLOW && old_lineinfo && old_row >= 0 && old_lineinfo[old_row].continuation) old_row--;`
+reaches −1 when row 0 is a continuation line. It then reads row −1, so garbage cells appear after
+a resize. ASan cannot see this because the system library is not instrumented. It was confirmed
+by reading the 0.3.3 source and with a small probe.
+
+The mitigation, in f197952 (`VtermSession::clearTopContinuation()`): clear the continuation flag of
+screen row 0 before `vterm_set_size`, and on entering the alternate screen. libvterm calls our
+settermprop before it switches its lineinfo. The cost is that a line wrapped across the top edge
+does not re-join on resize.
+
+`tests/vterm_test.cpp` reproduces the bug on the primary and the alternate screen. It failed before
+the fix and passes in the release and ASan builds. The live repro now prints 0 warnings.
+
+This is a local workaround only. Nothing was reported to Debian or upstream.
+
+## Not done in item 2
+
+- Any GPU timing: there is no GPU.
+- KVM runs.
+- The terminal in the virtio-vga VM.
+- The five missing VM screenshots.
+- A texture count.
+
 ## Tests
 
 `meson test` has 13 tests: desktop-file, metainfo, governor (new), profiles, painter, fonts, vterm,
 effects, session, fixes, search, gl-match (GL vs CPU PSNR) and view. view gained testTabClose,
 testTabIds, testCorruptSettings and testGovernor (auto, cpu). All pass in the release build and in
 the ASan+UBSan build (`--timeout-multiplier 4`).
+
+After item 2 (f197952 and later), all 13 pass again in both builds, with `meson test -j2`. The ASan run used the
+documented `ASAN_OPTIONS=detect_leaks=0:abort_on_error=1`. A first run without it failed painter, effects
+and gl-match on fontconfig cache "leaks". In that run, search also tripped `worstSlice < 60.0` under ASan with
+two tests in parallel; that assertion depends on timing.
 
 Tools: `tools/m3_close_bench.cpp` (`lterm-m3-close-bench`), `lterm-m3-bench --search`,
 `docs/bench/m3-item1/*.sh`, and `tools/m3-shot.sh` for the screenshots.
