@@ -27,6 +27,15 @@ struct ViewOptions {
     int fontPx = 0;                 // 0: the profile's
     std::vector<std::string> command;
     bool stats = false;             // print frame statistics on exit
+    // Checkpoint B
+    int scrollbackLines = 10000;
+    bool loginShell = false;
+    std::string cwd;
+    std::string onExit = "hold-on-error";  // close | hold | hold-on-error
+    bool bellVisual = true, bellUrgent = true, bellAudible = false;
+    std::string cursorShape = "block";  // block | underline | bar (DECSCUSR overrides)
+    bool cursorBlink = false;           // DECSCUSR / ?12 override
+    std::string wordChars = Selection::defaultWordChars();
 };
 
 // Frame statistics (ms), kept for --stats and the benchmarks in docs/.
@@ -44,7 +53,9 @@ public:
     ~TerminalView() override;
     bool start();
     VtermSession& session() { return *session_; }
-    sigc::signal<void> signalChildExited;
+    sigc::signal<void> signalChildExited;  // close the window (child gone and not held)
+    sigc::signal<void, int> signalExitStatus;  // raw wait status, emitted once
+    sigc::signal<void> signalBell;             // for the urgency hint (main decides)
     sigc::signal<void, std::string> signalTitle;
     sigc::signal<void, std::string> signalBackend;  // backend description changed
 
@@ -56,6 +67,11 @@ public:
     const Profile& profile() const { return profile_; }
     std::string backendName() const;
     const ViewStats& stats() const { return stats_; }
+    int scrollOffset() const { return scrollOffset_; }
+    const Selection& selection() const { return sel_; }
+    std::string selectionText() const { return sel_.text(*session_); }
+    void copyClipboard();
+    void pasteClipboard(bool primary);
 
 protected:
     void on_size_allocate(Gtk::Allocation& a) override;
@@ -63,6 +79,20 @@ protected:
 private:
     enum class Mode { Plain, Cpu, Gl };
     bool onKey(GdkEventKey* ev);
+    bool onButtonPress(GdkEventButton* ev);
+    bool onButtonRelease(GdkEventButton* ev);
+    bool onMotion(GdkEventMotion* ev);
+    bool onScroll(GdkEventScroll* ev);
+    bool cellAt(double x, double y, int& row, int& col) const;
+    bool mouseReporting(guint state) const;
+    void scrollBy(int lines);  // + = back into history
+    void snapToBottom();
+    void selectionChanged();
+    void onChildExit(int status);
+    void onBell();
+    void updateBlink();
+    void sendKeyInput();       // common handling for anything typed
+    void ensureWriteWatch();
     bool onPtyIo(Glib::IOCondition cond);
     bool onDraw(const Cairo::RefPtr<Cairo::Context>& cr);
     bool onGlRender(const Glib::RefPtr<Gdk::GLContext>& ctx);
@@ -110,6 +140,20 @@ private:
     bool active_ = true, visible_ = true;
     sigc::connection io_, tick_, frameTimer_;
     gint64 t0_ = 0;
+    // Checkpoint B state
+    int scrollOffset_ = 0;
+    Selection sel_;
+    bool selecting_ = false;
+    std::string selSnapshot_;  // the selected text; the selection is dropped when it changes
+    int pressedButtons_ = 0;  // bitmask of buttons reported to the application
+    double wheelAccum_ = 0;
+    bool exited_ = false, holding_ = false;
+    guint childWatch_ = 0;
+    sigc::connection writeWatch_, bellTimer_, blink_;
+    double lastBellMs_ = -1e9;
+    bool bellFlash_ = false;
+    bool blinkOff_ = false;
+    bool lastAlt_ = false;
     ViewStats stats_;
 };
 

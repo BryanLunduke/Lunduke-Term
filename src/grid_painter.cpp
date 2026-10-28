@@ -163,15 +163,35 @@ void GridPainter::paintRows(cairo_t* cr, const Grid& g, int ox, int oy, Color8 c
         for (c = 0; c < g.cols; ++c) {
             const Cell& cell = g.at(r, c);
             const bool isCursor = g.cursorVisible && r == g.cursorRow && c == g.cursorCol;
-            if (isCursor) {
+            // Only the solid block inverts the glyph; the other shapes are drawn over it.
+            const bool solid = isCursor && g.cursorShape == Grid::CursorShape::Block && !g.cursorHollow;
+            if (solid) {
                 setColor(cr, cursorColor);
                 cairo_rectangle(cr, ox + c * cellW_, y, cellW_ * (cell.width == 2 ? 2 : 1), cellH_);
                 cairo_fill(cr);
             }
-            if (cell.width == 0 || cell.text.empty() || (cell.text == " " && !cell.underline)) continue;
-            cairo_surface_t* m = glyph(cell);
-            setColor(cr, isCursor ? cell.bg : cell.fg);
-            cairo_mask_surface(cr, m, ox + c * cellW_ - padX_, y);
+            if (!(cell.width == 0 || cell.text.empty() || (cell.text == " " && !cell.underline))) {
+                cairo_surface_t* m = glyph(cell);
+                setColor(cr, solid ? cell.bg : cell.fg);
+                cairo_mask_surface(cr, m, ox + c * cellW_ - padX_, y);
+            }
+            if (isCursor && !solid) {
+                const int w = cellW_ * (cell.width == 2 ? 2 : 1);
+                const int x = ox + c * cellW_;
+                setColor(cr, cursorColor);
+                if (g.cursorHollow) {
+                    cairo_set_line_width(cr, 1.0);
+                    cairo_rectangle(cr, x + 0.5, y + 0.5, w - 1, cellH_ - 1);
+                    cairo_stroke(cr);
+                } else if (g.cursorShape == Grid::CursorShape::Underline) {
+                    const int t = std::max(2, cellH_ / 8);
+                    cairo_rectangle(cr, x, y + cellH_ - t, w, t);
+                    cairo_fill(cr);
+                } else {
+                    cairo_rectangle(cr, x, y, std::max(2, cellW_ / 8), cellH_);
+                    cairo_fill(cr);
+                }
+            }
         }
         cairo_restore(cr);
     }

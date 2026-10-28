@@ -3,10 +3,14 @@
 //   lunduke-terminal [--profile ID] [--effects|--no-effects] [--renderer auto|gl|cpu]
 //                    [--threads N] [--effects-fps N] [--max-fps N] [--no-pause-unfocused]
 //                    [--font FAMILY] [--font-px N] [--size WxH] [--quit-after MS] [--stats]
+//                    [--scrollback N] [--login] [--cwd DIR] [--on-exit close|hold|hold-on-error]
+//                    [--hold] [--bell LIST] [--cursor-shape block|underline|bar]
+//                    [--cursor-blink|--no-cursor-blink]
 //                    [--list-profiles] [-e COMMAND ARGS...]
 // Settings (optional): $XDG_CONFIG_HOME/lunduke-terminal/settings.ini, group [terminal], keys
 // profile, effects (true/false), renderer, threads, effects-fps, max-fps, pause-unfocused,
-// font, font-px. Command-line options win.
+// font, font-px, scrollback-lines, login-shell, cwd, on-exit, bell (comma list of visual,
+// urgent, audible or none), cursor-shape, cursor-blink, word-chars. Command-line options win.
 #include "terminal_view.hpp"
 
 #include <gtkmm.h>
@@ -14,8 +18,26 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <sys/wait.h>
 
 namespace {
+
+void parseBell(lterm::ViewOptions& o, const std::string& list) {
+    o.bellVisual = o.bellUrgent = o.bellAudible = false;
+    size_t i = 0;
+    while (i <= list.size()) {
+        size_t j = list.find(',', i);
+        if (j == std::string::npos) j = list.size();
+        std::string t = list.substr(i, j - i);
+        t.erase(0, t.find_first_not_of(' '));
+        t.erase(t.find_last_not_of(' ') + 1);
+        if (t == "visual") o.bellVisual = true;
+        else if (t == "urgent") o.bellUrgent = true;
+        else if (t == "audible") o.bellAudible = true;
+        else if (!t.empty() && t != "none") std::fprintf(stderr, "lunduke-terminal: unknown bell type '%s'\n", t.c_str());
+        i = j + 1;
+    }
+}
 
 void loadSettings(lterm::ViewOptions& o) {
     const std::string path = Glib::build_filename(Glib::get_user_config_dir(), "lunduke-terminal", "settings.ini");
@@ -33,6 +55,14 @@ void loadSettings(lterm::ViewOptions& o) {
         if (kf.has_key(g, "pause-unfocused")) o.pauseWhenUnfocused = kf.get_boolean(g, "pause-unfocused");
         if (kf.has_key(g, "font")) o.fontFamily = kf.get_string(g, "font");
         if (kf.has_key(g, "font-px")) o.fontPx = kf.get_integer(g, "font-px");
+        if (kf.has_key(g, "scrollback-lines")) o.scrollbackLines = kf.get_integer(g, "scrollback-lines");
+        if (kf.has_key(g, "login-shell")) o.loginShell = kf.get_boolean(g, "login-shell");
+        if (kf.has_key(g, "cwd")) o.cwd = kf.get_string(g, "cwd");
+        if (kf.has_key(g, "on-exit")) o.onExit = kf.get_string(g, "on-exit");
+        if (kf.has_key(g, "bell")) parseBell(o, kf.get_string(g, "bell"));
+        if (kf.has_key(g, "cursor-shape")) o.cursorShape = kf.get_string(g, "cursor-shape");
+        if (kf.has_key(g, "cursor-blink")) o.cursorBlink = kf.get_boolean(g, "cursor-blink");
+        if (kf.has_key(g, "word-chars")) o.wordChars = kf.get_string(g, "word-chars");
     } catch (const Glib::Error& e) {
         std::fprintf(stderr, "lunduke-terminal: %s: %s\n", path.c_str(), e.what().c_str());
     }
@@ -59,6 +89,15 @@ int main(int argc, char** argv) {
         else if (a == "--size" && i + 1 < argc) std::sscanf(argv[++i], "%dx%d", &w, &h);
         else if (a == "--quit-after" && i + 1 < argc) quitAfter = std::atoi(argv[++i]);
         else if (a == "--stats") opts.stats = true;
+        else if (a == "--scrollback" && i + 1 < argc) opts.scrollbackLines = std::atoi(argv[++i]);
+        else if (a == "--login") opts.loginShell = true;
+        else if (a == "--cwd" && i + 1 < argc) opts.cwd = argv[++i];
+        else if (a == "--on-exit" && i + 1 < argc) opts.onExit = argv[++i];
+        else if (a == "--hold") opts.onExit = "hold";
+        else if (a == "--bell" && i + 1 < argc) parseBell(opts, argv[++i]);
+        else if (a == "--cursor-shape" && i + 1 < argc) opts.cursorShape = argv[++i];
+        else if (a == "--cursor-blink") opts.cursorBlink = true;
+        else if (a == "--no-cursor-blink") opts.cursorBlink = false;
         else if (a == "--list-profiles") {
             for (const auto& p : lterm::builtinProfiles())
                 std::printf("%-16s %s%s\n", p.id.c_str(), p.label.c_str(), p.effects ? "" : " [default]");
@@ -74,6 +113,14 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "lunduke-terminal: --renderer must be auto, gl or cpu\n");
         return 2;
     }
+    if (opts.onExit != "close" && opts.onExit != "hold" && opts.onExit != "hold-on-error") {
+        std::fprintf(stderr, "lunduke-terminal: --on-exit must be close, hold or hold-on-error\n");
+        return 2;
+    }
+    if (opts.cursorShape != "block" && opts.cursorShape != "underline" && opts.cursorShape != "bar") {
+        std::fprintf(stderr, "lunduke-terminal: --cursor-shape must be block, underline or bar\n");
+        return 2;
+    }
     int gargc = 1;
     auto app = Gtk::Application::create(gargc, argv, "org.lunduke.Terminal", Gio::APPLICATION_NON_UNIQUE);
     Gtk::Window win;
@@ -84,6 +131,16 @@ int main(int argc, char** argv) {
     win.add(view);
     view.signalTitle.connect([&](const std::string& t) { win.set_title(t + " - Lunduke Terminal"); });
     view.signalChildExited.connect([&] { win.hide(); });
+    view.signalExitStatus.connect([&](int status) {
+        char t[64];
+        if (WIFSIGNALED(status)) std::snprintf(t, sizeof t, "[killed: signal %d] ", WTERMSIG(status));
+        else std::snprintf(t, sizeof t, "[exited: %d] ", WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+        win.set_title(t + win.get_title());
+    });
+    // Bell: urgency hint while the window is not focused; cleared when it gets focus.
+    view.signalBell.connect([&] {
+        if (!win.is_active()) win.set_urgency_hint(true);
+    });
     view.signalBackend.connect([](const std::string& b) {
         std::fprintf(stderr, "lunduke-terminal: %s\n", b.c_str());
     });
@@ -91,7 +148,10 @@ int main(int argc, char** argv) {
     // Pause the effects animation when the window is inactive, iconified or fully covered.
     bool iconified = false, obscured = false, mapped = false;
     auto updateVisible = [&] { view.setWindowVisible(mapped && !iconified && !obscured); };
-    win.property_is_active().signal_changed().connect([&] { view.setWindowActive(win.is_active()); });
+    win.property_is_active().signal_changed().connect([&] {
+        view.setWindowActive(win.is_active());
+        if (win.is_active()) win.set_urgency_hint(false);
+    });
     win.signal_window_state_event().connect([&](GdkEventWindowState* e) {
         iconified = (e->new_window_state & (GDK_WINDOW_STATE_ICONIFIED | GDK_WINDOW_STATE_WITHDRAWN)) != 0;
         updateVisible();

@@ -1,4 +1,7 @@
-# M1 notes — checkpoint A (GtkGLArea, glyph cache, idle CPU, profiles)
+# M1 notes — checkpoints A and B
+
+Checkpoint A: GtkGLArea, glyph cache, idle CPU, profiles. Checkpoint B (at the end): PTY,
+scrollback, selection, clipboard, mouse reporting, bell, cursor shapes.
 
 Branch `m1-core` from master `71de83e` (M0 spike merged in PR #1). Checkpoint A covers M1
 items 1–3; checkpoints B and C are listed at the end.
@@ -120,11 +123,7 @@ items 1–3; checkpoints B and C are listed at the end.
 
 ## What is left
 
-**Checkpoint B (item 4).**
-- Own PTY handling (instead of `forkpty` defaults).
-- Scrollback and selection.
-- Clipboard, including PRIMARY.
-- Mouse reporting, bell, cursor shapes.
+**Checkpoint B (item 4).** Done; see the checkpoint B section below.
 
 **Checkpoint C (item 5).**
 - Benchmarks in a TCG (no-KVM) VM.
@@ -146,3 +145,193 @@ items 1–3; checkpoints B and C are listed at the end.
     LIBGL_ALWAYS_SOFTWARE=1 build/lterm-m1-bench --compare --size 1280x800
     LIBGL_ALWAYS_SOFTWARE=1 build/lterm-m1-bench --resize-loop 60
     build/lunduke-terminal --profile amber --stats --quit-after 8000
+
+# Checkpoint B — PTY, scrollback, selection, clipboard, mouse, bell, cursor
+
+## PTY (`src/vterm_session.*`)
+
+- Own spawn, no `forkpty`, no utmp/wtmp:
+  - `posix_openpt(O_CLOEXEC)`, `grantpt`, `unlockpt`, `ptsname_r`, `TIOCSWINSZ`.
+  - The child calls `setsid`, opens the slave, `TIOCSCTTY`, sets termios (`IUTF8`, `VERASE`
+    = DEL) and `dup2`s 0–2.
+  - It also closes fds 3–1023 and resets the signal mask and dispositions.
+- **Signal safety.** argv and env are built before `fork`, so the child calls only
+  async-signal-safe functions up to `execvpe`.
+- **When exec fails.** The child prints `lunduke-terminal: cannot run X: <error>` and exits 127.
+- **Shell.** `$SHELL`, then the passwd entry, then `/bin/sh`. A login shell (`--login` /
+  `login-shell=true`) gets `argv[0]` = `-bash`.
+- **Working directory.** `cwd` setting/`--cwd`, falling back to `$HOME`.
+- **Environment:**
+  - `TERM=xterm-256color`, `COLORTERM=truecolor`, `TERM_PROGRAM=lunduke-terminal`,
+    `TERM_PROGRAM_VERSION`.
+  - The inherited `TERM*`, `COLUMNS` and `LINES` are removed.
+  - `LANG=C.UTF-8` is added only when none of `LANG`, `LC_ALL` or `LC_CTYPE` is set.
+- **Child exit** goes through GLib `g_child_watch_add` (SIGCHLD + waitpid status), not PTY
+  EOF:
+  - The PTY is drained first so the last output is still shown.
+  - `on-exit` = `close` | `hold` | `hold-on-error` (the default).
+  - **hold-on-error** closes on a clean exit 0 and holds otherwise. A held window shows
+    `[process exited with status N]` or `[process killed by signal N (Name)]` and prefixes
+    the title with `[exited: N]` / `[killed: signal N]`. Enter, Esc or q closes it; other
+    keys are ignored.
+  - Closing the window sends SIGHUP to the child's process group.
+- **Writes.** PTY writes are queued and flushed non-blockingly from an `IO_OUT` watch, so a
+  large paste never blocks the UI.
+
+## Scrollback
+
+- **Buffer.** libvterm `sb_pushline`/`sb_popline`/`sb_clear` feed a deque of trimmed cell rows
+  with a soft-wrap flag:
+  - Default size 10000 lines, set with `scrollback-lines` / `--scrollback N`; 0 disables it.
+  - `ED 3` (`clear` / `\e[3J`) empties it.
+  - Reflow is on.
+- **Scrolling.** Mouse wheel (3 lines), Shift+PgUp/PgDn (a page minus one line),
+  Shift+Home/End.
+  - Typing snaps to the bottom.
+  - While you are scrolled back, new output keeps the view anchored on the same text.
+- **Alt screen.** Scrollback is not used in the alt screen (less, vim, top). The wheel sends
+  3× Up/Down there instead, like xterm `alternateScroll`.
+- **Limitation:**
+  - The soft-wrap flag of a pushed line is read from libvterm's line info. That is exact
+    for one-line scrolls, which is the normal case.
+  - For a multi-line scroll in one operation (e.g. `CSI 5 S`) only the first line's flag is
+    known, so the others count as hard breaks. The only effect is a newline in copied text.
+
+## Selection (`src/selection.*`)
+
+- **Coordinates.** Positions are absolute line numbers (scrollback + screen), so a selection
+  survives scrolling and works across the scrollback/screen boundary.
+- **Mouse gestures:**
+  - Drag selects characters. Double-click selects a word; word characters are alnum plus
+    `word-chars`, default `-_./~:@%+=?&#`, so paths and URLs select whole.
+  - Triple-click selects a line, following soft wraps.
+  - Shift+click extends. Dragging past the top or bottom edge auto-scrolls.
+  - Wide characters are never split.
+- **Copied text.** Trailing blanks are trimmed and soft wraps join without a newline.
+- **Repaint.** Selected cells carry a `selected` flag that is part of `Cell::operator==`, so the
+  changed-rows repaint redraws exactly the rows whose highlight changed.
+- **When the selection is dropped:**
+  - the selected text changes (snapshot compare on damage);
+  - its history falls off the scrollback;
+  - the alt screen switches;
+  - the window is resized;
+  - a selection that is only blanks is not kept.
+- **CRT curvature.** The reverse warp is implemented in `pointToCell()`:
+  - The GLSL/C++ effects sample the source at `barrel(p)` for output position `p`, with
+    curvature = `screenCurvature × 0.4`.
+  - So a pointer at `p` sits over source `barrel(p)`; no analytic inverse is needed.
+  - The forward function is shared with `effects.hpp` and is unit-tested against it.
+  - It applies only when effects are on (not `plain`). Jitter and horizontal sync are
+    ignored because they are sub-cell and time-varying.
+  - Screenshots b-10/b-10b show a double-click in amber near the top-left and bottom-right
+    corners selecting the word under the pointer.
+
+## Clipboard and paste
+
+- **Copy and paste keys.** Ctrl+Shift+C copies to CLIPBOARD and Ctrl+Shift+V pastes from it.
+- **PRIMARY.** Selecting sets PRIMARY; middle-click and Shift+Insert paste it.
+- **Bracketed paste** (`?2004`) wraps the text in `ESC[200~ … ESC[201~` only when the
+  application enabled it.
+- **Sanitising.** Pasted text is always cleaned up:
+  - CRLF/LF become CR;
+  - C0 controls except TAB, and DEL, are dropped;
+  - so an embedded `ESC[201~` cannot end the bracket early.
+
+## Mouse reporting
+
+- **Modes and encoding.** Modes `?9` (X10), `?1000`, `?1002` and `?1003`, with SGR `?1006`
+  (and the default X10-style encoding).
+  - libvterm ignores `?9`, so the session scans the output for it, including sequences split
+    across reads. It then encodes press-only reports with no modifiers.
+- **What is reported:** wheel (64/65), modifiers and motion.
+- **Releases.** A release is always sent for a press that was reported, so the application
+  never keeps a stuck button.
+- **Shift bypass.** Holding Shift bypasses reporting, so you can select text inside mouse
+  applications.
+- **Focus events** (`?1004`) are sent on window focus changes.
+
+## Bell
+
+- **Setting.** `bell = visual,urgent` (default), plus `audible` or `none`; also `--bell LIST`.
+- **Visual flash.** Inverts the screen for 120 ms (composed with DECSCNM reverse video).
+- **Urgent.** Sets the window's urgency hint while unfocused and clears it on focus.
+- **Audible.** `gdk_beep`.
+- **Rate limit.** One bell per 200 ms.
+
+## Cursor
+
+- **Shapes.**
+  - Block, underline and bar, from `cursor-shape` / `--cursor-shape`.
+  - Applications can override it with DECSCUSR (`CSI n SP q`, 0–6) and `?12`.
+  - Unfocused windows show a hollow block.
+- **Blink** is off by default (`cursor-blink`, `--cursor-blink`).
+  - When on, a 530 ms timer runs only while the window is focused, visible, not held and
+    not scrolled back. Typing resets the phase.
+  - DECSCUSR 0/1 turn it on, like xterm.
+
+## Settings keys added (`[terminal]` in settings.ini)
+
+`scrollback-lines`, `login-shell`, `cwd`, `on-exit`, `bell`, `cursor-shape`, `cursor-blink`,
+`word-chars`.
+CLI flags: `--scrollback N`, `--login`, `--cwd DIR`, `--on-exit close|hold|hold-on-error`,
+`--hold`, `--bell LIST`, `--cursor-shape block|underline|bar`, `--cursor-blink`,
+`--no-cursor-blink`.
+
+## Tests
+
+`meson test -C build` passes 6/6: profiles, vterm, **session (new)**, painter, effects and gl-match.
+
+**session (headless).**
+- **Scrollback:** limit, offset, colours, ED 3, limit 0, alt screen, wrap flag.
+- **Selection text:** char, reversed, word, path, blank, line, multi-line from scrollback,
+  soft wrap, wide characters, custom word chars.
+- **`pointToCell`:** flat, and with curvature 0.12 against `barrel`.
+- **Mouse encoding:**
+  - none; X10, including a split `?9h`; 1000 in X10 encoding;
+  - wheel; SGR 1006; Ctrl+right; 1002 drag; 1003 motion.
+- **Paste:** unbracketed, bracketed, ESC stripped.
+- **DECSCUSR and modes:** DECSCUSR 2/4/5, `?12`, `?25`, `?5`, focus `?1004`.
+- **changedRows:** a change to the cursor shape or the `selected` flag.
+- **Environment.**
+- **Real PTY:**
+  - TERM/COLORTERM, isatty, `stty size`, session leader, IUTF8;
+  - exit status 3, cwd, SIGTERM, login shell `$0=-bash`;
+  - a missing program exits 127 with a message.
+
+**painter.** Gained pixel checks for the block, underline, bar and hollow cursors.
+
+## Live checks (Xvfb, xfwm4, xdotool)
+
+vim, less, htop, mc and vttest are not installed on the box, and big packages were not added.
+The checks used bash, `cat -v`, a python3 curses mouse program, procps `top` and printf.
+
+| Screenshot | Shows |
+|---|---|
+| b-01-env-pty | TERM/COLORTERM/LANG, `/dev/pts/0`, bash is the session leader |
+| b-02-scrollback-wheel | 3 wheel clicks = 9 lines back |
+| b-03-scrollback-shift-pgup | Shift+PgUp, a page back |
+| b-04-selection-drag-in-scrollback | drag selection in scrollback, Ctrl+Shift+C → Ctrl+Shift+V into `cat` |
+| b-04b-double-click-word | double-click selects `/usr/share/doc/lunduke-terminal/README.md` |
+| b-04c-triple-click-line | triple-click line |
+| b-04d-primary-middle-click-bracketed-paste | middle-click PRIMARY under `?2004` → `^[[200~…^[[201~` |
+| b-05-mouse-sgr1006-shift-bypass | SGR reports `^[[<0;11;3M/m`, right = 2, wheel = 64; Shift-drag selects instead |
+| b-05b-mouse-1003-1002-x10 | 1003 motion `<35;…`, 1002 drag, X10 press-only |
+| b-06-mouse-python-curses | curses BUTTON1/3 CLICKED, BUTTON4/5, Ctrl modifier |
+| b-07-cursor-shapes-decscusr | block / underline / bar / hollow (unfocused) via DECSCUSR |
+| b-08-visual-bell-flash | visual bell (mean brightness 0.79 during, 0.008 after); urgency hint verified with xprop |
+| b-09-exit-hold-status | `exit 3`: hold message and title `[exited: 3]`; Enter closes, other keys don't |
+| b-09b-exit-signal | `kill -KILL $$`: `[process killed by signal 9 (Killed)]`; Esc closes |
+| b-10 / b-10b | amber with curvature: double-click near the corners selects the word under the pointer (red ring) |
+| b-11-top-procps | procps `top` running (it does not use the alt screen) |
+
+## Idle CPU re-check (1000×600, pidstat over 10 s, terminal idle at a prompt)
+
+| Case | CPU |
+|---|---|
+| plain, focused | 0.00 % |
+| plain, `--cursor-blink` | 0.10 % (a 530 ms timer that repaints one row) |
+| amber, unfocused | 0.00 % |
+
+`--stats` with an idle plain window gives 4 content frames, 1 full repaint and 0 ticks after
+both 4 s and 8 s, so nothing redraws when nothing changes. Pointer motion without mouse
+reporting does not repaint either.

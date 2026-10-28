@@ -22,7 +22,7 @@ effects_lib = static_library('lterm-effects',
 gl_lib = static_library('lterm-gl', 'src/gl_effects.cpp', 'src/gl_pipeline.cpp',
   link_with : effects_lib, dependencies : [epoxy_dep, egl_dep])
 
-vterm_lib = static_library('lterm-vterm', 'src/vterm_session.cpp',
+vterm_lib = static_library('lterm-vterm', 'src/vterm_session.cpp', 'src/selection.cpp',
   link_with : effects_lib, dependencies : [vterm_dep, util_dep, pangocairo_dep])
 
 executable('lunduke-terminal',
@@ -52,3 +52,6 @@ test('gl-match', executable('gl_match_test', 'tests/gl_match_test.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib],
   dependencies : [pangocairo_dep, epoxy_dep, threads_dep]),
   env : ['LIBGL_ALWAYS_SOFTWARE=1'], timeout : 120)
+test('session', executable('session_test', 'tests/session_test.cpp',
+  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
+  timeout : 60)
