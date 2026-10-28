@@ -60,6 +60,11 @@ FrameUniforms frameUniforms(const EffectParams& p, float timeMs, float burnInLas
     return u;
 }
 
+float EffectParams::burnInFadeMs() const {
+    if (burnIn <= 0) return 0.0f;
+    return lint(160.0f, 1600.0f, burnIn);  // decay reaches 1 after 1/burnInTime ms
+}
+
 std::vector<float> bloomWeights(int radius) {
     std::vector<float> w(static_cast<size_t>(radius) + 1);
     const float sigma = std::max(1.0f, radius / 2.0f);

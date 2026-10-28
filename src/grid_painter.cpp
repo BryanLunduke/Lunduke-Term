@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "grid_painter.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -30,9 +31,18 @@ GridPainter::GridPainter(const std::string& family, int pixelSize) {
     pango_font_metrics_unref(m);
     if (cellW_ < 1) cellW_ = 1;
     if (cellH_ < 1) cellH_ = 1;
+    padX_ = std::max(1, cellW_ / 2);
+    glyphLayout_ = pango_layout_new(ctx_);
+}
+
+void GridPainter::clearCache() {
+    for (auto& kv : cache_) cairo_surface_destroy(kv.second);
+    cache_.clear();
 }
 
 GridPainter::~GridPainter() {
+    clearCache();
+    if (glyphLayout_) g_object_unref(glyphLayout_);
     pango_font_description_free(font_);
     pango_font_description_free(bold_);
     g_object_unref(ctx_);
@@ -96,6 +106,75 @@ void GridPainter::paint(cairo_t* cr, const Grid& g, int ox, int oy, Color8 curso
         }
     }
     g_object_unref(layout);
+}
+
+cairo_surface_t* GridPainter::glyph(const Cell& cell) {
+    GlyphKey key{cell.text,
+                 static_cast<uint8_t>((cell.bold ? 1 : 0) | (cell.italic ? 2 : 0) | (cell.underline ? 4 : 0)),
+                 static_cast<uint8_t>(cell.width == 2 ? 2 : 1)};
+    auto it = cache_.find(key);
+    if (it != cache_.end()) return it->second;
+    if (cache_.size() >= 8192) clearCache();  // crude bound; real terminals rarely get here
+    const int w = cellW_ * key.width + 2 * padX_;
+    cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_A8, w, cellH_);
+    cairo_t* cr = cairo_create(s);
+    PangoLayout* layout = glyphLayout_;
+    pango_layout_set_font_description(layout, cell.bold ? bold_ : font_);
+    PangoAttrList* attrs = nullptr;
+    if (cell.underline || cell.italic) {
+        attrs = pango_attr_list_new();
+        if (cell.underline) pango_attr_list_insert(attrs, pango_attr_underline_new(PANGO_UNDERLINE_SINGLE));
+        if (cell.italic) pango_attr_list_insert(attrs, pango_attr_style_new(PANGO_STYLE_ITALIC));
+    }
+    pango_layout_set_attributes(layout, attrs);
+    if (attrs) pango_attr_list_unref(attrs);
+    pango_layout_set_text(layout, cell.text.c_str(), -1);
+    cairo_set_source_rgba(cr, 1, 1, 1, 1);
+    const int base = pango_layout_get_baseline(layout) / PANGO_SCALE;
+    cairo_move_to(cr, padX_, ascent_ - base);
+    pango_cairo_show_layout(cr, layout);
+    cairo_destroy(cr);
+    cairo_surface_flush(s);
+    cache_.emplace(std::move(key), s);
+    return s;
+}
+
+void GridPainter::paintRows(cairo_t* cr, const Grid& g, int ox, int oy, Color8 cursorColor, Color8 clear,
+                            const std::vector<char>* rows, int surfaceWidth) {
+    for (int r = 0; r < g.rows; ++r) {
+        if (rows && (r >= static_cast<int>(rows->size()) || !(*rows)[r])) continue;
+        const int y = oy + r * cellH_;
+        cairo_save(cr);
+        cairo_rectangle(cr, 0, y, surfaceWidth, cellH_);
+        cairo_clip(cr);
+        setColor(cr, clear);
+        cairo_paint(cr);
+        int c = 0;
+        while (c < g.cols) {
+            int e = c + 1;
+            while (e < g.cols && g.at(r, e).bg == g.at(r, c).bg) ++e;
+            if (g.at(r, c).bg != clear) {
+                setColor(cr, g.at(r, c).bg);
+                cairo_rectangle(cr, ox + c * cellW_, y, (e - c) * cellW_, cellH_);
+                cairo_fill(cr);
+            }
+            c = e;
+        }
+        for (c = 0; c < g.cols; ++c) {
+            const Cell& cell = g.at(r, c);
+            const bool isCursor = g.cursorVisible && r == g.cursorRow && c == g.cursorCol;
+            if (isCursor) {
+                setColor(cr, cursorColor);
+                cairo_rectangle(cr, ox + c * cellW_, y, cellW_ * (cell.width == 2 ? 2 : 1), cellH_);
+                cairo_fill(cr);
+            }
+            if (cell.width == 0 || cell.text.empty() || (cell.text == " " && !cell.underline)) continue;
+            cairo_surface_t* m = glyph(cell);
+            setColor(cr, isCursor ? cell.bg : cell.fg);
+            cairo_mask_surface(cr, m, ox + c * cellW_ - padX_, y);
+        }
+        cairo_restore(cr);
+    }
 }
 
 void surfaceToRgba(cairo_surface_t* s, std::vector<uint8_t>& out) {

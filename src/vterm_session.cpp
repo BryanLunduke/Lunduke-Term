@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "vterm_session.hpp"
+#include "profiles.hpp"
 
 #include <cerrno>
 #include <csignal>
@@ -142,6 +143,24 @@ static void appendUtf8(std::string& s, uint32_t c) {
     }
 }
 
+void VtermSession::setColors(Color8 fg, Color8 bg, const std::array<Color8, 16>& palette, float minFgGrey) {
+    fg_ = fg;
+    bg_ = bg;
+    palette_ = palette;
+    havePalette_ = true;
+    minFgGrey_ = minFgGrey;
+    damaged_ = true;
+}
+
+Color8 VtermSession::mapColor(VTermColor c, bool foreground) const {
+    if (foreground && VTERM_COLOR_IS_DEFAULT_FG(&c)) return fg_;
+    if (!foreground && VTERM_COLOR_IS_DEFAULT_BG(&c)) return bg_;
+    if (havePalette_ && VTERM_COLOR_IS_INDEXED(&c) && c.indexed.idx < 16) return palette_[c.indexed.idx];
+    vterm_screen_convert_color_to_rgb(screen_, &c);
+    Color8 o{c.rgb.red, c.rgb.green, c.rgb.blue};
+    return foreground ? liftToGrey(o, minFgGrey_) : o;
+}
+
 void VtermSession::fillGrid(Grid& g) const {
     if (g.rows != rows_ || g.cols != cols_) g.resize(rows_, cols_);
     for (int r = 0; r < rows_; ++r) {
@@ -156,10 +175,8 @@ void VtermSession::fillGrid(Grid& g) const {
             cell.text.clear();
             for (int i = 0; i < VTERM_MAX_CHARS_PER_CELL && vc.chars[i] && vc.chars[i] != 0xFFFFFFFFu; ++i)
                 appendUtf8(cell.text, vc.chars[i]);
-            vterm_screen_convert_color_to_rgb(screen_, &vc.fg);
-            vterm_screen_convert_color_to_rgb(screen_, &vc.bg);
-            Color8 fg{vc.fg.rgb.red, vc.fg.rgb.green, vc.fg.rgb.blue};
-            Color8 bg{vc.bg.rgb.red, vc.bg.rgb.green, vc.bg.rgb.blue};
+            Color8 fg = mapColor(vc.fg, true);
+            Color8 bg = mapColor(vc.bg, false);
             if (vc.attrs.reverse) std::swap(fg, bg);
             cell.fg = fg;
             cell.bg = bg;

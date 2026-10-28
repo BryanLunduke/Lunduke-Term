@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Lunduke Terminal - M0 spike: CRT effects description shared by the CPU and GL back-ends.
+// Lunduke Terminal: CRT effects description shared by the GL (main) and CPU (fallback) back-ends.
 //
 // The maths follows cool-retro-term 1.2.0 (app/qml/ShaderTerminal.qml, BurnInEffect.qml,
 // ShaderLibrary.qml), re-implemented from scratch for a single source of truth:
 //   1. bloom source: 2x2 box downsample + separable Gaussian (transparent border)
-//   2. burn-in: feedback buffer, new = max(old - decay, current) in source space
+//   2. burn-in: feedback buffer, new = max(old - decay, current) in source space (half
+//      resolution by default, like CRT's burnInQuality 0.5; fed from the bloom downsample)
 //   3. static pass: barrel warp, chroma/tint to phosphor colour, bloom add, brightness
 //   4. dynamic pass: horizontal sync, jitter, static noise, glowing line, burn-in combine,
 //      scanline rasterization, flicker, ambient light, outside-screen mask
@@ -42,7 +43,23 @@ struct EffectParams {
     float rasterizationIntensity = 1.0f;
     // Global quality: bloom radius at half resolution (CRT: lint(16,64,bloomQuality)=40 full res).
     int bloomRadiusHalfRes = 20;
+    // M1: keep the burn-in feedback buffer at half resolution (4x less memory and bandwidth).
+    // The M0 golden comparison used full resolution; both are kept so the M0 numbers can be
+    // reproduced.
+    bool burnInHalfRes = true;
+
+    // True when the picture changes on its own (noise, flicker, jitter, sync, glowing line),
+    // i.e. the view needs an effects tick even when the terminal content is unchanged.
+    bool animated() const {
+        return staticNoise > 0 || flickering > 0 || jitter > 0 || horizontalSync > 0 || glowingLine > 0;
+    }
+    // Time after a content change until the burn-in ghost has fully faded (ms), 0 without burn-in.
+    float burnInFadeMs() const;
 };
+
+// Byte order of 8-bit source/destination pixels. BGRA is Cairo's ARGB32/RGB24 in memory on a
+// little-endian machine, which lets the view hand its Cairo surface over without conversion.
+enum class PixelOrder { RGBA, BGRA };
 
 // Values derived from the profile the way CRT 1.2.0 does it (see ShaderTerminal.qml).
 struct DerivedParams {
@@ -91,8 +108,14 @@ class EffectsPipeline {
 public:
     virtual ~EffectsPipeline() = default;
     virtual void resize(int width, int height) = 0;
-    // Terminal content changed: RGBA8 (R,G,B,A byte order), width*height*4, row 0 = top.
-    virtual void setSource(const uint8_t* rgba, int stride, float timeMs) = 0;
+    // Terminal content changed. px is 8-bit 4-channel (see PixelOrder), row 0 = top. Only rows
+    // [rowBegin, rowEnd) changed since the previous call (rowEnd < 0: all rows); the others must
+    // be identical to what was passed before.
+    virtual void updateSource(const uint8_t* px, int stride, PixelOrder order, float timeMs,
+                              int rowBegin = 0, int rowEnd = -1) = 0;
+    void setSource(const uint8_t* rgba, int stride, float timeMs) {
+        updateSource(rgba, stride, PixelOrder::RGBA, timeMs);
+    }
     // One effects tick; writes RGBA8 (row 0 = top) into out (width*height*4).
     virtual void render(float timeMs, uint8_t* out) = 0;
     virtual const char* name() const = 0;

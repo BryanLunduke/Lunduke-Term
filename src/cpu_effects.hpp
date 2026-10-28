@@ -13,8 +13,13 @@ class CpuEffects final : public EffectsPipeline {
 public:
     CpuEffects(const EffectParams& params, int threads);
     void resize(int width, int height) override;
-    void setSource(const uint8_t* rgba, int stride, float timeMs) override;
-    void render(float timeMs, uint8_t* out) override;
+    void updateSource(const uint8_t* px, int stride, PixelOrder order, float timeMs, int rowBegin = 0,
+                      int rowEnd = -1) override;
+    void render(float timeMs, uint8_t* out) override { renderTo(timeMs, out, w_ * 4, PixelOrder::RGBA); }
+    // Effects tick straight into a caller buffer (e.g. a Cairo RGB24 surface with BGRA order).
+    void renderTo(float timeMs, uint8_t* out, int stride, PixelOrder order);
+    int width() const { return w_; }
+    int height() const { return h_; }
     const char* name() const override { return "cpu"; }
 
     // Stage timings of the last setSource() in ms (bloom, burn-in, static).
@@ -27,8 +32,10 @@ private:
     std::unique_ptr<ThreadPool> pool_;
     int w_ = 0, h_ = 0, hw_ = 0, hh_ = 0;
     std::vector<float> src_;      // RGBA float, source
+    std::vector<float> down_;             // half res RGBA: 2x2 box downsample of src_
     std::vector<float> bloomA_, bloomB_;  // half res RGBA
-    std::vector<float> burn_, burnTmp_;   // RGBA float (rgb + prev mask)
+    std::vector<float> burn_;             // RGBA float (rgb + prev mask), full or half res
+    int bw_ = 0, bh_ = 0;                 // burn-in buffer size
     std::vector<float> static_;   // RGBA float, static pass output
     std::vector<float> warp_;     // per pixel: staticCoords.u, .v, distance, inScreen
     std::vector<float> weights_;

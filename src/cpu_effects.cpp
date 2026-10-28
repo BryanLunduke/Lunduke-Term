@@ -32,13 +32,15 @@ void CpuEffects::resize(int width, int height) {
     h_ = height;
     hw_ = std::max(1, w_ / 2);
     hh_ = std::max(1, h_ / 2);
+    bw_ = p_.burnInHalfRes ? hw_ : w_;
+    bh_ = p_.burnInHalfRes ? hh_ : h_;
     const size_t n = static_cast<size_t>(w_) * h_ * 4;
     src_.assign(n, 0.0f);
     static_.assign(n, 0.0f);
-    burn_.assign(n, 0.0f);
-    burnTmp_.assign(n, 0.0f);
-    bloomA_.assign(static_cast<size_t>(hw_) * hh_ * 4, 0.0f);
-    bloomB_.assign(bloomA_.size(), 0.0f);
+    burn_.assign(static_cast<size_t>(bw_) * bh_ * 4, 0.0f);
+    down_.assign(static_cast<size_t>(hw_) * hh_ * 4, 0.0f);
+    bloomA_.assign(down_.size(), 0.0f);
+    bloomB_.assign(down_.size(), 0.0f);
     haveBurn_ = false;
     buildLut();
 }
@@ -68,20 +70,31 @@ void CpuEffects::buildLut() {
     });
 }
 
-void CpuEffects::setSource(const uint8_t* rgba, int stride, float timeMs) {
-    // 0. bytes -> float
-    pool_->parallelFor(h_, [&](int y0, int y1) {
-        for (int y = y0; y < y1; ++y) {
-            const uint8_t* s = rgba + static_cast<size_t>(y) * stride;
-            float* d = &src_[static_cast<size_t>(y) * w_ * 4];
-            for (int i = 0; i < w_ * 4; ++i) d[i] = s[i] * (1.0f / 255.0f);
-        }
-    });
+void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, float timeMs, int rowBegin,
+                              int rowEnd) {
+    // 0. bytes -> float, only the rows that changed.
+    if (rowEnd < 0 || rowEnd > h_) rowEnd = h_;
+    rowBegin = std::max(0, rowBegin);
+    const bool bgra = order == PixelOrder::BGRA;
+    if (rowEnd > rowBegin) {
+        pool_->parallelFor(rowEnd - rowBegin, [&](int y0, int y1) {
+            for (int y = rowBegin + y0; y < rowBegin + y1; ++y) {
+                const uint8_t* s = px + static_cast<size_t>(y) * stride;
+                float* d = &src_[static_cast<size_t>(y) * w_ * 4];
+                for (int x = 0; x < w_; ++x) {
+                    d[x * 4 + 0] = s[x * 4 + (bgra ? 2 : 0)] * (1.0f / 255.0f);
+                    d[x * 4 + 1] = s[x * 4 + 1] * (1.0f / 255.0f);
+                    d[x * 4 + 2] = s[x * 4 + (bgra ? 0 : 2)] * (1.0f / 255.0f);
+                    d[x * 4 + 3] = 1.0f;
+                }
+            }
+        });
+    }
 
-    // 1. bloom source: 2x2 box downsample, then separable Gaussian with transparent border.
+    // 1. half-resolution 2x2 box downsample (input of the bloom blur and of the half-res burn-in).
     auto t0 = Clock::now();
-    if (p_.bloom > 0) {
-        const int R = p_.bloomRadiusHalfRes;
+    const bool halfBurn = p_.burnIn > 0 && p_.burnInHalfRes;
+    if (p_.bloom > 0 || halfBurn) {
         pool_->parallelFor(hh_, [&](int y0, int y1) {
             for (int y = y0; y < y1; ++y) {
                 int sy0 = clampi(2 * y, 0, h_ - 1), sy1 = clampi(2 * y + 1, 0, h_ - 1);
@@ -91,15 +104,19 @@ void CpuEffects::setSource(const uint8_t* rgba, int stride, float timeMs) {
                     const float* b = &src_[(static_cast<size_t>(sy0) * w_ + sx1) * 4];
                     const float* c = &src_[(static_cast<size_t>(sy1) * w_ + sx0) * 4];
                     const float* d = &src_[(static_cast<size_t>(sy1) * w_ + sx1) * 4];
-                    float* o = &bloomA_[(static_cast<size_t>(y) * hw_ + x) * 4];
+                    float* o = &down_[(static_cast<size_t>(y) * hw_ + x) * 4];
                     for (int i = 0; i < 4; ++i) o[i] = 0.25f * (a[i] + b[i] + c[i] + d[i]);
                 }
             }
         });
+    }
+    // Bloom: separable Gaussian with transparent border, down_ -> B -> A.
+    if (p_.bloom > 0) {
+        const int R = p_.bloomRadiusHalfRes;
         // horizontal: A -> B
         pool_->parallelFor(hh_, [&](int y0, int y1) {
             for (int y = y0; y < y1; ++y) {
-                const float* row = &bloomA_[static_cast<size_t>(y) * hw_ * 4];
+                const float* row = &down_[static_cast<size_t>(y) * hw_ * 4];
                 for (int x = 0; x < hw_; ++x) {
                     float acc[4] = {0, 0, 0, 0};
                     for (int k = -R; k <= R; ++k) {
@@ -143,10 +160,11 @@ void CpuEffects::setSource(const uint8_t* rgba, int stride, float timeMs) {
             burnLast_ = timeMs;
         }
         const float decay0 = clamp01((burnLast_ - burnPrev_) * d_.burnInTime);
-        pool_->parallelFor(h_, [&](int y0, int y1) {
-            for (size_t i = static_cast<size_t>(y0) * w_; i < static_cast<size_t>(y1) * w_; ++i) {
+        const float* srcBuf = p_.burnInHalfRes ? down_.data() : src_.data();
+        pool_->parallelFor(bh_, [&](int y0, int y1) {
+            for (size_t i = static_cast<size_t>(y0) * bw_; i < static_cast<size_t>(y1) * bw_; ++i) {
                 float* acc = &burn_[i * 4];
-                const float* t = &src_[i * 4];
+                const float* t = srcBuf + i * 4;
                 float decay = std::max(0.0f, decay0 - acc[3]);
                 for (int c = 0; c < 3; ++c) acc[c] = clamp01(std::max(acc[c] - decay, t[c]));
                 acc[3] = rgb2grey(t[0], t[1], t[2]);
@@ -207,7 +225,8 @@ void CpuEffects::setSource(const uint8_t* rgba, int stride, float timeMs) {
     lastStaticMs = msSince(t0);
 }
 
-void CpuEffects::render(float timeMs, uint8_t* out) {
+void CpuEffects::renderTo(float timeMs, uint8_t* out, int stride, PixelOrder order) {
+    const int ri = order == PixelOrder::BGRA ? 2 : 0, bi = 2 - ri;
     const FrameUniforms fu = frameUniforms(p_, timeMs, burnLast_);
     const Rgb fc = p_.fontColor;
     const float chroma = p_.chromaColor;
@@ -233,7 +252,7 @@ void CpuEffects::render(float timeMs, uint8_t* out) {
                                           v * vry - (vry + 120.0f) * fractf(timeMs * 0.00015f))) *
                        d_.glowingLine;
             }
-            uint8_t* orow = out + static_cast<size_t>(y) * w_ * 4;
+            uint8_t* orow = out + static_cast<size_t>(y) * stride;
             for (int x = 0; x < w_; ++x) {
                 const size_t idx = static_cast<size_t>(y) * w_ + x;
                 const float* lut = &warp_[idx * 4];
@@ -251,7 +270,7 @@ void CpuEffects::render(float timeMs, uint8_t* out) {
                 color += glow;
                 sampleClamp<3>(static_.data(), w_, h_, tu, tv, t);
                 if (p_.burnIn != 0.0f) {
-                    sampleClamp<3>(burn_.data(), w_, h_, su, sv, b);
+                    sampleClamp<3>(burn_.data(), bw_, bh_, su, sv, b);
                     float br = 0.65f * (b[0] - fu.burnInDecay);
                     float bgc = 0.65f * (b[1] - fu.burnInDecay);
                     float bb = 0.65f * (b[2] - fu.burnInDecay);
@@ -277,7 +296,7 @@ void CpuEffects::render(float timeMs, uint8_t* out) {
                 for (int i = 0; i < 3; ++i) {
                     float f = t[i] * fu.flickerBrightness + amb;
                     f = f * inScreen;  // outside the tube: black (stand-in for the bezel)
-                    o[i] = static_cast<uint8_t>(clamp01(f) * 255.0f + 0.5f);
+                    o[i == 0 ? ri : (i == 2 ? bi : 1)] = static_cast<uint8_t>(clamp01(f) * 255.0f + 0.5f);
                 }
                 o[3] = 255;
             }

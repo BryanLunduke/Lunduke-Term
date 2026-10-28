@@ -6,6 +6,7 @@
 
 #include <vterm.h>
 
+#include <array>
 #include <functional>
 #include <string>
 #include <sys/types.h>
@@ -40,6 +41,9 @@ public:
     void sendBytes(const char* bytes, size_t len);
 
     void fillGrid(Grid& g) const;
+    // Colours used by fillGrid(): default fg/bg, ANSI 0-15, and a minimum grey level applied to
+    // every other foreground colour (see Profile).
+    void setColors(Color8 fg, Color8 bg, const std::array<Color8, 16>& palette, float minFgGrey);
     std::string rowText(int row) const;
 
     bool takeDamage() {
@@ -52,6 +56,7 @@ public:
     std::function<void()> onBell;
 
 private:
+    Color8 mapColor(VTermColor c, bool foreground) const;
     static int cbDamage(VTermRect, void* user);
     static int cbMoveCursor(VTermPos pos, VTermPos, int visible, void* user);
     static int cbSetTermProp(VTermProp prop, VTermValue* val, void* user);
@@ -68,6 +73,10 @@ private:
     bool cursorVisible_ = true;
     std::string title_, titleBuf_;
     std::string pendingOut_;
+    Color8 fg_{208, 208, 208}, bg_{0, 0, 0};
+    std::array<Color8, 16> palette_{};
+    bool havePalette_ = false;
+    float minFgGrey_ = 0.0f;
 };
 
 }  // namespace lterm
