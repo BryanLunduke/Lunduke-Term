@@ -1,0 +1,7 @@
+date: Wed Oct 28 12:27:18 CDT 2026
+uname: Linux 6.12.94+ x86_64
+model name	: Intel(R) Xeon(R) Processor
+cpus: 8
+load: 0.55 0.73 1.39 1/1030 124344
+gl amber/full 64x64 LP_NUM_THREADS=default (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 0.76 ms, tick 0.19 ms
+done: Wed Oct 28 12:33:14 CDT 2026

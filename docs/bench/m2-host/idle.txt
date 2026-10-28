@@ -1,0 +1,17 @@
+# window 1280x800, idle shell, cpu = (utime+stime)/wall over 10 s after 12 s; 100% = one core
+plain (default): cpu 0.0% rss 52440kB  [stats: quality=reduced software=1 tick-interval 100.0 ms ]
+ibm-3278 GL (static profile): cpu 0.0% rss 228584kB  [stats: quality=reduced software=1 tick-interval 244.0 ms ]
+amber GL BEFORE (full, no governor = M1): cpu 96.2% rss 228364kB  [stats: quality=full software=1 tick-interval 50.0 ms ]
+amber GL auto: cpu 16.2% rss 228616kB  [stats: quality=reduced software=1 tick-interval 243.0 ms ]
+amber GL full: cpu 22.6% rss 228288kB  [stats: quality=full software=1 tick-interval 230.8 ms ]
+amber GL reduced: cpu 16.2% rss 228504kB  [stats: quality=reduced software=1 tick-interval 218.5 ms ]
+amber GL static: cpu 0.0% rss 227820kB  [stats: quality=static software=1 tick-interval 50.0 ms ]
+amber CPU BEFORE (full, no governor = M1): cpu 133.0% rss 127876kB  [stats: quality=full software=1 tick-interval 50.0 ms ]
+amber CPU threads=4 auto: cpu 20.0% rss 127840kB  [stats: quality=reduced software=1 tick-interval 247.4 ms ]
+amber CPU threads=4 full: cpu 21.5% rss 127816kB  [stats: quality=full software=1 tick-interval 308.8 ms ]
+amber CPU threads=4 reduced: cpu 20.5% rss 127808kB  [stats: quality=reduced software=1 tick-interval 249.7 ms ]
+amber CPU threads=4 static: cpu 0.0% rss 123876kB  [stats: quality=static software=1 tick-interval 50.0 ms ]
+# re-run Wed Oct 28 12:50:08 CDT 2026 after commit 039690e (GL content frames drew into an internal FBO before it; idle ticks were not affected)
+amber GL static (re-run): cpu 0.0% rss 227748kB  [stats: quality=static software=1 tick-interval 50.0 ms ]
+ibm-3278 GL (static profile) (re-run): cpu 0.0% rss 228328kB  [stats: quality=reduced software=1 tick-interval 202.6 ms ]
+amber GL auto (re-run): cpu 16.7% rss 228496kB  [stats: quality=reduced software=1 tick-interval 227.1 ms ]
