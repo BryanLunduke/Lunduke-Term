@@ -1,0 +1,13 @@
+# window 1280x800, idle shell, cpu = (utime+stime)/wall over 10 s after 40 s; 100% = one core
+plain (default): cpu 0.0% rss 44364kB  [stats: quality=reduced software=1 tick-interval 100.0 ms ]
+ibm-3278 GL (static profile): cpu 0.0% rss 220196kB  [stats: quality=reduced software=1 tick-interval 100.0 ms ]
+amber GL BEFORE (full, no governor = M1): cpu 325.6% rss 217988kB  [stats: quality=full software=1 tick-interval 50.0 ms ]
+amber GL auto: cpu 0.0% rss 264168kB  [lunduke-terminal: animation needs 320% of a core at 1 fps; effects-quality auto -> static stats: quality=static software=1 tick-interval 50.0 ms ]
+amber GL full: cpu 327.4% rss 218204kB  [stats: quality=full software=1 tick-interval 1000.0 ms ]
+amber GL reduced: cpu 327.0% rss 218124kB  [stats: quality=reduced software=1 tick-interval 1000.0 ms ]
+amber GL static: cpu 0.0% rss 217744kB  [stats: quality=static software=1 tick-interval 50.0 ms ]
+amber CPU BEFORE (full, no governor = M1): cpu 290.2% rss 119492kB  [stats: quality=full software=1 tick-interval 50.0 ms ]
+amber CPU threads=4 auto: cpu 0.0% rss 115108kB  [lunduke-terminal: animation needs 106% of a core at 1 fps; effects-quality auto -> static stats: quality=static software=1 tick-interval 50.0 ms ]
+amber CPU threads=4 full: cpu 155.7% rss 119488kB  [stats: quality=full software=1 tick-interval 1000.0 ms ]
+amber CPU threads=4 reduced: cpu 120.5% rss 119092kB  [stats: quality=reduced software=1 tick-interval 1000.0 ms ]
+amber CPU threads=4 static: cpu 0.0% rss 115156kB  [stats: quality=static software=1 tick-interval 50.0 ms ]
