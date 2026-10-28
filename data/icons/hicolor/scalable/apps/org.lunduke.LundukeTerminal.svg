@@ -1,21 +1,88 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- SPDX-License-Identifier: CC0-1.0 . Placeholder icon: a CRT monitor with an amber prompt. -->
+<!-- SPDX-License-Identifier: CC0-1.0
+     Lunduke Terminal icon: an original drawing (hand-written paths, no third-party artwork).
+     A CRT monitor with a curved amber screen, a ">_" prompt, scanlines and a glass reflection. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <defs>
-    <radialGradient id="glass" cx="50%" cy="45%" r="65%">
-      <stop offset="0" stop-color="#2b1a08"/>
-      <stop offset="1" stop-color="#0b0704"/>
-    </radialGradient>
     <linearGradient id="case" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#4a4540"/>
-      <stop offset="1" stop-color="#26231f"/>
+      <stop offset="0" stop-color="#6b645a"/>
+      <stop offset="0.55" stop-color="#47413a"/>
+      <stop offset="1" stop-color="#2b2723"/>
     </linearGradient>
+    <linearGradient id="caseEdge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9a9184"/>
+      <stop offset="1" stop-color="#3a352f"/>
+    </linearGradient>
+    <linearGradient id="recess" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d0a08"/>
+      <stop offset="1" stop-color="#29241f"/>
+    </linearGradient>
+    <radialGradient id="glass" cx="0.5" cy="0.48" r="0.62">
+      <stop offset="0" stop-color="#4a2c0a"/>
+      <stop offset="0.6" stop-color="#2a1806"/>
+      <stop offset="1" stop-color="#0c0703"/>
+    </radialGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="stand" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b3631"/>
+      <stop offset="1" stop-color="#1f1c19"/>
+    </linearGradient>
+    <linearGradient id="foot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6b645a"/>
+      <stop offset="1" stop-color="#36312c"/>
+    </linearGradient>
+    <pattern id="scan" width="4" height="3" patternUnits="userSpaceOnUse">
+      <rect width="4" height="1.1" fill="#000000" opacity="0.32"/>
+    </pattern>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.6"/>
+    </filter>
+    <clipPath id="screenClip">
+      <path id="screen" d="M23 25 Q64 20.5 105 25 Q109.5 53.5 105 82 Q64 86.5 23 82 Q18.5 53.5 23 25 Z"/>
+    </clipPath>
   </defs>
-  <rect x="8" y="10" width="112" height="92" rx="14" fill="url(#case)"/>
-  <rect x="18" y="20" width="92" height="70" rx="12" fill="url(#glass)" stroke="#120d09" stroke-width="2"/>
-  <path d="M30 42 l12 8 -12 8" fill="none" stroke="#ff8100" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="48" y="58" width="22" height="5" rx="1.5" fill="#ff8100"/>
-  <ellipse cx="44" cy="32" rx="22" ry="6" fill="#ffffff" opacity="0.08"/>
-  <rect x="44" y="102" width="40" height="8" fill="#26231f"/>
-  <rect x="30" y="110" width="68" height="8" rx="3" fill="#3a3632"/>
+
+  <!-- shadow -->
+  <ellipse cx="64" cy="120.5" rx="44" ry="4.5" fill="#000000" opacity="0.28"/>
+  <!-- stand -->
+  <path d="M50 98 L78 98 L82 110 L46 110 Z" fill="url(#stand)"/>
+  <path d="M30 110.5 Q30 107.5 34 107.5 L94 107.5 Q98 107.5 98 110.5 L99 116 Q99 118.5 96 118.5 L32 118.5 Q29 118.5 29 116 Z" fill="url(#foot)"/>
+  <path d="M34 108.5 L94 108.5" stroke="#a39a8c" stroke-width="1" opacity="0.6"/>
+
+  <!-- case -->
+  <rect x="5" y="9" width="118" height="93" rx="17" fill="url(#caseEdge)"/>
+  <rect x="6.5" y="10.5" width="115" height="90" rx="15.5" fill="url(#case)"/>
+  <!-- recess around the tube -->
+  <rect x="14" y="17" width="100" height="73" rx="11" fill="url(#recess)"/>
+  <rect x="14.5" y="89" width="99" height="1.2" rx="0.6" fill="#8a8173" opacity="0.55"/>
+
+  <!-- tube -->
+  <use href="#screen" fill="url(#glass)"/>
+  <g clip-path="url(#screenClip)">
+    <ellipse cx="62" cy="54" rx="44" ry="30" fill="#ff9a00" opacity="0.10"/>
+    <!-- prompt: glow, then the crisp glyphs -->
+    <g filter="url(#glow)" opacity="0.85">
+      <path d="M33 41 L49 52.5 L33 64" fill="none" stroke="#ff8a00" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="55" y="59" width="22" height="7" fill="#ff8a00"/>
+    </g>
+    <path d="M33 41 L49 52.5 L33 64" fill="none" stroke="#ffb31a" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="55" y="59.5" width="22" height="6" rx="0.8" fill="#ffb31a"/>
+    <path d="M34.5 42.8 L46.5 51.6" stroke="#ffe2a0" stroke-width="1.6" stroke-linecap="round" opacity="0.8"/>
+    <rect x="57" y="60.6" width="18" height="1.4" fill="#ffe2a0" opacity="0.7"/>
+    <rect x="18" y="18" width="92" height="70" fill="url(#scan)"/>
+  </g>
+  <!-- glass reflection -->
+  <path d="M27 28.5 Q64 24 100 28 Q99 31 96 32 Q62 30 30 46 Q26 40 27 28.5 Z" fill="url(#shine)"/>
+  <path d="M95 76 Q101 66 102.5 56" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" opacity="0.14"/>
+  <!-- tube rim -->
+  <use href="#screen" fill="none" stroke="#000000" stroke-width="1.4" opacity="0.7"/>
+
+  <!-- top highlight of the case, power LED -->
+  <path d="M22 11.5 L106 11.5" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.22"/>
+  <circle cx="104" cy="95.5" r="2.4" fill="#ffae1a"/>
+  <circle cx="104" cy="95.5" r="4.2" fill="#ffae1a" opacity="0.25"/>
+  <rect x="22" y="94.3" width="18" height="2.4" rx="1.2" fill="#1c1916" opacity="0.8"/>
 </svg>
