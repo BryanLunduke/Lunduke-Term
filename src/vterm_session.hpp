@@ -173,6 +173,7 @@ private:
     int escTarget_ = 0;       // feed() state 3: 0 = G0, 1 = G1 being designated
     std::string csiParams_;   // parameters of the open CSI (bounded)
     void restoreCharsets();
+    std::string penSgr() const;
     // Continuation flags of the screen rows, taken just before an operation that may push
     // several lines to the scrollback at once (CSI S, CSI M, resize). libvterm shifts its line
     // info before the pushes, which loses the flags of all but the last pushed row.

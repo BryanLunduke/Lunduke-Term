@@ -327,6 +327,44 @@ void VtermSession::snapshotWraps() {
 // Feeds the bytes to libvterm, but every CSI S (scroll up) and CSI M (delete lines) on its own,
 // with the line continuation flags saved just before it, so lines that leave the screen
 // several at a time keep their soft-wrap flag (see cbPushLine).
+static void appendColorSgr(std::string& out, const VTermColor& c, bool fg) {
+    char buf[32];
+    if ((fg && VTERM_COLOR_IS_DEFAULT_FG(&c)) || (!fg && VTERM_COLOR_IS_DEFAULT_BG(&c))) return;
+    if (VTERM_COLOR_IS_INDEXED(&c)) std::snprintf(buf, sizeof buf, ";%d;5;%d", fg ? 38 : 48, c.indexed.idx);
+    else std::snprintf(buf, sizeof buf, ";%d;2;%d;%d;%d", fg ? 38 : 48, c.rgb.red, c.rgb.green, c.rgb.blue);
+    out += buf;
+}
+
+// The current pen as one SGR sequence ("ESC [ m" for the default pen).
+std::string VtermSession::penSgr() const {
+    std::string p;
+    VTermValue v;
+    auto flag = [&](VTermAttr a, const char* code) {
+        if (vterm_state_get_penattr(state_, a, &v) && v.boolean) (p += ';') += code;
+    };
+    flag(VTERM_ATTR_BOLD, "1");
+    flag(VTERM_ATTR_ITALIC, "3");
+    flag(VTERM_ATTR_BLINK, "5");
+    flag(VTERM_ATTR_REVERSE, "7");
+    flag(VTERM_ATTR_CONCEAL, "8");
+    flag(VTERM_ATTR_STRIKE, "9");
+    if (vterm_state_get_penattr(state_, VTERM_ATTR_UNDERLINE, &v) && v.number) {
+        if (v.number == VTERM_UNDERLINE_DOUBLE) p += ";21";
+        else if (v.number == VTERM_UNDERLINE_CURLY) p += ";4:3";
+        else p += ";4";
+    }
+    if (vterm_state_get_penattr(state_, VTERM_ATTR_FONT, &v) && v.number > 0 && v.number < 10)
+        p += ";" + std::to_string(10 + v.number);
+    if (vterm_state_get_penattr(state_, VTERM_ATTR_FOREGROUND, &v)) appendColorSgr(p, v.color, true);
+    if (vterm_state_get_penattr(state_, VTERM_ATTR_BACKGROUND, &v)) appendColorSgr(p, v.color, false);
+    if (vterm_state_get_penattr(state_, VTERM_ATTR_SMALL, &v) && v.boolean &&
+        vterm_state_get_penattr(state_, VTERM_ATTR_BASELINE, &v))
+        p += v.number == VTERM_BASELINE_RAISE ? ";73" : v.number == VTERM_BASELINE_LOWER ? ";74" : "";
+    if (p.empty()) return "\x1b[m";
+    p[0] = '[';
+    return "\x1b" + p + "m";
+}
+
 void VtermSession::restoreCharsets() {
     cs_ = savedCs_;
     char seq[8] = {0x1b, '(', cs_.g0, 0x1b, ')', cs_.g1, static_cast<char>(cs_.shifted ? 0x0e : 0x0f), 0};
@@ -353,6 +391,8 @@ void VtermSession::feed(const char* bytes, size_t len) {
             else if (c == '(' || c == ')') {
                 escTarget_ = c == '(' ? 0 : 1;
                 csiState_ = 3;
+            } else if (c == ']' || c == 'P' || c == '_' || c == '^' || c == 'X') {
+                csiState_ = 4;  // OSC / DCS / APC / PM / SOS string
             } else {
                 if (c == '7') savedCs_ = cs_;
                 else if (c == '8') {
@@ -398,6 +438,13 @@ void VtermSession::feed(const char* bytes, size_t len) {
                 csiParams_ += c;
             }
             break;
+        case 4:  // inside a control string, until BEL or ST (ESC \\)
+            if (c == 0x07 || c == 0x18 || c == 0x1a) csiState_ = 0;
+            else if (c == 0x1b) csiState_ = 5;
+            break;
+        case 5:
+            csiState_ = c == '\\' ? 0 : (c == 0x1b ? 5 : 4);
+            break;
         case 3:  // ESC ( / ESC ) : intermediates, then the final byte names the set
             if (c >= 0x30 && c <= 0x7e) {
                 (escTarget_ ? cs_.g1 : cs_.g0) = c;
@@ -424,7 +471,16 @@ void VtermSession::resize(int rows, int cols) {
     snapshotWraps();  // shrinking pushes the top rows to the scrollback, several at once
     rows_ = rows;
     cols_ = cols;
+    // libvterm fills the cells a resize/reflow creates with the *current* pen, which in a
+    // full-screen program is whatever it drew last (vim's reverse status line), and on the
+    // main screen behind the alternate one too: blanks came back reverse after leaving vim.
+    // Resize with the default pen, then give the application its pen back. Only between
+    // sequences: SGR fed into the middle of a CSI or a control string would corrupt it.
+    const std::string pen = csiState_ == 0 ? penSgr() : std::string();
+    const bool swapPen = !pen.empty() && pen != "\x1b[m";
+    if (swapPen) feedRaw("\x1b[m", 3);
     vterm_set_size(vt_, rows, cols);  // reflow + scrollback push/pop happen in here
+    if (swapPen) feedRaw(pen.data(), pen.size());
     wrapSnapActive_ = false;
     vterm_screen_flush_damage(screen_);
     if (fd_ >= 0) {

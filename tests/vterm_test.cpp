@@ -98,6 +98,26 @@ int main() {
         feed(a, "\x1b[?47l");
         CHECK(!a.altScreen() && a.rowText(0) == "main");
     }
+    // vim: resizing while a full-screen program has a reverse/colour pen must not paint the
+    // new and reflowed blanks (also those of the main screen behind it) with that pen.
+    {
+        VtermSession v(3, 10);
+        v.setColors(Color8{200, 200, 200}, Color8{0, 0, 0}, std::array<Color8, 16>{}, 0.f);
+        feed(v, "main\x1b[?1049h\x1b[7;44mstatus");
+        v.resize(5, 20);
+        feed(v, "X\x1b[?1049l");
+        Grid h;
+        v.fillGrid(h);
+        CHECK(h.at(0, 8).bg.r == 0 && h.at(0, 8).bg.b == 0);   // was the old width
+        CHECK(h.at(0, 15).bg.r == 0 && h.at(0, 15).bg.b == 0);  // new column
+        CHECK(h.at(4, 3).bg.r == 0);                            // new row
+        feed(v, "\x1b[?1049h");
+        v.resize(4, 12);
+        feed(v, "\x1b[HY");
+        v.fillGrid(h);
+        CHECK(h.at(0, 0).text == "Y" && h.at(0, 0).fg.b > 100);  // pen (reverse on blue) kept
+        CHECK(h.at(3, 11).bg.r == 0 && h.at(3, 11).bg.b == 0);
+    }
     // DECSCNM: libvterm reverses the cells itself; the grid must come out light exactly once.
     {
         VtermSession r(2, 10);
