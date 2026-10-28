@@ -1,0 +1,49 @@
+amber full scale 2: PSNR 103.97 dB, max diff 1
+amber reduced scale 2: PSNR 105.22 dB, max diff 1
+amber static scale 2: PSNR 106.98 dB, max diff 1
+green-scanlines full scale 2: PSNR 106.98 dB, max diff 1
+green-scanlines reduced scale 2: PSNR 106.98 dB, max diff 1
+green-scanlines static scale 2: PSNR 109.99 dB, max diff 1
+ibm-dos rgb full scale 1: PSNR 106.98 dB, max diff 1
+ibm-dos rgb reduced scale 1: PSNR 103.97 dB, max diff 1
+ibm-dos rgb static scale 1: PSNR 103.97 dB, max diff 1
+amber bezel full scale 1: PSNR 99.00 dB, max diff 0
+amber bezel reduced scale 1: PSNR 106.98 dB, max diff 1
+amber bezel static scale 1: PSNR 106.98 dB, max diff 1
+green-scanlines bezel full scale 1: PSNR 106.98 dB, max diff 1
+green-scanlines bezel reduced scale 1: PSNR 102.21 dB, max diff 1
+green-scanlines bezel static scale 1: PSNR 103.97 dB, max diff 1
+amber bezel+rgb full scale 1: PSNR 99.00 dB, max diff 0
+amber bezel+rgb reduced scale 1: PSNR 106.98 dB, max diff 1
+amber bezel+rgb static scale 1: PSNR 106.98 dB, max diff 1
+vintage bezel full scale 1: PSNR 103.97 dB, max diff 1
+vintage bezel reduced scale 1: PSNR 99.00 dB, max diff 0
+vintage bezel static scale 1: PSNR 106.98 dB, max diff 1
+futuristic full scale 1: PSNR 103.97 dB, max diff 1
+futuristic reduced scale 1: PSNR 103.97 dB, max diff 1
+futuristic static scale 1: PSNR 102.21 dB, max diff 1
+paper-white bezel full scale 1: PSNR 103.97 dB, max diff 1
+paper-white bezel reduced scale 1: PSNR 102.21 dB, max diff 1
+paper-white bezel static scale 1: PSNR 102.21 dB, max diff 1
+ibm-dos rgb full scale 2: PSNR 103.97 dB, max diff 1
+ibm-dos rgb reduced scale 2: PSNR 106.98 dB, max diff 1
+ibm-dos rgb static scale 2: PSNR 109.99 dB, max diff 1
+amber bezel full scale 2: PSNR 103.46 dB, max diff 1
+amber bezel reduced scale 2: PSNR 104.55 dB, max diff 1
+amber bezel static scale 2: PSNR 103.97 dB, max diff 1
+green-scanlines bezel full scale 2: PSNR 105.22 dB, max diff 1
+green-scanlines bezel reduced scale 2: PSNR 105.22 dB, max diff 1
+green-scanlines bezel static scale 2: PSNR 106.02 dB, max diff 1
+amber bezel+rgb full scale 2: PSNR 103.46 dB, max diff 1
+amber bezel+rgb reduced scale 2: PSNR 104.55 dB, max diff 1
+amber bezel+rgb static scale 2: PSNR 104.55 dB, max diff 1
+vintage bezel full scale 2: PSNR 103.46 dB, max diff 1
+vintage bezel reduced scale 2: PSNR 109.99 dB, max diff 1
+vintage bezel static scale 2: PSNR 108.23 dB, max diff 1
+futuristic full scale 2: PSNR 106.98 dB, max diff 1
+futuristic reduced scale 2: PSNR 113.01 dB, max diff 1
+futuristic static scale 2: PSNR 106.02 dB, max diff 1
+paper-white bezel full scale 2: PSNR 103.01 dB, max diff 1
+paper-white bezel reduced scale 2: PSNR 103.46 dB, max diff 1
+paper-white bezel static scale 2: PSNR 102.59 dB, max diff 1
+after 50 resizes (bezel on): textures 12 -> 12, fbos 10 -> 10, glIsTexture 13 -> 13, PSNR 102.21 dB, max diff 1

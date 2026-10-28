@@ -25,7 +25,8 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             build-essential meson ninja-build pkg-config \
             libgtkmm-3.0-dev libvterm-dev libepoxy-dev libegl-dev libfontconfig-dev libx11-dev \
-            libgl1-mesa-dri libegl-mesa0 fonts-dejavu-core xvfb xauth dbus-x11
+            libgl1-mesa-dri libegl-mesa0 fonts-dejavu-core xvfb xauth dbus-x11 \
+            desktop-file-utils appstream
       - name: Configure
         run: meson setup build --buildtype=release
       - name: Compile

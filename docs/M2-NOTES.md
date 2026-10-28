@@ -446,3 +446,74 @@ static pass) and nothing per tick.
   `halt_on_error=1`, `--timeout-multiplier 4`): 9/9 OK, no `runtime error` / AddressSanitizer
   report in the log.
 - `docs/ci/ci.yml`: yamllint clean (default rules, line length 120). It has not run on GitHub.
+
+# M2 stage 3 (items 6–8; 3513fc5 … HEAD)
+
+## Item 6: packaging prep (3513fc5) — nothing was built or installed on the system
+
+- App id `org.lunduke.LundukeTerminal` (GApplication id, `.desktop`, metainfo, icon name;
+  `set_default_icon_name`). `-T/--title` added for launchers.
+- `data/org.lunduke.LundukeTerminal.desktop` (TerminalEmulator, actions "New Window" and "Amber"),
+  `data/org.lunduke.LundukeTerminal.metainfo.xml` (CC0 metadata, GPL-3.0-or-later project),
+  `data/icons/hicolor/scalable/apps/org.lunduke.LundukeTerminal.svg` (placeholder, CC0).
+- `meson install`: binary, desktop file, metainfo, icon, README/FONTS/PACKAGING docs
+  (checked with `meson install --destdir` into /tmp only).
+- Tests `desktop-file` (`desktop-file-validate`) and `metainfo` (`appstreamcli validate --no-net`)
+  run when the tools exist. The only appstream note is the pedantic `cid-contains-uppercase-letter`,
+  kept because the id was chosen. `docs/ci/ci.yml` installs `desktop-file-utils appstream`.
+- `debian/` (control, rules, changelog, copyright DEP-5, source/format, postinst/prerm with
+  `x-terminal-emulator` priority 20) is prep only; no deb was built. Font Depends/Recommends/Suggests
+  and the licence rule (no Apple II/PET/C64 fonts) are in [`PACKAGING.md`](PACKAGING.md).
+- No lcos-live, apt or ISO changes.
+
+## Item 7: CRT-style profiles (2c4fcd2) — no c64 profile, no C64/Apple II/PET fonts
+
+| Profile | Basis | Colour | Font | Bezel | Palette |
+|---|---|---|---|---|---|
+| `vintage` | CRT 1.2.0 "Vintage" tube values | #00ff3e, chroma 0 | Terminus (instead of PetMe) | yes, #3b3328 | `kVintage` (warm) |
+| `futuristic` | CRT 1.2.0 "Futuristic" | #729fcf, chroma 1 | Terminus | no (flat, margin .01) | `kFuturistic` (cool, legible) |
+| `paper-white` | own white-phosphor variation | #dce6ff, scanlines .5 | Terminus | yes, #c8c4bc | `kPaperWhite` |
+
+The default stays `plain`. `profiles_test` checks the CRT values, that each new palette differs
+from the others, that no profile uses a forbidden family or id (petme, commodore, c64, c-64,
+printchar, prnumber, apple, atariclassic) and that there is no c64 profile. `gl-match` covers
+vintage+bezel, futuristic and paper-white+bezel at all three qualities, scale 1 and 2.
+
+## Item 8: tabs, search, settings (e1385ba, ca9aa8e, 7a13b12)
+
+- `src/search.*`: search over the scrollback + screen with soft-wrapped lines joined, case
+  folding (`g_utf8_casefold`, ASCII fast path), matches as cell ranges; `search` test
+  (10 000 lines × 80 columns ≈ 24 ms).
+- `TerminalView`: highlight of all matches (#c4a000) and the current one (#f57900) on the
+  composed grid, "N of M", re-run 250 ms after output and after a reflow; live `setFont`,
+  `setEffectsQuality`, `setScrollbackLines`, `setFrame`.
+- `TerminalWindow` (`src/terminal_window.*`): Gtk::Notebook, tab bar only with ≥ 2 tabs, new tab in
+  the current shell's cwd (from /proc), hidden tabs stop animating; search bar; settings dialog
+  (profile, font + size, effects quality, scrollback, bezel; "Save as default" keeps other keys).
+  Tab closes from inside a view signal are deferred to idle (no use-after-free).
+- `view` test (ASan-built): `testTabs`, `testSearchView`, `testSearchBar`, `testSettingsDialog`.
+
+## Stage 3 results — REAL
+
+- Release `build/`: 12/12 OK (profiles, painter, fonts, vterm, effects, session, fixes, search,
+  gl-match, view, desktop-file, metainfo).
+- ASan + UBSan `build-san/` (`detect_leaks=0`, `--timeout-multiplier 4`): 12/12 OK, no
+  `runtime error` / AddressSanitizer report.
+- PSNR GL vs C++ (`docs/bench/m2s3-host/psnr.txt`): 48 cases, 99.00–113.01 dB, max diff ≤ 1
+  (stage 2: 99–110 dB); resize loop textures 12 → 12, FBOs 10 → 10.
+- Idle CPU, host 1280×800, 10 s window (`docs/bench/m2s3-host/idle.txt`; stage-2 value in brackets):
+  plain 1 tab 0.0 % [0.0], plain 3 tabs 0.0 %, amber gl auto 17.4 % [18.6], amber 3 tabs 18.7 %
+  (hidden tabs add nothing beyond noise), amber static 0.0 % [0.0], vintage 15.8 %,
+  vintage+bezel 17.1 %, futuristic 18.1 %, paper-white 17.0 %.
+
+### Screenshots (`/workspace/lcos-app-reviews/terminal-m2/`, host, 1000×640)
+
+`s3-profile-{vintage,futuristic,paper-white}.png`, `s3-profile-{vintage,paper-white}-bezel.png`,
+`s3-search-{plain,amber}-{newest,older}.png` (3 tabs, search "needle": newest = 4 of 4, then 2 of 4 after two Enters; matches count oldest-first),
+`s3-settings-{plain,amber}.png`. Fonts from an unpacked local fontconfig (not installed). Toolbar
+icons are blank squares on the bare Xvfb (no icon theme there).
+
+### Tools downloaded (Debian trixie, `dpkg-deb -x` into /workspace/lterm-tools/root)
+
+appstream 1.0.5-1, libappstream5 1.0.5-1, libxmlb2 0.3.22-1, libyaml-0-2 0.2.5-2,
+libstemmer0d 2.2.0-4+b2 (for `appstreamcli`; URLs + sha256 in /workspace/lterm-tools/urls.txt).

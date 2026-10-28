@@ -23,6 +23,10 @@ slow software rendering), vttest/vim/htop/mc fixes, HiDPI (the GTK scale factor:
 glyphs and effects, font size stays logical), the CRT 1.2.0 RGB shift (`ibm-dos`) and an optional
 monitor bezel for `amber`, `green` and `green-scanlines` (rounded glass, shaded frame, glass
 highlight and the screen's glow reflected on the frame; pre-rendered, so it costs nothing when idle).
+Stage 3: three more CRT 1.2.0-derived profiles (`vintage`, `futuristic`, `paper-white`, each with its
+own palette and licence-clean fonts only), tabs, scrollback search with highlighting, a settings
+dialog, and packaging prep (`.desktop`, AppStream metainfo, icon placeholder, `meson install`,
+an unbuilt `debian/`; see [`docs/PACKAGING.md`](docs/PACKAGING.md)). The default stays `plain`.
 
 | Part | Where |
 |---|---|
@@ -32,6 +36,9 @@ highlight and the screen's glow reflected on the frame; pre-rendered, so it cost
 | GLSL pipeline (GtkGLArea or headless EGL) | `src/gl_pipeline.*`, `src/gl_shaders.hpp`, `src/gl_effects.*` |
 | C++ fallback effects, row-parallel | `src/effects.*`, `src/cpu_effects.*`, `src/thread_pool.*` |
 | Profiles and palettes | `src/profiles.*` |
+| Window: tabs, search bar, settings dialog | `src/terminal_window.*` |
+| Scrollback search (wrap-joined, case-folded) | `src/search.*` |
+| Desktop file, metainfo, icon; Debian packaging prep | `data/`, `debian/`, `docs/PACKAGING.md` |
 | Font choice and fallback (fontconfig) | `src/font_resolve.*` |
 | Benchmarks | `tools/m1_bench.cpp`, `tools/bench-m1.sh`, `tools/m0_bench.cpp` |
 
@@ -43,7 +50,8 @@ Without them, the profiles fall back to DejaVu Sans Mono. See `docs/FONTS.md`.
 
     meson setup build
     ninja -C build -j2
-    meson test -C build          # effects, vterm, session, profiles, fonts, painter and CPU-vs-GL (incl. resize-leak) tests
+    meson test -C build          # effects, vterm, session, profiles, fonts, painter, search, view and CPU-vs-GL (incl. resize-leak) tests
+    meson install -C build --destdir /tmp/stage   # binary, .desktop, metainfo, icon, docs
 
 ### Run
 
@@ -57,6 +65,9 @@ Without them, the profiles fall back to DejaVu Sans Mono. See `docs/FONTS.md`.
     build/lunduke-terminal --profile green --frame --frame-size 40 --frame-color '#c8c0b0' --frame-shininess 1
     build/lunduke-terminal --profile ibm-dos --rgb-shift 0          # ibm-dos without its RGB shift
     GDK_SCALE=2 build/lunduke-terminal --profile amber              # HiDPI (follows the GTK scale)
+    build/lunduke-terminal --profile vintage --frame                # green CRT 1.2.0 "Vintage", with bezel
+    build/lunduke-terminal --profile futuristic                     # blue, chroma 1, no bezel
+    build/lunduke-terminal --profile paper-white --frame -T notes   # white phosphor, own window title
 
 Options: `--profile ID`, `--effects`/`--no-effects`, `--renderer auto|gl|cpu`, `--threads N`
 (C++ fallback), `--effects-fps N` (default 20), `--max-fps N` (default 60), `--no-pause-unfocused`,
@@ -64,14 +75,20 @@ Options: `--profile ID`, `--effects`/`--no-effects`, `--renderer auto|gl|cpu`, `
 `--login`, `--cwd DIR`, `--on-exit close|hold|hold-on-error`, `--hold`, `--bell visual,urgent,audible|none`,
 `--cursor-shape block|underline|bar`, `--cursor-blink`/`--no-cursor-blink`,
 `--effects-quality auto|full|reduced|static`, `--cpu-budget PCT`, `--frame`/`--no-frame`
-(bezel; amber/green/green-scanlines only, ignored with a warning elsewhere), `--frame-size PX`
+(bezel; amber/green/green-scanlines/vintage/paper-white only, ignored with a warning elsewhere), `--frame-size PX`
 (logical px, default 28), `--frame-color #RRGGBB`, `--frame-shininess 0..1` (reflection and
-highlights), `--rgb-shift X` (CRT `rbgShift`, 0 = off), `-e COMMAND...`.
+highlights), `--rgb-shift X` (CRT `rbgShift`, 0 = off), `-T/--title TEXT`, `-e COMMAND...`.
 A press on the bezel neither selects nor is reported to the application; a drag that leaves the
 glass clamps to the edge cells.
 Keys: Ctrl+Shift+E toggles effects, Ctrl+Shift+P cycles profiles, Ctrl+Shift+C/V copy/paste,
 Shift+PgUp/PgDn/Home/End scroll back, Shift+Insert or middle-click pastes PRIMARY, Shift bypasses
-mouse reporting. Defaults can be set in
+mouse reporting. Tabs: Ctrl+Shift+T opens a tab (in the current tab's working directory),
+Ctrl+Shift+W closes it, Ctrl+PgUp/PgDn switch (wrapping); the tab bar shows only with two or more
+tabs, and hidden tabs do not animate. Search: Ctrl+Shift+F opens the search bar over the scrollback
+(matches highlighted, current one in orange, "N of M"); Enter goes to the next older match,
+Shift+Enter to the newer one, Escape closes. Settings: Ctrl+Shift+S opens a dialog for profile,
+font and size, effects quality, scrollback lines and bezel; changes apply live to every tab in the window and to new tabs;
+"Save as default" writes them to the settings file (other keys are kept). Defaults can be set in
 `~/.config/lunduke-terminal/settings.ini` (group `[terminal]`, keys `profile`, `effects`,
 `renderer`, `threads`, `effects-fps`, `max-fps`, `pause-unfocused`, `font`, `font-px`,
 `scrollback-lines`, `login-shell`, `cwd`, `on-exit`, `bell`, `cursor-shape`, `cursor-blink`, `word-chars`,
