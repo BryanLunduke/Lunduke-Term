@@ -202,3 +202,7 @@ All in `/workspace/lcos-app-reviews/terminal-m2/`:
   rebooted (pid 131297, 12:38:40 CDT).
 - Explicit `full`/`reduced` on very slow software rendering stay above the budget (see TCG).
   Only `auto` demotes.
+
+## Tests
+
+`meson test -C build` (DISPLAY = own Xvfb :43): 9/9 OK (profiles, painter, fonts, effects, vterm, session, fixes, gl-match, view).
