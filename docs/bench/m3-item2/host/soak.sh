@@ -15,10 +15,10 @@ sample() { t=$(( $(date +%s)-start )); r=$(awk '/VmRSS/{print $2}' /proc/$pid/st
 sample
 while [ $(( $(date +%s)-start )) -lt $DUR ] && kill -0 $pid 2>/dev/null; do
   i=$((i+1))
-  xdotool windowactivate --sync $win 2>/dev/null
+  xdotool windowfocus --sync $win 2>/dev/null; xdotool mousemove --window $win 300 200
   # open 3 tabs, type in them, close them (back to tab 1 with the output loop)
-  for k in 1 2 3; do xdotool key --window $win ctrl+shift+t; opened=$((opened+1)); sleep 0.6; xdotool type --window $win --delay 5 "echo soak $i $k; ls /usr/lib | head -50"; xdotool key --window $win Return; sleep 0.4; done
-  for k in 1 2 3; do xdotool key --window $win ctrl+shift+w; closed=$((closed+1)); sleep 0.5; done
+  for k in 1 2 3; do xdotool key ctrl+shift+t; opened=$((opened+1)); sleep 0.6; xdotool type --delay 5 "echo soak $i $k; ls /usr/lib | head -50"; xdotool key Return; sleep 0.4; done
+  for k in 1 2 3; do xdotool key ctrl+shift+w; closed=$((closed+1)); sleep 0.5; done
   # resize a few times
   for sz in "700 400" "1200 760" "500 300" "1024 640"; do xdotool windowsize $win $sz; rs=$((rs+1)); sleep 0.5; done
   [ $((i%2)) = 0 ] && sample
