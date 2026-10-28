@@ -1,0 +1,8 @@
+before (run 1, std VGA):
+33fc871b94b74d7b204a1883b2a3e079848bf8c94250f71834d10870c4706e61  /workspace/lcos-iso/lcos-live-100-01.iso
+after run 1:
+33fc871b94b74d7b204a1883b2a3e079848bf8c94250f71834d10870c4706e61  /workspace/lcos-iso/lcos-live-100-01.iso
+before run 2 (virtio-vga):
+33fc871b94b74d7b204a1883b2a3e079848bf8c94250f71834d10870c4706e61  /workspace/lcos-iso/lcos-live-100-01.iso
+after run 2:
+33fc871b94b74d7b204a1883b2a3e079848bf8c94250f71834d10870c4706e61  /workspace/lcos-iso/lcos-live-100-01.iso

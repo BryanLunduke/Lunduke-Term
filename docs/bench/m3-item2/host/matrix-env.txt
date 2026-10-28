@@ -1,0 +1,21 @@
+Wed Oct 28 17:14:31 CDT 2026
+6.12.94+
+Extended renderer info (GLX_MESA_query_renderer):
+    Accelerated: no
+OpenGL renderer string: llvmpipe (LLVM 19.1.7, 256 bits)
+OpenGL core profile version string: 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1
+OpenGL core profile shading language version string: 4.50
+OpenGL version string: 4.5 (Compatibility Profile) Mesa 25.0.7-2+deb13u1
+OpenGL shading language version string: 4.50
+OpenGL ES profile version string: OpenGL ES 3.2 Mesa 25.0.7-2+deb13u1
+OpenGL ES profile shading language version string: OpenGL ES GLSL ES 3.20
+8
+plain            Plain (no effects) [default] font: DejaVu Sans Mono 16px
+amber            Amber                  font: DejaVu Sans Mono 22px (fallback)
+green            Green                  font: DejaVu Sans Mono 22px (fallback)
+green-scanlines  Green scanlines        font: DejaVu Sans Mono 22px (fallback)
+ibm-dos          IBM DOS (colour)       font: DejaVu Sans Mono 22px (fallback)
+ibm-3278         IBM 3278 (static)      font: DejaVu Sans Mono 22px (fallback)
+vintage          Vintage                font: DejaVu Sans Mono 22px (fallback)
+futuristic       Futuristic (colour)    font: DejaVu Sans Mono 22px (fallback)
+paper-white      Paper white            font: DejaVu Sans Mono 22px (fallback)

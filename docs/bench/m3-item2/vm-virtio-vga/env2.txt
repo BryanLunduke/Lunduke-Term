@@ -1,0 +1,5 @@
+0 virtio_gpudrmfb
+total 0
+drwxr-xr-x  2 root root        80 Oct 28 22:00 by-path
+crw-rw----+ 1 root video 226,   0 Oct 28 22:01 card0
+crw-rw-rw-  1 root video 226, 128 Oct 28 22:00 renderD128

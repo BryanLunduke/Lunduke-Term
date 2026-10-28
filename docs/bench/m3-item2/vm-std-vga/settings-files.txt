@@ -1,0 +1,9 @@
+total 8
+drwxrwxr-x 2 lcos lcos 80 Oct 28 21:55 .
+drwx------ 3 lcos lcos 60 Oct 28 21:53 ..
+-rw-rw-r-- 1 lcos lcos 69 Oct 28 21:55 settings.ini
+-rw-rw-r-- 1 lcos lcos 35 Oct 28 21:55 settings.ini.corrupt
+[terminal]
+profile=plain
+effects-quality=auto
+scrollback-lines=10000

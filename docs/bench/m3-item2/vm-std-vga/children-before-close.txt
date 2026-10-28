@@ -1,0 +1,4 @@
+  PID STAT CMD
+11298 Ss+  bash --norc -i
+11325 Ss+  /bin/bash
+11332 Ss+  /bin/bash

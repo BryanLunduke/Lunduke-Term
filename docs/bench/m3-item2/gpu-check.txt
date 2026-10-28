@@ -1,0 +1,122 @@
+## date: Wed Oct 28 16:40:01 CDT 2026
+$ ls -la /dev/dri
+ls: cannot access '/dev/dri': No such file or directory
+$ lspci
+--: line 2: lspci: command not found
+$ ls /sys/class/drm
+ls: cannot access '/sys/class/drm': No such file or directory
+$ /sys/bus/pci/devices display class (0x03xxxx)
+(end)
+$ ls /sys/bus/pci/devices | wc -l
+7
+$ DISPLAY=:44 glxinfo -B
+name of display: :44
+display: :44  screen: 0
+direct rendering: Yes
+Extended renderer info (GLX_MESA_query_renderer):
+    Vendor: Mesa (0xffffffff)
+    Device: llvmpipe (LLVM 19.1.7, 256 bits) (0xffffffff)
+    Version: 25.0.7
+    Accelerated: no
+    Video memory: 16002MB
+    Unified memory: yes
+    Preferred profile: core (0x1)
+    Max core profile version: 4.5
+    Max compat profile version: 4.5
+    Max GLES1 profile version: 1.1
+    Max GLES[23] profile version: 3.2
+Memory info (GL_ATI_meminfo):
+    VBO free memory - total: 31 MB, largest block: 31 MB
+    VBO free aux. memory - total: 5488 MB, largest block: 5488 MB
+    Texture free memory - total: 31 MB, largest block: 31 MB
+    Texture free aux. memory - total: 5488 MB, largest block: 5488 MB
+    Renderbuffer free memory - total: 31 MB, largest block: 31 MB
+    Renderbuffer free aux. memory - total: 5488 MB, largest block: 5488 MB
+Memory info (GL_NVX_gpu_memory_info):
+    Dedicated video memory: 322701 MB
+    Total available memory: 338703 MB
+    Currently available dedicated video memory: 31 MB
+OpenGL vendor string: Mesa
+OpenGL renderer string: llvmpipe (LLVM 19.1.7, 256 bits)
+OpenGL core profile version string: 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1
+OpenGL core profile shading language version string: 4.50
+OpenGL core profile context flags: (none)
+OpenGL core profile profile mask: core profile
+
+OpenGL version string: 4.5 (Compatibility Profile) Mesa 25.0.7-2+deb13u1
+OpenGL shading language version string: 4.50
+OpenGL context flags: (none)
+OpenGL profile mask: compatibility profile
+
+OpenGL ES profile version string: OpenGL ES 3.2 Mesa 25.0.7-2+deb13u1
+OpenGL ES profile shading language version string: OpenGL ES GLSL ES 3.20
+
+$ eglinfo -B (surfaceless/device)
+GBM platform:
+eglinfo: eglInitialize failed
+
+Wayland platform:
+eglinfo: eglInitialize failed
+
+X11 platform:
+EGL API version: 1.5
+EGL vendor string: Mesa Project
+EGL version string: 1.5
+EGL client APIs: OpenGL OpenGL_ES 
+OpenGL core profile vendor: Mesa
+OpenGL core profile renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+OpenGL core profile version: 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1
+OpenGL core profile shading language version: 4.50
+OpenGL compatibility profile vendor: Mesa
+OpenGL compatibility profile renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+OpenGL compatibility profile version: 4.5 (Compatibility Profile) Mesa 25.0.7-2+deb13u1
+OpenGL compatibility profile shading language version: 4.50
+OpenGL ES profile vendor: Mesa
+OpenGL ES profile renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+OpenGL ES profile version: OpenGL ES 3.2 Mesa 25.0.7-2+deb13u1
+OpenGL ES profile shading language version: OpenGL ES GLSL ES 3.20
+
+Surfaceless platform:
+EGL API version: 1.5
+EGL vendor string: Mesa Project
+EGL version string: 1.5
+EGL client APIs: OpenGL OpenGL_ES 
+OpenGL core profile vendor: Mesa
+OpenGL core profile renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+OpenGL core profile version: 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1
+OpenGL core profile shading language version: 4.50
+OpenGL compatibility profile vendor: Mesa
+OpenGL compatibility profile renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+OpenGL compatibility profile version: 4.5 (Compatibility Profile) Mesa 25.0.7-2+deb13u1
+OpenGL compatibility profile shading language version: 4.50
+OpenGL ES profile vendor: Mesa
+OpenGL ES profile renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+OpenGL ES profile version: OpenGL ES 3.2 Mesa 25.0.7-2+deb13u1
+OpenGL ES profile shading language version: OpenGL ES GLSL ES 3.20
+
+Device platform:
+Device #0:
+
+Platform Device platform:
+EGL API version: 1.5
+EGL vendor string: Mesa Project
+EGL version string: 1.5
+EGL client APIs: OpenGL OpenGL_ES 
+OpenGL core profile vendor: Mesa
+OpenGL core profile renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+OpenGL core profile version: 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1
+OpenGL core profile shading language version: 4.50
+OpenGL compatibility profile vendor: Mesa
+OpenGL compatibility profile renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+OpenGL compatibility profile version: 4.5 (Compatibility Profile) Mesa 25.0.7-2+deb13u1
+OpenGL compatibility profile shading language version: 4.50
+OpenGL ES profile vendor: Mesa
+OpenGL ES profile renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+$ nvidia-smi
+--: line 2: nvidia-smi: command not found
+$ cpu
+model name	: Intel(R) Xeon(R) Processor
+avx2
+avx512f
+8
+6.12.94+

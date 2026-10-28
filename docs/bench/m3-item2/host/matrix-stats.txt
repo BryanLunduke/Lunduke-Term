@@ -1,0 +1,44 @@
+amber-cpu: stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=1 full-repaints=1 rows-painted=21 ticks=280 median paint 3.29 ms, median effects-source 11.20 ms, median tick 7.85 ms, glyphs cached 41
+amber-cpu: stats: quality=reduced software=1 tick-interval 159.1 ms
+amber-gl: lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+amber-gl: stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=2 full-repaints=1 rows-painted=42 ticks=306 median paint 2.82 ms, median effects-source 27.34 ms, median tick 2.85 ms, glyphs cached 41
+amber-gl: stats: quality=reduced software=1 tick-interval 149.3 ms
+futuristic-cpu: stats: backend="futuristic, effects: C++ fallback (4 threads), quality reduced" content-frames=1 full-repaints=1 rows-painted=22 ticks=348 median paint 4.39 ms, median effects-source 10.84 ms, median tick 7.23 ms, glyphs cached 43
+futuristic-cpu: stats: quality=reduced software=1 tick-interval 137.2 ms
+futuristic-gl: lunduke-terminal: futuristic, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+futuristic-gl: stats: backend="futuristic, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=2 full-repaints=1 rows-painted=44 ticks=330 median paint 2.04 ms, median effects-source 29.23 ms, median tick 2.98 ms, glyphs cached 43
+futuristic-gl: stats: quality=reduced software=1 tick-interval 131.6 ms
+green-cpu: stats: backend="green, effects: C++ fallback (4 threads), quality reduced" content-frames=1 full-repaints=1 rows-painted=21 ticks=333 median paint 3.45 ms, median effects-source 10.74 ms, median tick 7.84 ms, glyphs cached 41
+green-cpu: stats: quality=reduced software=1 tick-interval 139.0 ms
+green-gl: lunduke-terminal: green, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+green-gl: stats: backend="green, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=2 full-repaints=1 rows-painted=42 ticks=306 median paint 3.78 ms, median effects-source 103.29 ms, median tick 3.00 ms, glyphs cached 41
+green-gl: stats: quality=reduced software=1 tick-interval 144.1 ms
+green-scanlines-cpu: stats: backend="green-scanlines, effects: C++ fallback (4 threads), quality reduced" content-frames=1 full-repaints=1 rows-painted=21 ticks=267 median paint 3.07 ms, median effects-source 9.81 ms, median tick 8.99 ms, glyphs cached 41
+green-scanlines-cpu: stats: quality=reduced software=1 tick-interval 183.5 ms
+green-scanlines-gl: lunduke-terminal: green-scanlines, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+green-scanlines-gl: stats: backend="green-scanlines, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=2 full-repaints=1 rows-painted=42 ticks=302 median paint 2.85 ms, median effects-source 27.47 ms, median tick 2.90 ms, glyphs cached 41
+green-scanlines-gl: stats: quality=reduced software=1 tick-interval 155.7 ms
+ibm-3278-cpu: stats: backend="ibm-3278, effects: C++ fallback (4 threads), quality reduced" content-frames=1 full-repaints=1 rows-painted=21 ticks=0 median paint 3.43 ms, median effects-source 9.95 ms, median tick 0.00 ms, glyphs cached 41
+ibm-3278-cpu: stats: quality=reduced software=1 tick-interval 100.0 ms
+ibm-3278-gl: lunduke-terminal: ibm-3278, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+ibm-3278-gl: stats: backend="ibm-3278, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=2 full-repaints=1 rows-painted=42 ticks=11 median paint 2.54 ms, median effects-source 23.28 ms, median tick 2.94 ms, glyphs cached 41
+ibm-3278-gl: stats: quality=reduced software=1 tick-interval 100.0 ms
+ibm-dos-cpu: stats: backend="ibm-dos, effects: C++ fallback (4 threads), quality reduced" content-frames=1 full-repaints=1 rows-painted=21 ticks=284 median paint 4.81 ms, median effects-source 16.68 ms, median tick 7.12 ms, glyphs cached 41
+ibm-dos-cpu: stats: quality=reduced software=1 tick-interval 183.9 ms
+ibm-dos-gl: lunduke-terminal: ibm-dos, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+ibm-dos-gl: stats: backend="ibm-dos, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=2 full-repaints=1 rows-painted=42 ticks=372 median paint 1.98 ms, median effects-source 23.77 ms, median tick 2.80 ms, glyphs cached 41
+ibm-dos-gl: stats: quality=reduced software=1 tick-interval 121.1 ms
+paper-white-cpu: stats: backend="paper-white, effects: C++ fallback (4 threads), quality reduced" content-frames=1 full-repaints=1 rows-painted=21 ticks=276 median paint 2.90 ms, median effects-source 9.41 ms, median tick 8.97 ms, glyphs cached 41
+paper-white-cpu: stats: quality=reduced software=1 tick-interval 174.5 ms
+paper-white-gl: lunduke-terminal: paper-white, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+paper-white-gl: stats: backend="paper-white, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=2 full-repaints=1 rows-painted=42 ticks=313 median paint 2.11 ms, median effects-source 24.81 ms, median tick 2.89 ms, glyphs cached 41
+paper-white-gl: stats: quality=reduced software=1 tick-interval 143.8 ms
+plain-cpu: stats: backend="plain, no effects" content-frames=1 full-repaints=1 rows-painted=33 ticks=0 median paint 47.10 ms, median effects-source 0.00 ms, median tick 0.00 ms, glyphs cached 93
+plain-cpu: stats: quality=reduced software=1 tick-interval 100.0 ms
+plain-gl: stats: backend="plain, no effects" content-frames=1 full-repaints=1 rows-painted=33 ticks=0 median paint 59.38 ms, median effects-source 0.00 ms, median tick 0.00 ms, glyphs cached 81
+plain-gl: stats: quality=reduced software=1 tick-interval 100.0 ms
+vintage-cpu: stats: backend="vintage, effects: C++ fallback (4 threads), quality reduced" content-frames=1 full-repaints=1 rows-painted=21 ticks=228 median paint 3.57 ms, median effects-source 14.19 ms, median tick 9.31 ms, glyphs cached 41
+vintage-cpu: stats: quality=reduced software=1 tick-interval 213.7 ms
+vintage-gl: lunduke-terminal: vintage, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+vintage-gl: stats: backend="vintage, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=2 full-repaints=1 rows-painted=42 ticks=375 median paint 2.54 ms, median effects-source 23.52 ms, median tick 2.85 ms, glyphs cached 41
+vintage-gl: stats: quality=reduced software=1 tick-interval 119.9 ms
