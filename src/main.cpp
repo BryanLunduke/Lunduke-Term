@@ -99,8 +99,11 @@ int main(int argc, char** argv) {
         else if (a == "--cursor-blink") opts.cursorBlink = true;
         else if (a == "--no-cursor-blink") opts.cursorBlink = false;
         else if (a == "--list-profiles") {
-            for (const auto& p : lterm::builtinProfiles())
-                std::printf("%-16s %s%s\n", p.id.c_str(), p.label.c_str(), p.effects ? "" : " [default]");
+            for (const auto& p : lterm::builtinProfiles()) {
+                const auto f = lterm::profileFont(p);
+                std::printf("%-16s %-22s font: %s %dpx%s%s\n", p.id.c_str(), (p.label + (p.effects ? "" : " [default]")).c_str(),
+                            f.family.c_str(), f.px, f.fallback ? " (fallback)" : "", f.monospace ? "" : " (not monospaced!)");
+            }
             return 0;
         } else if (a == "-e") {
             for (++i; i < argc; ++i) opts.command.push_back(argv[i]);

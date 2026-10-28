@@ -10,6 +10,7 @@ vterm_dep = dependency('vterm', version : '>=0.3')
 epoxy_dep = dependency('epoxy')
 egl_dep = dependency('egl')
 threads_dep = dependency('threads')
+fontconfig_dep = dependency('fontconfig')
 util_dep = meson.get_compiler('cpp').find_library('util')
 
 inc = include_directories('src')
@@ -17,7 +18,8 @@ inc = include_directories('src')
 effects_lib = static_library('lterm-effects',
   'src/effects.cpp', 'src/cpu_effects.cpp', 'src/thread_pool.cpp',
   'src/grid_painter.cpp', 'src/synthetic_frame.cpp', 'src/profiles.cpp',
-  dependencies : [pangocairo_dep, threads_dep])
+  'src/font_resolve.cpp',
+  dependencies : [pangocairo_dep, threads_dep, fontconfig_dep])
 
 gl_lib = static_library('lterm-gl', 'src/gl_effects.cpp', 'src/gl_pipeline.cpp',
   link_with : effects_lib, dependencies : [epoxy_dep, egl_dep])
@@ -46,6 +48,8 @@ test('profiles', executable('profiles_test', 'tests/profiles_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]))
 test('painter', executable('painter_test', 'tests/painter_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]))
+test('fonts', executable('fonts_test', 'tests/fonts_test.cpp',
+  include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep, fontconfig_dep]))
 test('vterm', executable('vterm_test', 'tests/vterm_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]))
 test('gl-match', executable('gl_match_test', 'tests/gl_match_test.cpp',

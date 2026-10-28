@@ -64,7 +64,17 @@ Rgb hex(uint32_t v) {
     return Rgb{((v >> 16) & 0xff) / 255.0f, ((v >> 8) & 0xff) / 255.0f, (v & 0xff) / 255.0f};
 }
 
-const char* kTerminus = "Terminus (TTF), Terminus, DejaVu Sans Mono, Monospace";
+// fonts-terminus (TTF, scalable) first, then fonts-terminus-otb (bitmap strikes), then
+// fonts-dejavu-core, then whatever fontconfig calls monospace.
+const std::vector<FontChoice> kTerminus = {
+    {"Terminus (TTF)", 0}, {"Terminus", 0}, {"DejaVu Sans Mono", 0}, {"Monospace", 0}};
+
+void setFonts(Profile& p, std::vector<FontChoice> head, const std::vector<FontChoice>& tail) {
+    head.insert(head.end(), tail.begin(), tail.end());
+    p.fonts = head;
+    p.fontFamily.clear();
+    for (const auto& f : p.fonts) p.fontFamily += (p.fontFamily.empty() ? "" : ", ") + f.family;
+}
 
 std::vector<Profile> makeProfiles() {
     std::vector<Profile> v;
@@ -76,7 +86,7 @@ std::vector<Profile> makeProfiles() {
         p.palette = kTango;
         p.fg = Color8{0xd3, 0xd7, 0xcf};
         p.cursor = p.fg;
-        p.fontFamily = "DejaVu Sans Mono, Monospace";
+        setFonts(p, {{"DejaVu Sans Mono", 0}}, {{"Monospace", 0}});
         p.fontPx = 16;
         p.marginFrac = 0.0f;
         p.marginMinPx = 4;
@@ -100,7 +110,7 @@ std::vector<Profile> makeProfiles() {
     amber.fg = Color8{0xee, 0xee, 0xec};
     amber.cursor = amber.fg;
     amber.minFgGrey = 0.45f;
-    amber.fontFamily = kTerminus;
+    setFonts(amber, {}, kTerminus);
     amber.fontPx = 22;
     amber.marginFrac = 0.04f;
     amber.marginMinPx = 12;
@@ -142,7 +152,9 @@ std::vector<Profile> makeProfiles() {
         p.fg = Color8{0xaa, 0xaa, 0xaa};
         p.cursor = p.fg;
         p.minFgGrey = 0.30f;
-        p.fontFamily = std::string("Px437 IBM VGA8, PxPlus IBM VGA8, ") + kTerminus;
+        // fonts-pc names it "Px IBM VGA8"; the int10h originals ("Px437"/"PxPlus") work if the
+        // user installed them. 32 px = exactly 2x the 8x16 VGA glyphs (crisp, ~80x25 on 1280x800).
+        setFonts(p, {{"Px IBM VGA8", 32}, {"Px437 IBM VGA8", 32}, {"PxPlus IBM VGA8", 32}}, kTerminus);
         v.push_back(p);
     }
     {
@@ -160,7 +172,7 @@ std::vector<Profile> makeProfiles() {
         p.fx.jitter = 0.0f;
         p.fx.screenCurvature = 0.2f;
         p.fx.staticNoise = 0.0f;
-        p.fontFamily = std::string("IBM 3270, 3270, ") + kTerminus;
+        setFonts(p, {{"IBM 3270", 0}, {"3270", 0}}, kTerminus);  // fonts-3270
         v.push_back(p);
     }
     return v;
@@ -171,6 +183,12 @@ std::vector<Profile> makeProfiles() {
 const std::vector<Profile>& builtinProfiles() {
     static const std::vector<Profile> v = makeProfiles();
     return v;
+}
+
+FontPick profileFont(const Profile& p) {
+    FontPick f = pickFont(p.fonts);
+    if (f.px <= 0) f.px = p.fontPx;
+    return f;
 }
 
 const Profile* findProfile(const std::string& id) {

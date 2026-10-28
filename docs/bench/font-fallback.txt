@@ -1,0 +1,78 @@
+# fc-match / --list-profiles under private fontconfig configs (no system-wide install)
+# fonts.conf        = system fonts + all Debian font packages unpacked with dpkg-deb -x
+# fonts-otb.conf    = system fonts + fonts-terminus-otb only (incl. its 71-enable-terminus.conf)
+# fonts-min.conf    = DejaVu only
+# fonts-nomono.conf = DejaVu with DejaVuSansMono rejected (no monospace font at all)
+# note: fc-match parses '-' as a size separator, so C-64 is queried as 'C\-64'
+
+=== FONTCONFIG_FILE=fonts.conf
+fc-match "Px IBM VGA8"     -> Px IBM VGA8 (Px_IBM_VGA8.ttf) spacing=100
+fc-match "IBM 3270"        -> IBM 3270 (3270-Regular.ttf) spacing=100
+fc-match "Terminus (TTF)"  -> Terminus (TTF) (TerminusTTF-4.46.0.ttf) spacing=100
+fc-match "Terminus"        -> Terminus (terminus-normal.otb) spacing=110
+fc-match "DejaVu Sans Mono" -> DejaVu Sans Mono (DejaVuSansMono.ttf) spacing=100
+fc-match "Monospace"       -> DejaVu Sans Mono (DejaVuSansMono.ttf) spacing=100
+fc-match "C\-64"           -> C-64 (C-64-Regular.ttf) spacing=100
+fc-match "Amiga"           -> Amiga (Amiga-Regular.ttf) spacing=100
+fc-match "Atari"           -> Atari (atarist-normal.otf) spacing=100
+--- lunduke-terminal --list-profiles
+plain            Plain (no effects) [default] font: DejaVu Sans Mono 16px
+amber            Amber                  font: Terminus (TTF) 22px
+green            Green                  font: Terminus (TTF) 22px
+green-scanlines  Green scanlines        font: Terminus (TTF) 22px
+ibm-dos          IBM DOS (colour)       font: Px IBM VGA8 32px
+ibm-3278         IBM 3278 (static)      font: IBM 3270 22px
+
+=== FONTCONFIG_FILE=fonts-otb.conf
+fc-match "Px IBM VGA8"     -> Noto Sans (NotoSans-VariableFont_wdth,wght.ttf) spacing=none
+fc-match "IBM 3270"        -> Noto Sans (NotoSans-VariableFont_wdth,wght.ttf) spacing=none
+fc-match "Terminus (TTF)"  -> Noto Sans (NotoSans-VariableFont_wdth,wght.ttf) spacing=none
+fc-match "Terminus"        -> Terminus (terminus-normal.otb) spacing=110
+fc-match "DejaVu Sans Mono" -> DejaVu Sans Mono (DejaVuSansMono.ttf) spacing=100
+fc-match "Monospace"       -> DejaVu Sans Mono (DejaVuSansMono.ttf) spacing=100
+fc-match "C\-64"           -> Noto Sans (NotoSans-VariableFont_wdth,wght.ttf) spacing=none
+fc-match "Amiga"           -> Noto Sans (NotoSans-VariableFont_wdth,wght.ttf) spacing=none
+fc-match "Atari"           -> Noto Sans (NotoSans-VariableFont_wdth,wght.ttf) spacing=none
+--- lunduke-terminal --list-profiles
+plain            Plain (no effects) [default] font: DejaVu Sans Mono 16px
+amber            Amber                  font: Terminus 22px (fallback)
+green            Green                  font: Terminus 22px (fallback)
+green-scanlines  Green scanlines        font: Terminus 22px (fallback)
+ibm-dos          IBM DOS (colour)       font: Terminus 22px (fallback)
+ibm-3278         IBM 3278 (static)      font: Terminus 22px (fallback)
+
+=== FONTCONFIG_FILE=fonts-min.conf
+fc-match "Px IBM VGA8"     -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+fc-match "IBM 3270"        -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+fc-match "Terminus (TTF)"  -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+fc-match "Terminus"        -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+fc-match "DejaVu Sans Mono" -> DejaVu Sans Mono (DejaVuSansMono.ttf) spacing=100
+fc-match "Monospace"       -> DejaVu Sans Mono (DejaVuSansMono.ttf) spacing=100
+fc-match "C\-64"           -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+fc-match "Amiga"           -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+fc-match "Atari"           -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+--- lunduke-terminal --list-profiles
+plain            Plain (no effects) [default] font: DejaVu Sans Mono 16px
+amber            Amber                  font: DejaVu Sans Mono 22px (fallback)
+green            Green                  font: DejaVu Sans Mono 22px (fallback)
+green-scanlines  Green scanlines        font: DejaVu Sans Mono 22px (fallback)
+ibm-dos          IBM DOS (colour)       font: DejaVu Sans Mono 22px (fallback)
+ibm-3278         IBM 3278 (static)      font: DejaVu Sans Mono 22px (fallback)
+
+=== FONTCONFIG_FILE=fonts-nomono.conf
+fc-match "Px IBM VGA8"     -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+fc-match "IBM 3270"        -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+fc-match "Terminus (TTF)"  -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+fc-match "Terminus"        -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+fc-match "DejaVu Sans Mono" -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+fc-match "Monospace"       -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+fc-match "C\-64"           -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+fc-match "Amiga"           -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+fc-match "Atari"           -> DejaVu Sans (DejaVuSans.ttf) spacing=none
+--- lunduke-terminal --list-profiles
+plain            Plain (no effects) [default] font: Monospace 16px (fallback) (not monospaced!)
+amber            Amber                  font: Monospace 22px (fallback) (not monospaced!)
+green            Green                  font: Monospace 22px (fallback) (not monospaced!)
+green-scanlines  Green scanlines        font: Monospace 22px (fallback) (not monospaced!)
+ibm-dos          IBM DOS (colour)       font: Monospace 22px (fallback) (not monospaced!)
+ibm-3278         IBM 3278 (static)      font: Monospace 22px (fallback) (not monospaced!)

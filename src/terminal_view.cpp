@@ -224,9 +224,28 @@ void TerminalView::updateBlink() {
 }
 
 void TerminalView::applyProfile() {
-    const std::string family = opts_.fontFamily.empty() ? profile_.fontFamily : opts_.fontFamily;
-    const int px = opts_.fontPx > 0 ? opts_.fontPx : profile_.fontPx;
-    painter_.reset(new GridPainter(family, px));
+    FontPick pick;
+    if (!opts_.fontFamily.empty()) {
+        // A user font that is not installed falls back to the profile's fonts, never to the
+        // proportional default sans that fontconfig would substitute.
+        std::vector<FontChoice> v;
+        for (auto& f : splitFamilies(opts_.fontFamily)) v.push_back(FontChoice{f, 0});
+        const auto first = v.empty() ? std::string() : v.front().family;
+        v.insert(v.end(), profile_.fonts.begin(), profile_.fonts.end());
+        pick = pickFont(v);
+        if (pick.px <= 0) pick.px = profile_.fontPx;
+        if (pick.fallback && fontWarned_ != opts_.fontFamily) {
+            std::fprintf(stderr, "lunduke-terminal: font '%s' is not installed, using '%s'\n",
+                         first.c_str(), pick.family.c_str());
+            fontWarned_ = opts_.fontFamily;
+        }
+    } else {
+        pick = profileFont(profile_);
+    }
+    if (!pick.monospace)
+        std::fprintf(stderr, "lunduke-terminal: font '%s' is not monospaced\n", pick.family.c_str());
+    const int px = opts_.fontPx > 0 ? opts_.fontPx : pick.px;
+    painter_.reset(new GridPainter(pick.family, px));
     applyColors();
     cpu_.reset();
     glParamsStale_ = true;

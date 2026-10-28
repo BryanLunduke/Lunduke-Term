@@ -5,6 +5,7 @@
 #pragma once
 
 #include "effects.hpp"
+#include "font_resolve.hpp"
 #include "grid.hpp"
 
 #include <array>
@@ -28,14 +29,20 @@ struct Profile {
     bool hasEffectsPalette = false;
     std::array<Color8, 16> effectsPalette{};
     float effectsMinFgGrey = 0.0f;
-    std::string fontFamily;   // Pango family list, first installed one wins
-    int fontPx = 16;
+    // Font choices in order; the first *installed* one wins (pickFont / profileFont), each may
+    // carry its own pixel size (pixel fonts look right only at integer multiples). See
+    // docs/FONTS.md for the Debian package that provides each family.
+    std::vector<FontChoice> fonts;
+    std::string fontFamily;   // the same list joined with ", " (for display / Pango)
+    int fontPx = 16;          // size for choices with px == 0
     // Fraction of the window kept free around the text (the barrel warp hides the corners).
     float marginFrac = 0.0f;
     int marginMinPx = 4;
 };
 
 const std::vector<Profile>& builtinProfiles();
+// The installed font this profile will use (falls back along `fonts`, then to Monospace).
+FontPick profileFont(const Profile& p);
 // nullptr when unknown.
 const Profile* findProfile(const std::string& id);
 

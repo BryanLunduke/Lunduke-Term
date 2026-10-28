@@ -77,6 +77,7 @@ protected:
     void on_size_allocate(Gtk::Allocation& a) override;
 
 private:
+    std::string fontWarned_;  // the --font value already warned about
     enum class Mode { Plain, Cpu, Gl };
     bool onKey(GdkEventKey* ev);
     bool onButtonPress(GdkEventButton* ev);

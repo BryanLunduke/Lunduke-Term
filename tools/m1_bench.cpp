@@ -111,8 +111,9 @@ int main(int argc, char** argv) {
         return 2;
     }
     const EffectParams fx = prof->fx;
-    const std::string family = prof->fontFamily;
-    const int px = prof->fontPx;
+    const FontPick pick = profileFont(*prof);
+    const std::string family = pick.family;
+    const int px = pick.px;
 
     if (doPaint) {
         GridPainter painter(family, px);

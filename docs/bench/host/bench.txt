@@ -1,0 +1,52 @@
+$ env build/lterm-m1-bench --paint --size 1280x800 --profile plain --runs 20
+paint 1280x800 grid 123x39 font 'DejaVu Sans Mono' 16px: direct Pango 12.10 ms, glyph cache cold 3.92 ms, warm full 2.61 ms, one changed row 0.061 ms (180 glyphs cached)
+$ env build/lterm-m1-bench --paint --size 1280x800 --profile amber --runs 20
+paint 1280x800 grid 112x32 font 'Terminus (TTF)' 22px: direct Pango 9.07 ms, glyph cache cold 3.47 ms, warm full 2.10 ms, one changed row 0.075 ms (120 glyphs cached)
+$ env build/lterm-m1-bench --tick --threads 1,2,4 --size 1280x800 --profile amber --runs 20
+cpu amber 1280x800 threads=1: content pass 71.01 ms, tick 65.33 ms
+cpu amber 1280x800 threads=2: content pass 54.07 ms, tick 43.35 ms
+cpu amber 1280x800 threads=4: content pass 30.58 ms, tick 25.63 ms
+$ env PIXMAN_DISABLE=avx2 GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX,-AVX2,-AVX512F,-AVX512VL,-AVX512BW,-AVX512DQ,-FMA build/lterm-m1-bench --paint --size 1280x800 --profile amber --runs 20
+paint 1280x800 grid 112x32 font 'Terminus (TTF)' 22px: direct Pango 28.31 ms, glyph cache cold 7.41 ms, warm full 3.84 ms, one changed row 0.129 ms (120 glyphs cached)
+$ env PIXMAN_DISABLE=avx2 GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX,-AVX2,-AVX512F,-AVX512VL,-AVX512BW,-AVX512DQ,-FMA build/lterm-m1-bench --tick --threads 1,2,4 --size 1280x800 --profile amber --runs 20
+cpu amber 1280x800 threads=1: content pass 70.93 ms, tick 64.52 ms
+cpu amber 1280x800 threads=2: content pass 42.87 ms, tick 36.54 ms
+cpu amber 1280x800 threads=4: content pass 23.27 ms, tick 19.87 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=1 build/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --runs 20
+gl amber 1280x800 LP_NUM_THREADS=1 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 108.29 ms, tick 33.85 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=1 GALLIUM_OVERRIDE_CPU_CAPS=sse4.1 LP_NATIVE_VECTOR_WIDTH=128 build/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --runs 20
+gl amber 1280x800 LP_NUM_THREADS=1 (llvmpipe (LLVM 19.1.7, 128 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 135.75 ms, tick 52.92 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=2 build/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --runs 20
+gl amber 1280x800 LP_NUM_THREADS=2 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 55.48 ms, tick 17.22 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=2 GALLIUM_OVERRIDE_CPU_CAPS=sse4.1 LP_NATIVE_VECTOR_WIDTH=128 build/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --runs 20
+gl amber 1280x800 LP_NUM_THREADS=2 (llvmpipe (LLVM 19.1.7, 128 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 69.20 ms, tick 26.21 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=4 build/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --runs 20
+gl amber 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 31.50 ms, tick 9.14 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=4 GALLIUM_OVERRIDE_CPU_CAPS=sse4.1 LP_NATIVE_VECTOR_WIDTH=128 build/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --runs 20
+gl amber 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 128 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 37.33 ms, tick 13.41 ms
+$ env build/lterm-m1-bench --paint --size 1920x1080 --profile plain --runs 20
+paint 1920x1080 grid 187x54 font 'DejaVu Sans Mono' 16px: direct Pango 19.52 ms, glyph cache cold 5.89 ms, warm full 4.58 ms, one changed row 0.045 ms (120 glyphs cached)
+$ env build/lterm-m1-bench --paint --size 1920x1080 --profile amber --runs 20
+paint 1920x1080 grid 170x44 font 'Terminus (TTF)' 22px: direct Pango 14.72 ms, glyph cache cold 4.69 ms, warm full 3.56 ms, one changed row 0.066 ms (120 glyphs cached)
+$ env build/lterm-m1-bench --tick --threads 1,2,4 --size 1920x1080 --profile amber --runs 20
+cpu amber 1920x1080 threads=1: content pass 137.25 ms, tick 125.16 ms
+cpu amber 1920x1080 threads=2: content pass 73.49 ms, tick 65.73 ms
+cpu amber 1920x1080 threads=4: content pass 46.26 ms, tick 40.44 ms
+$ env PIXMAN_DISABLE=avx2 GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX,-AVX2,-AVX512F,-AVX512VL,-AVX512BW,-AVX512DQ,-FMA build/lterm-m1-bench --paint --size 1920x1080 --profile amber --runs 20
+paint 1920x1080 grid 170x44 font 'Terminus (TTF)' 22px: direct Pango 17.48 ms, glyph cache cold 5.07 ms, warm full 3.68 ms, one changed row 0.067 ms (120 glyphs cached)
+$ env PIXMAN_DISABLE=avx2 GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX,-AVX2,-AVX512F,-AVX512VL,-AVX512BW,-AVX512DQ,-FMA build/lterm-m1-bench --tick --threads 1,2,4 --size 1920x1080 --profile amber --runs 20
+cpu amber 1920x1080 threads=1: content pass 138.17 ms, tick 126.61 ms
+cpu amber 1920x1080 threads=2: content pass 69.88 ms, tick 62.62 ms
+cpu amber 1920x1080 threads=4: content pass 55.52 ms, tick 47.57 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=1 build/lterm-m1-bench --tick-gl --size 1920x1080 --profile amber --runs 20
+gl amber 1920x1080 LP_NUM_THREADS=1 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 205.40 ms, tick 61.52 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=1 GALLIUM_OVERRIDE_CPU_CAPS=sse4.1 LP_NATIVE_VECTOR_WIDTH=128 build/lterm-m1-bench --tick-gl --size 1920x1080 --profile amber --runs 20
+gl amber 1920x1080 LP_NUM_THREADS=1 (llvmpipe (LLVM 19.1.7, 128 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 262.96 ms, tick 99.75 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=2 build/lterm-m1-bench --tick-gl --size 1920x1080 --profile amber --runs 20
+gl amber 1920x1080 LP_NUM_THREADS=2 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 111.07 ms, tick 32.76 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=2 GALLIUM_OVERRIDE_CPU_CAPS=sse4.1 LP_NATIVE_VECTOR_WIDTH=128 build/lterm-m1-bench --tick-gl --size 1920x1080 --profile amber --runs 20
+gl amber 1920x1080 LP_NUM_THREADS=2 (llvmpipe (LLVM 19.1.7, 128 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 132.58 ms, tick 49.42 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=4 build/lterm-m1-bench --tick-gl --size 1920x1080 --profile amber --runs 20
+gl amber 1920x1080 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 57.49 ms, tick 16.29 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=4 GALLIUM_OVERRIDE_CPU_CAPS=sse4.1 LP_NATIVE_VECTOR_WIDTH=128 build/lterm-m1-bench --tick-gl --size 1920x1080 --profile amber --runs 20
+gl amber 1920x1080 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 128 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1): content pass 75.30 ms, tick 26.42 ms
