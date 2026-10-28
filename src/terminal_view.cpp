@@ -361,6 +361,11 @@ void TerminalView::onGlUnrealize() {
 
 bool TerminalView::onGlRender(const Glib::RefPtr<Gdk::GLContext>&) {
     if (glFailed_ || mode_ != Mode::Gl) return true;
+    // GtkGLArea's framebuffer: read it before updateSource() binds the pipeline's own FBOs
+    // (M1 read it afterwards, so a content frame landed in an internal FBO and only the next
+    // effects tick showed it; with nothing animating, the window stayed black).
+    GLint fbo = 0;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &fbo);
     if (!glPipe_ || glParamsStale_) {
         if (glPipe_) glPipe_->release();
         glPipe_.reset(new GlPipeline(fx_));
@@ -392,8 +397,6 @@ bool TerminalView::onGlRender(const Glib::RefPtr<Gdk::GLContext>&) {
         srcDirtyY0_ = srcDirtyY1_ = 0;
     }
     const auto r0 = std::chrono::steady_clock::now();
-    GLint fbo = 0;
-    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &fbo);
     glPipe_->render(static_cast<float>(t), static_cast<unsigned>(fbo), true);
     if (opts_.stats) glFinish();
     if (!content) {
