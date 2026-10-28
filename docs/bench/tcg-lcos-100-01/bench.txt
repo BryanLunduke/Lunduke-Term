@@ -1,0 +1,28 @@
+$ env /t/bin/lterm-m1-bench --paint --size 1280x800 --profile plain --runs 10
+paint 1280x800 grid 123x39 font 'DejaVu Sans Mono' 16px: direct Pango 678.27 ms, glyph cache cold 166.11 ms, warm full 91.55 ms, one changed row 2.231 ms (180 glyphs cached)
+$ env /t/bin/lterm-m1-bench --paint --size 1280x800 --profile amber --runs 10
+paint 1280x800 grid 112x32 font 'Terminus (TTF)' 22px: direct Pango 520.29 ms, glyph cache cold 132.05 ms, warm full 63.82 ms, one changed row 1.684 ms (120 glyphs cached)
+$ env /t/bin/lterm-m1-bench --tick --threads 1,2,4 --size 1280x800 --profile amber --runs 10
+cpu amber 1280x800 threads=1: content pass 2513.21 ms, tick 1464.97 ms
+cpu amber 1280x800 threads=2: content pass 1479.76 ms, tick 870.60 ms
+cpu amber 1280x800 threads=4: content pass 899.30 ms, tick 538.58 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=1 /t/bin/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --runs 10
+gl amber 1280x800 LP_NUM_THREADS=1 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.6 (Core Profile) Mesa 26.1.6-1~bpo13+1): content pass 11296.71 ms, tick 7592.61 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=2 /t/bin/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --runs 10
+gl amber 1280x800 LP_NUM_THREADS=2 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.6 (Core Profile) Mesa 26.1.6-1~bpo13+1): content pass 6033.01 ms, tick 4076.81 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=4 /t/bin/lterm-m1-bench --tick-gl --size 1280x800 --profile amber --runs 10
+gl amber 1280x800 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.6 (Core Profile) Mesa 26.1.6-1~bpo13+1): content pass 3745.94 ms, tick 2438.94 ms
+$ env /t/bin/lterm-m1-bench --paint --size 1920x1080 --profile plain --runs 10
+paint 1920x1080 grid 187x54 font 'DejaVu Sans Mono' 16px: direct Pango 1071.16 ms, glyph cache cold 192.45 ms, warm full 151.91 ms, one changed row 1.471 ms (120 glyphs cached)
+$ env /t/bin/lterm-m1-bench --paint --size 1920x1080 --profile amber --runs 10
+paint 1920x1080 grid 170x44 font 'Terminus (TTF)' 22px: direct Pango 730.77 ms, glyph cache cold 185.82 ms, warm full 104.58 ms, one changed row 2.061 ms (120 glyphs cached)
+$ env /t/bin/lterm-m1-bench --tick --threads 1,2,4 --size 1920x1080 --profile amber --runs 10
+cpu amber 1920x1080 threads=1: content pass 5242.34 ms, tick 3064.14 ms
+cpu amber 1920x1080 threads=2: content pass 2553.26 ms, tick 1548.09 ms
+cpu amber 1920x1080 threads=4: content pass 1713.96 ms, tick 879.05 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=1 /t/bin/lterm-m1-bench --tick-gl --size 1920x1080 --profile amber --runs 10
+gl amber 1920x1080 LP_NUM_THREADS=1 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.6 (Core Profile) Mesa 26.1.6-1~bpo13+1): content pass 22271.92 ms, tick 14376.48 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=2 /t/bin/lterm-m1-bench --tick-gl --size 1920x1080 --profile amber --runs 10
+gl amber 1920x1080 LP_NUM_THREADS=2 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.6 (Core Profile) Mesa 26.1.6-1~bpo13+1): content pass 11147.28 ms, tick 7416.43 ms
+$ env LIBGL_ALWAYS_SOFTWARE=1 LP_NUM_THREADS=4 /t/bin/lterm-m1-bench --tick-gl --size 1920x1080 --profile amber --runs 10
+gl amber 1920x1080 LP_NUM_THREADS=4 (llvmpipe (LLVM 19.1.7, 256 bits) / 4.6 (Core Profile) Mesa 26.1.6-1~bpo13+1): content pass 5370.78 ms, tick 3494.17 ms

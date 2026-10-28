@@ -124,17 +124,6 @@ items 1–3; checkpoints B and C are listed at the end.
 
 **Checkpoints B and C (items 4–6).** Done; see the sections below.
 
-**Checkpoint C (item 5).**
-- Benchmarks in a TCG (no-KVM) VM.
-- A real-hardware-style llvmpipe path with limited `LP_NUM_THREADS` and no AVX
-  (`LP_NATIVE_VECTOR_WIDTH=128`, CPU-feature masks).
-
-**Checkpoint C (item 6).**
-- Licence-clean fonts only: fonts-pc, fonts-3270, fonts-terminus, fonts-hermit, fonts-proggy.
-- Verify the sixtyfour / Amiga / Atari licences in the Debian copyright files.
-- Avoid the Apple II, PET and original C64 fonts.
-- Prefer depending on the Debian packages over bundling.
-
 ## Reproduce
 
     meson setup build && ninja -C build -j2 && meson test -C build

@@ -94,4 +94,81 @@ Plain has no effects, so the repaint is its whole frame cost.
 
 ## REAL TCG VM — LCOS 1.0 live ISO under qemu, no KVM (bench/tcg-lcos-100-01/)
 
-TCG_PLACEHOLDER
+**Setup.**
+- `qemu-system-x86_64` 10.0.13 with `-accel tcg,thread=multi -cpu max -smp 4 -m 2048`, q35, no
+  KVM. It ran on the same shared box as above.
+- **Read-only ISO.** `lcos-live-100-01.iso` was attached as a read-only cdrom with `-snapshot`.
+  The kernel and initrd were read out of that ISO for `-kernel/-initrd`. Nothing was built or
+  changed.
+- **Guest.** LCOS 1.0.0, kernel 7.2.6-lunduke, XLibre at 1280×800, Mesa 26.1.6 llvmpipe (LLVM
+  19.1.7). TCG's `-cpu max` emulates AVX2 but not AVX-512, so llvmpipe runs 256-bit.
+- **Payload.** A separate ext2 disk (`/t`) held our binaries, libvterm/libxdo, Terminus TTF
+  (the ISO has no fonts-terminus) and xdotool for focusing.
+- **Commands.** See `vm.sh` and `run.sh` in `bench/tcg-lcos-100-01/`.
+- **Timing.** The guest ran `RUNS=10` (no-AVX variants skipped) from 11:25:44 to 11:56:55 CDT.
+
+### Full repaint (ms, median)
+
+| Size | Profile | direct Pango | cold | **warm full** | one row |
+|---|---|---|---|---|---|
+| 1280×800 | plain | 678.27 | 166.11 | **91.55** | 2.231 |
+| 1280×800 | amber | 520.29 | 132.05 | **63.82** | 1.684 |
+| 1920×1080 | plain | 1071.16 | 192.45 | **151.91** | 1.471 |
+| 1920×1080 | amber | 730.77 | 185.82 | **104.58** | 2.061 |
+
+### Effects per frame, amber (ms, median)
+
+| Size | Path | threads | idle tick | content pass |
+|---|---|---|---|---|
+| 1280×800 | CPU fallback | 1 / 2 / 4 | 1464.97 / 870.60 / 538.58 | 2513.21 / 1479.76 / 899.30 |
+| 1280×800 | llvmpipe 256-bit | LP 1 / 2 / 4 | 7592.61 / 4076.81 / 2438.94 | 11296.71 / 6033.01 / 3745.94 |
+| 1920×1080 | CPU fallback | 1 / 2 / 4 | 3064.14 / 1548.09 / 879.05 | 5242.34 / 2553.26 / 1713.96 |
+| 1920×1080 | llvmpipe 256-bit | LP 1 / 2 / 4 | 14376.48 / 7416.43 / 3494.17 | 22271.92 / 11147.28 / 5370.78 |
+
+### Idle CPU, window 1280×800, focused via xdotool (bench/tcg-lcos-100-01/idle.txt)
+
+| Case | CPU (100 % = 1 vCPU) | RSS |
+|---|---|---|
+| plain (default) | **0.0 %** | 44 MB |
+| ibm-3278 GL (static) | **0.0 %** | 218 MB |
+| amber GL default / LP 1 / 2 / 4 | 396.8 / 100.2 / 199.7 / 395.7 % | 217–221 MB |
+| amber GL `--effects-fps 10` | 396.6 % | 218 MB |
+| amber CPU threads 1 / 2 / 4 | 100.1 / 194.9 / 357.3 % | 119 MB |
+
+**Reading it.**
+- Under TCG every animated case is **saturated**: it uses all the threads it is given and cannot
+  reach the requested fps. A tick takes 0.5–7.6 s at 1280×800, so `--effects-fps 10` makes no
+  difference.
+- The static and plain profiles stay at 0 % idle. A full plain repaint takes about 90 ms, so
+  typing is usable but sluggish. That is TCG; a real machine is ~35× faster on this path.
+
+## DERIVED — TCG slowdown versus the host (not measurements)
+
+These ratios divide the REAL TCG VM numbers by the REAL host numbers above. They describe this
+emulator on this box, not any real LCOS machine.
+
+| 1280×800 metric | host | TCG VM | ratio |
+|---|---|---|---|
+| warm full repaint, plain | 2.61 ms | 91.55 ms | ≈35× |
+| CPU tick, 4 threads | 25.6 ms | 538.6 ms | ≈21× |
+| llvmpipe tick, LP 1 | 33.9 ms | 7592.6 ms | ≈224× |
+| llvmpipe tick, LP 4 | 9.1 ms | 2438.9 ms | ≈267× |
+
+TCG translates llvmpipe's JIT-generated AVX2 code very badly. That is why, **in the VM only**,
+the C++ fallback is 4–5× faster than llvmpipe, while on the host llvmpipe is 2–3× faster.
+
+## PROXY
+
+**None used.** The TCG VM produced real results, so no number in this file is a proxy estimate.
+Real-hardware-style behaviour (few cores, no AVX) is covered by the REAL host runs with limited
+`LP_NUM_THREADS` and threads and the no-AVX masks. These emulate a weaker CPU on a fast one.
+They are not measurements of an old machine.
+
+## Conclusions for M1
+
+1. **`plain` default.** It costs 0 % at idle and 2.6 ms per full repaint even on the host, so it
+   is fine on any machine, TCG included.
+2. **Animated CRT profiles on software GL.** Use them when there are ≥2 modern cores (≤ 26 ms per
+   tick at 1280×800 without AVX). On very weak CPUs or emulators they saturate. M2 should split
+   static and dynamic passes and auto-lower the fps (see M1-NOTES M2 list).
+3. **No AVX** costs llvmpipe ~1.5× and our CPU path ~nothing.
