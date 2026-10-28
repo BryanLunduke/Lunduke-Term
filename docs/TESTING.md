@@ -32,7 +32,7 @@ Leak detection is off: GTK, fontconfig and Mesa keep caches until exit.
 
 ## CI
 
-`.github/workflows/ci.yml` runs two jobs in a `debian:trixie` container (the LCOS base):
+`docs/ci/ci.yml` (to be copied to `.github/workflows/ci.yml`; the box's GitHub token has no `workflow` scope, so it could not be pushed there) runs two jobs in a `debian:trixie` container (the LCOS base):
 `build-test` (release build + `xvfb-run -a meson test`) and `sanitizers` (ASan + UBSan,
 as above). The test log is uploaded when a job fails.
 

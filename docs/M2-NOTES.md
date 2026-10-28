@@ -244,9 +244,101 @@ Screenshots (`/workspace/lcos-app-reviews/terminal-m2/`): `s2-vttest-1-border.pn
 
 ### CI
 
-`.github/workflows/ci.yml`: jobs `build-test` (debian:trixie container, apt build deps, meson
+`docs/ci/ci.yml` (to be copied to `.github/workflows/ci.yml`; the box's GitHub token has no `workflow` scope, so it could not be pushed there): jobs `build-test` (debian:trixie container, apt build deps, meson
 setup/compile, `xvfb-run -a meson test`) and `sanitizers` (`-Db_sanitize=address,undefined`,
 `--timeout-multiplier 4`). Validated with yamllint 1.37.1 (default rules, line length 120) and a
 PyYAML load; every apt package name was checked against the trixie `Packages` index. The same
 steps were run locally: release `xvfb-run -a meson test` 9/9 OK, ASan+UBSan build 9/9 OK, no
 `runtime error` in the log. **The workflow has not run on GitHub yet.** See `docs/TESTING.md`.
+
+## Item 4: HiDPI (6ffd50f)
+
+The view follows the GTK scale factor (`GDK_SCALE`, `notify::scale-factor` at run time). The
+font size stays in logical px; the surface, the glyph cache, the GL textures and the C++
+effects buffers are in device px.
+
+- `GridPainter(family, px, scale)`: metrics measured at `px` and multiplied, glyphs rasterised
+  at `px*scale` (sharp, not upscaled); cursor line widths scale too.
+- `computeGridLayout()`: margins, rows and columns in logical px, then times the scale, so a
+  window has the same rows × columns at scale 1 and 2.
+- 1:1 blit with `cairo_scale(1/scale)`; event coordinates are multiplied before `pointToCell`.
+- `scaleEffectParams()`: scanline period and bloom radius times the scale (bloom capped at 64);
+  noise is sampled per logical pixel (`EffectParams::pixelScale`) in GLSL and C++, so the look
+  matches scale 1.
+- Tests: painter cell size and picture at scale 2; layout and mouse/selection mapping at scale 2
+  (`session`: `testScale2Mapping`); GL vs CPU PSNR at scale 2 for every quality level
+  (`gl-match`); scale-2 picture vs scale 1; run-time scale change in a real view, plain and GL
+  (`view`: `testScaleChange`).
+- PSNR GL vs C++ at scale 2 (1280×800 device px), full / reduced / static: amber 103.97 /
+  105.22 / 106.98 dB, green-scanlines 106.98 / 106.98 / 109.99 dB (max diff ≤ 1).
+- Screenshots: `s2-hidpi-plain-scale{1,2}.png`, `s2-hidpi-plain-scale2-crop-1to1.png`,
+  `s2-hidpi-amber-gl-scale{1,2}.png`, `s2-hidpi-amber-cpu-scale2.png`,
+  `s2-hidpi-amber-static-{gl,cpu}-scale2.png`, `s2-hidpi-selection-scale2.png`,
+  `s2-hidpi-xftdpi192{,-scale2}.png`.
+
+## Item 5: RGB shift and bezel (d0c4079)
+
+### RGB shift
+
+CRT 1.2.0 `rbgShift`: displacement `12 · rbgShift · 0.75` px (CRT's `totalFontScaling`), times
+`pixelScale` at HiDPI; for 0.3524 that is 3.17 device px at scale 1. Each channel is mixed from
+the left (L), right (R) and centre (C) sample with CRT's weights: r = .1L + .3R + .6C,
+g = .2L + .2R + .6C, b = .3L + .1R + .6C. It runs in the static pass (once per content
+change) in both back-ends, so it adds no per-tick work. Profile `ibm-dos` uses 0.3524 (CRT's
+"IBM DOS" value); every profile accepts `--rgb-shift X` / `rgb-shift=` in settings.ini.
+
+### Bezel
+
+- Geometry (`frameGeometry()`): inset = min(frameSize · pixelScale, ¼ · min(w, h)); the glass
+  is a rounded rectangle (radius min(0.6 · inset, ½ · min(inner))), the screen content and the
+  barrel warp are mapped inside it (`screenCoords()`). With the frame off the mapping is
+  bit-identical to M1.
+- Static layer, rendered once per size (GLSL `kFrame`, C++ `frameLayerRows()`): frame colour
+  with a vertical shade and a darker rim, a lit inner bevel (light from the top-left, specular
+  scaled by shininess), an inner shadow on the glass edge and a soft glass highlight.
+  Premultiplied RGBA.
+- Reflection: the phosphor glow (bloom) mirrored at the glass edge onto the bevel, weighted by
+  shininess and distance; recomputed per content change only, never per tick.
+- Tick: the dynamic pass composites the premultiplied layer (GL: one texture fetch; C++: only
+  on each row's non-empty spans of the layer, using unquantised floats so it matches GL).
+- Grid layout: the inset is added to the margins, so the text sits inside the glass.
+- Mouse: `pointToCell()` takes the geometry. A press on the bezel or in a rounded corner selects
+  nothing and is not reported to the application (middle-click paste still works); a drag that
+  leaves the glass clamps to the edge cells; edge-scroll still works.
+- Profiles: `amber`, `green`, `green-scanlines` offer it (`--frame`, off by default; frame
+  colours #2a2622 / #22262a). `plain`, `ibm-dos`, `ibm-3278` ignore `--frame` with a warning.
+- Options / settings.ini: `--frame`/`--no-frame` (`frame`), `--frame-size PX` (`frame-size`,
+  logical px, default 28), `--frame-color #RRGGBB` (`frame-color`), `--frame-shininess 0..1`
+  (`frame-shininess`, default .5), `--rgb-shift X` (`rgb-shift`).
+
+### PSNR, GL (llvmpipe) vs C++, 640×400 logical, `gl-match` test — REAL
+
+All max diff ≤ 1 (8-bit).
+
+| Variant | scale 1: full / reduced / static | scale 2: full / reduced / static |
+|---|---|---|
+| ibm-dos RGB shift | 106.98 / 103.97 / 103.97 | 103.97 / 106.98 / 109.99 |
+| amber bezel | 99.00 / 106.98 / 106.98 | 103.46 / 104.55 / 103.97 |
+| green-scanlines bezel | 106.98 / 102.21 / 103.97 | 105.22 / 105.22 / 106.02 |
+| amber bezel + RGB shift | 99.00 / 106.98 / 106.98 | 103.46 / 104.55 / 104.55 |
+
+Resize loop (50 resizes, bezel + RGB shift on): textures 12 → 12, FBOs 10 → 10, PSNR after
+102.21 dB. Screenshots of the real window, GL vs C++ static (deterministic): RGB shift
+107.95 dB, amber bezel 106.19 dB (ImageMagick `compare -metric PSNR`).
+
+The first C++ bezel version composited after the 8-bit quantisation and only reached 61 dB;
+compositing on the unquantised row floats fixed it.
+
+### Tests added
+
+- `effects`: geometry (inset, radius, SDF), static layer (frame colour, bevel, transparent glass
+  centre), the reflection (the bezel pixel next to a lit column rises 29 → 40), the RGB fringes
+  (left 63/42/21, right 21/42/63 on a white column).
+- `gl-match`: the table above, both scales, plus the bezel resize-leak loop.
+- `session`: `testBezelMapping` (bezel and rounded corner → outside, clamping, scale 2).
+- `view`: `testBezelPointer` for `auto` (GL) and `cpu` in a real 640×400 window: grid 42×12,
+  margins 47/38 (they include the bezel); bezel, top edge and corner map to no cell; a press and
+  drag on the bezel selects nothing; a drag from row 0 of the glass onto the bezel corner clamps
+  to column 0 and copies the start of "alpha beta gamma". (That a bezel press is not reported to
+  a mouse-tracking application follows from the same early return in `onButtonPress`, which runs before the reporting branch; it is not covered
+  by a test.)

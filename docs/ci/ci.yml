@@ -1,0 +1,70 @@
+# Build and test Lunduke Terminal on Debian trixie (the LCOS base).
+# Tests that need X run under xvfb-run; GL tests use Mesa llvmpipe (LIBGL_ALWAYS_SOFTWARE=1).
+---
+name: ci
+
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches: [master, 'm*-*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: build + test (debian trixie)
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential meson ninja-build pkg-config \
+            libgtkmm-3.0-dev libvterm-dev libepoxy-dev libegl-dev libfontconfig-dev libx11-dev \
+            libgl1-mesa-dri libegl-mesa0 fonts-dejavu-core xvfb xauth dbus-x11
+      - name: Configure
+        run: meson setup build --buildtype=release
+      - name: Compile
+        run: meson compile -C build
+      - name: Test
+        run: xvfb-run -a -s "-screen 0 1280x1024x24" meson test -C build --print-errorlogs
+      - name: Upload test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testlog-release
+          path: build/meson-logs/testlog.txt
+
+  sanitizers:
+    name: ASan + UBSan (debian trixie)
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential meson ninja-build pkg-config \
+            libgtkmm-3.0-dev libvterm-dev libepoxy-dev libegl-dev libfontconfig-dev libx11-dev \
+            libgl1-mesa-dri libegl-mesa0 fonts-dejavu-core xvfb xauth dbus-x11
+      - name: Configure
+        run: meson setup build-san --buildtype=debug -Db_sanitize=address,undefined -Db_lundef=false
+      - name: Compile
+        run: meson compile -C build-san
+      - name: Test
+        env:
+          # GTK/fontconfig keep caches until exit; leaks are not what this job is for.
+          ASAN_OPTIONS: detect_leaks=0:abort_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: xvfb-run -a -s "-screen 0 1280x1024x24" meson test -C build-san --print-errorlogs --timeout-multiplier 4
+      - name: Upload test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testlog-sanitizers
+          path: build-san/meson-logs/testlog.txt
