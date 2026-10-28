@@ -13,7 +13,9 @@ M0 (the spike, PR #1) answered the feasibility questions; see
 `Gtk::GLArea` (C++ fallback), glyph-cached changed-rows-only rendering, an idle-aware frame
 scheduler, and profiles with a plain no-effects default. Checkpoint B: own PTY spawn,
 scrollback, selection (with curvature-correct mouse mapping), CLIPBOARD/PRIMARY, bracketed
-paste, mouse reporting (X10/1000/1002/1003, SGR), bell and cursor shapes. See [`docs/M1-NOTES.md`](docs/M1-NOTES.md).
+paste, mouse reporting (X10/1000/1002/1003, SGR), bell and cursor shapes. Checkpoint C: benchmarks
+(host, limited/no-AVX llvmpipe, TCG VM) in [`docs/M1-BENCHMARKS.md`](docs/M1-BENCHMARKS.md), licence-checked
+fonts with monospace-safe fallback in [`docs/FONTS.md`](docs/FONTS.md). See [`docs/M1-NOTES.md`](docs/M1-NOTES.md).
 
 | Part | Where |
 |---|---|
@@ -23,21 +25,24 @@ paste, mouse reporting (X10/1000/1002/1003, SGR), bell and cursor shapes. See [`
 | GLSL pipeline (GtkGLArea or headless EGL) | `src/gl_pipeline.*`, `src/gl_shaders.hpp`, `src/gl_effects.*` |
 | C++ fallback effects, row-parallel | `src/effects.*`, `src/cpu_effects.*`, `src/thread_pool.*` |
 | Profiles and palettes | `src/profiles.*` |
-| Benchmarks | `tools/m1_bench.cpp`, `tools/m0_bench.cpp` |
+| Font choice and fallback (fontconfig) | `src/font_resolve.*` |
+| Benchmarks | `tools/m1_bench.cpp`, `tools/bench-m1.sh`, `tools/m0_bench.cpp` |
 
 ### Build
 
-Needs `libgtkmm-3.0-dev`, `libvterm-dev` (0.3.3), `libepoxy-dev`, `libegl-dev`, Meson, Ninja, g++.
+Needs `libgtkmm-3.0-dev`, `libvterm-dev` (0.3.3), `libepoxy-dev`, `libegl-dev`, `libfontconfig-dev`, Meson, Ninja, g++.
+No fonts are bundled. For the retro profiles, install `fonts-terminus` (or `fonts-terminus-otb`), `fonts-pc` and `fonts-3270`.
+Without them, the profiles fall back to DejaVu Sans Mono. See `docs/FONTS.md`.
 
     meson setup build
     ninja -C build -j2
-    meson test -C build          # effects, vterm, session, profiles, painter and CPU-vs-GL (incl. resize-leak) tests
+    meson test -C build          # effects, vterm, session, profiles, fonts, painter and CPU-vs-GL (incl. resize-leak) tests
 
 ### Run
 
     build/lunduke-terminal                         # plain profile, no effects (default)
     build/lunduke-terminal --profile amber         # Default Amber CRT look (GLSL, C++ fallback)
-    build/lunduke-terminal --list-profiles         # plain, amber, green, green-scanlines, ibm-dos, ibm-3278
+    build/lunduke-terminal --list-profiles         # profiles and the font each resolves to here
     build/lunduke-terminal --effects               # plain colours with the CRT effects
     build/lunduke-terminal --profile green --renderer cpu --threads 4
     build/lunduke-terminal --effects-fps 10 --max-fps 60 --no-pause-unfocused --stats -e htop
@@ -57,6 +62,7 @@ mouse reporting. Defaults can be set in
     build/lterm-m1-bench --paint
     LIBGL_ALWAYS_SOFTWARE=1 build/lterm-m1-bench --compare --resize-loop 60
     build/lterm-m0-bench --bench --threads 1,4,8 --runs 5 --frames 30
+    DISPLAY=:1 IDLE=1 tools/bench-m1.sh /tmp/bench build   # full M1 matrix (see docs/M1-BENCHMARKS.md)
 
 The effect maths follows cool-retro-term 1.2.0 (GPL-3.0-or-later, Filippo Scognamiglio);
 it was re-implemented here for C++ and GLSL 3.30 (both projects are GPL-3.0-or-later).

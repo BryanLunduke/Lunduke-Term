@@ -1,4 +1,4 @@
-# M1 notes — checkpoints A and B
+# M1 notes — checkpoints A, B and C
 
 Checkpoint A: GtkGLArea, glyph cache, idle CPU, profiles. Checkpoint B (at the end): PTY,
 scrollback, selection, clipboard, mouse reporting, bell, cursor shapes.
@@ -117,13 +117,12 @@ items 1–3; checkpoints B and C are listed at the end.
 - **The glowing line.** The sweeping brighter band in some screenshots is cool-retro-term's
   glowing-line effect, which has a sawtooth edge. It is not an artefact.
 - **`--stats` timings.** GL timings call `glFinish` only when `--stats` is on.
-- **`ibm-dos` font.** The profile's first-choice family, "Px437 IBM VGA8", is only referenced
-  by name, nothing is bundled. Its licence review belongs to checkpoint C. Without it the
-  profile falls back to Terminus.
+- **`ibm-dos` font.** Resolved in checkpoint C: Debian's fonts-pc calls the family `Px IBM VGA8`.
+  See [FONTS.md](FONTS.md).
 
 ## What is left
 
-**Checkpoint B (item 4).** Done; see the checkpoint B section below.
+**Checkpoints B and C (items 4–6).** Done; see the sections below.
 
 **Checkpoint C (item 5).**
 - Benchmarks in a TCG (no-KVM) VM.
@@ -335,3 +334,113 @@ The checks used bash, `cat -v`, a python3 curses mouse program, procps `top` and
 `--stats` with an idle plain window gives 4 content frames, 1 full repaint and 0 ticks after
 both 4 s and 8 s, so nothing redraws when nothing changes. Pointer motion without mouse
 reporting does not repaint either.
+
+# Checkpoint C — benchmarks (item 5) and fonts (item 6)
+
+## Benchmarks
+
+**Where.** Everything is in [M1-BENCHMARKS.md](M1-BENCHMARKS.md), with raw output in `bench/`.
+`tools/bench-m1.sh OUTDIR [BUILDDIR]` reruns the whole matrix:
+- sizes 1280×800 and 1920×1080;
+- plain vs amber repaint;
+- CPU effects tick at 1/2/4 threads;
+- llvmpipe at `LP_NUM_THREADS` 1/2/4;
+- "no AVX" variants;
+- idle CPU of the real terminal.
+
+**Real runs.** Two:
+- the box itself (8 vCPU Xeon with AVX-512);
+- the LCOS 1.0 live ISO, booted read-only under `qemu-system-x86_64 -accel tcg` (no KVM, `-snapshot`).
+
+**No AVX.**
+- Our binaries are built for baseline x86-64 (no `-march`); objdump finds 0 ymm/zmm instructions.
+- llvmpipe is restricted with `GALLIUM_OVERRIDE_CPU_CAPS=sse4.1 LP_NATIVE_VECTOR_WIDTH=128`. The
+  renderer string then reports "128 bits", and `GALLIUM_DUMP_CPU` shows avx=0.
+- For the CPU path, pixman and glibc AVX paths are masked with `PIXMAN_DISABLE` and
+  `GLIBC_TUNABLES`.
+
+## Fonts
+
+**Where.** See [FONTS.md](FONTS.md) for the licence table and the profile → font mapping.
+
+**New code.**
+- `src/font_resolve.*` picks the first *installed* family through fontconfig. Each choice has its
+  own pixel size, e.g. `Px IBM VGA8` at 32 px = 2× its 8×16 glyphs.
+- A missing font falls back along the profile's list, then to `Monospace`, and never to the
+  proportional sans that fontconfig would substitute.
+- The terminal warns when a `--font` is missing or the pick is not monospaced.
+- `--list-profiles` shows what each profile resolves to.
+- New meson test `fonts`.
+- Screenshots `c-01`…`c-08` are in `/workspace/lcos-app-reviews/terminal-m1/`.
+
+## Tests
+
+`meson test -C build` passes 7/7: profiles, vterm, **fonts (new)**, session, painter, effects and
+gl-match.
+
+## Problems during checkpoint C
+
+**The box was reset mid-run (about 11:02 CDT).**
+- Lost: the build directory, apt packages, the first TCG VM and some uncommitted files.
+- Done again:
+  - rebuilt the dev packages, fetching apt indexes and .debs over https with curl because apt's
+    own https failed through the proxy;
+  - rewrote `tests/fonts_test.cpp`, `tools/bench-m1.sh` and `docs/FONTS.md`;
+  - rebooted the TCG VM from scratch.
+- The host benchmarks in `bench/host/` were run after the reset. They differ a little from the
+  checkpoint A numbers (it is a different box instance).
+
+**fonts-terminus** has an incomplete Debian copyright file (see FONTS.md). It is not on the
+LCOS 1.0 ISO, so amber/green fall back to DejaVu Sans Mono there until it is added.
+
+# M1 summary
+
+M1 turned the M0 spike into a usable terminal. Not part of LCOS 1.0.
+- **Rendering:**
+  - GtkGLArea GLSL effects, with a multithreaded C++ fallback;
+  - glyph cache and changed-rows-only repaint;
+  - idle-aware frame scheduler: no ticks when unfocused, hidden or static;
+  - plain no-effects default (0 % idle CPU).
+- **Profiles:** plain, amber, green, green-scanlines, ibm-dos and ibm-3278, with phosphor-safe
+  palettes and licence-checked Debian fonts, plus a monospace-safe fallback.
+- **Terminal core:**
+  - own PTY spawn, scrollback, selection (curvature-aware), CLIPBOARD/PRIMARY, bracketed paste;
+  - mouse reporting (X10/1000/1002/1003, SGR), bell and cursor shapes;
+  - exit/hold handling and `settings.ini`.
+- **Measured** on the AVX-512 box, with llvmpipe limited to 1/2/4 threads and no AVX, and in a
+  no-KVM TCG VM of LCOS 1.0.
+- **Blocking "M1 ready":** nothing functional. The animated CRT profiles are still expensive on
+  pure software rendering (TCG numbers in M1-BENCHMARKS.md). That is why `plain` stays the
+  default and the effects remain opt-in.
+
+## M2 proposals (remaining work)
+
+1. **Cheaper effects on software GL.**
+   - Split the shader into a static pass (curvature, bloom, burn-in, rasterization), cached
+     until the content changes, and a light per-tick dynamic pass (noise, flicker, glow line).
+   - Lower the default effects fps on llvmpipe (10).
+   - Auto-pick `--effects-fps` from a startup self-benchmark.
+   - Optionally render the effects at half resolution and upscale.
+2. **Detect software rendering** (llvmpipe/softpipe) and default an amber choice to "static" CRT
+   (no animated noise or flicker) there.
+3. **Packaging (separate task):**
+   - Debian `Depends: fonts-dejavu-core`;
+   - `Recommends: fonts-terminus | fonts-terminus-otb, fonts-pc, fonts-3270`;
+   - a .desktop file, man page and AppStream metainfo.
+   - Propose adding fonts-terminus to a later LCOS release.
+   - Report the fonts-terminus copyright gap to Debian.
+4. **New profiles** on licence-clean fonts: c64 (`C-64`), amiga (`Amiga`), atari-800, atari-st,
+   modern (Hermit).
+5. **Missing CRT effects:** `rbgShift` (IBM DOS), frame/border reflections, a margin fix for
+   `plain` + effects.
+6. **HiDPI:** scale factor, and font size in points vs pixels.
+7. **Terminal features:**
+   - tabs or multiple windows;
+   - a search in scrollback;
+   - URL detection and opening;
+   - a settings dialog (GTK) instead of editing `settings.ini`;
+   - drag-and-drop paste;
+   - OSC 52 / OSC 8.
+8. **Tests:** a vttest/esctest pass on a machine that has them, plus the large apps (vim, htop,
+   mc). A11y via ATK was not looked at.
+9. **CI:** a GitHub Actions job running `meson test` with Xvfb and llvmpipe.
