@@ -28,7 +28,7 @@ struct ViewOptions {
     std::vector<std::string> command;
     bool stats = false;             // print frame statistics on exit
     // Checkpoint B
-    int scrollbackLines = 10000;
+    long long scrollbackLines = 10000;  // clamped to 0..kMaxScrollbackLines
     bool loginShell = false;
     std::string cwd;
     std::string onExit = "hold-on-error";  // close | hold | hold-on-error
@@ -156,6 +156,9 @@ private:
     bool blinkOff_ = false;
     bool lastAlt_ = false;
     ViewStats stats_;
+    // Async callbacks (clipboard requests) hold a weak_ptr to this; it expires in the
+    // destructor, so a reply that arrives after the window closed is ignored.
+    std::shared_ptr<char> alive_ = std::make_shared<char>(0);
 };
 
 }  // namespace lterm

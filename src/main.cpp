@@ -55,7 +55,7 @@ void loadSettings(lterm::ViewOptions& o) {
         if (kf.has_key(g, "pause-unfocused")) o.pauseWhenUnfocused = kf.get_boolean(g, "pause-unfocused");
         if (kf.has_key(g, "font")) o.fontFamily = kf.get_string(g, "font");
         if (kf.has_key(g, "font-px")) o.fontPx = kf.get_integer(g, "font-px");
-        if (kf.has_key(g, "scrollback-lines")) o.scrollbackLines = kf.get_integer(g, "scrollback-lines");
+        if (kf.has_key(g, "scrollback-lines")) o.scrollbackLines = kf.get_int64(g, "scrollback-lines");
         if (kf.has_key(g, "login-shell")) o.loginShell = kf.get_boolean(g, "login-shell");
         if (kf.has_key(g, "cwd")) o.cwd = kf.get_string(g, "cwd");
         if (kf.has_key(g, "on-exit")) o.onExit = kf.get_string(g, "on-exit");
@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
         else if (a == "--size" && i + 1 < argc) std::sscanf(argv[++i], "%dx%d", &w, &h);
         else if (a == "--quit-after" && i + 1 < argc) quitAfter = std::atoi(argv[++i]);
         else if (a == "--stats") opts.stats = true;
-        else if (a == "--scrollback" && i + 1 < argc) opts.scrollbackLines = std::atoi(argv[++i]);
+        else if (a == "--scrollback" && i + 1 < argc) opts.scrollbackLines = std::strtoll(argv[++i], nullptr, 10);
         else if (a == "--login") opts.loginShell = true;
         else if (a == "--cwd" && i + 1 < argc) opts.cwd = argv[++i];
         else if (a == "--on-exit" && i + 1 < argc) opts.onExit = argv[++i];

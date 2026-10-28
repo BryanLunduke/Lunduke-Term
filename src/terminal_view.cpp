@@ -59,7 +59,10 @@ TerminalView::TerminalView(const ViewOptions& opts)
     session_.reset(new VtermSession(24, 80));
     session_->onTitle = [this] { signalTitle.emit(session_->title()); };
     session_->onBell = [this] { onBell(); };
-    session_->setScrollbackLimit(static_cast<size_t>(std::max(0, opts_.scrollbackLines)));
+    const size_t sb = clampScrollbackLines(opts_.scrollbackLines);
+    if (opts_.scrollbackLines > static_cast<long long>(kMaxScrollbackLines))
+        std::fprintf(stderr, "lunduke-terminal: scrollback-lines %lld is too large, using %zu\n", opts_.scrollbackLines, sb);
+    session_->setScrollbackLimit(sb);
     sel_.setWordChars(opts_.wordChars);
     t0_ = g_get_monotonic_time();
 
@@ -90,7 +93,15 @@ TerminalView::TerminalView(const ViewOptions& opts)
 }
 
 TerminalView::~TerminalView() {
-    if (childWatch_) g_source_remove(childWatch_);
+    alive_.reset();  // pending clipboard replies must not touch this object any more
+    if (childWatch_) {
+        g_source_remove(childWatch_);
+        childWatch_ = 0;
+        // The window closed while the child still runs: hang up, and make sure the child is
+        // reaped even if it takes its time to exit (no zombie while the process lives on).
+        const pid_t left = session_->hangup(50);
+        if (left > 0) g_child_watch_add(left, [](GPid pid, gint, gpointer) { g_spawn_close_pid(pid); }, nullptr);
+    }
     writeWatch_.disconnect();
     bellTimer_.disconnect();
     blink_.disconnect();
@@ -659,8 +670,10 @@ void TerminalView::copyClipboard() {
 
 void TerminalView::pasteClipboard(bool primary) {
     if (holding_) return;
+    std::weak_ptr<char> alive = alive_;
     Gtk::Clipboard::get(primary ? GDK_SELECTION_PRIMARY : GDK_SELECTION_CLIPBOARD)
-        ->request_text([this](const Glib::ustring& t) {
+        ->request_text([this, alive](const Glib::ustring& t) {
+            if (alive.expired()) return;  // the view was destroyed while the request was pending
             if (t.empty() || holding_ || exited_) return;
             snapToBottom();
             session_->paste(t.raw());

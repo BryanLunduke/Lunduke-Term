@@ -10,6 +10,8 @@
 #include <fcntl.h>
 #include <pwd.h>
 #include <sys/ioctl.h>
+#include <sys/resource.h>
+#include <sys/syscall.h>
 #include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
@@ -38,23 +40,70 @@ std::vector<std::string> childEnvironment(char** base) {
     return env;
 }
 
+// Length of the valid UTF-8 sequence at s[i] (1-4), or 0 if it is not valid (overlong forms,
+// surrogates, > U+10FFFF, truncated). cp receives the code point.
+static size_t utf8Seq(const std::string& s, size_t i, uint32_t& cp) {
+    const auto b = [&](size_t k) { return static_cast<unsigned char>(s[k]); };
+    const unsigned char c = b(i);
+    size_t n;
+    uint32_t min;
+    if (c < 0x80) {
+        cp = c;
+        return 1;
+    } else if ((c & 0xE0) == 0xC0) {
+        n = 2, cp = c & 0x1F, min = 0x80;
+    } else if ((c & 0xF0) == 0xE0) {
+        n = 3, cp = c & 0x0F, min = 0x800;
+    } else if ((c & 0xF8) == 0xF0) {
+        n = 4, cp = c & 0x07, min = 0x10000;
+    } else {
+        return 0;
+    }
+    if (i + n > s.size()) return 0;
+    for (size_t k = 1; k < n; ++k) {
+        if ((b(i + k) & 0xC0) != 0x80) return 0;
+        cp = (cp << 6) | (b(i + k) & 0x3F);
+    }
+    if (cp < min || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) return 0;
+    return n;
+}
+
 std::string sanitizePaste(const std::string& text) {
     std::string out;
     out.reserve(text.size());
-    for (size_t i = 0; i < text.size(); ++i) {
-        unsigned char c = static_cast<unsigned char>(text[i]);
-        if (c == '\r') {
+    for (size_t i = 0; i < text.size();) {
+        uint32_t cp = 0;
+        const size_t n = utf8Seq(text, i, cp);
+        if (n == 0) {  // invalid byte (incl. a raw 8-bit C1 such as 0x9B): dropped
+            ++i;
+            continue;
+        }
+        if (cp == '\r') {
             out += '\r';
             if (i + 1 < text.size() && text[i + 1] == '\n') ++i;
-        } else if (c == '\n') {
+        } else if (cp == '\n') {
             out += '\r';
-        } else if (c == '\t' || c >= 0x20) {
-            if (c == 0x7f) continue;
-            out += static_cast<char>(c);
+        } else if (cp == '\t' || (cp >= 0x20 && cp != 0x7f && !(cp >= 0x80 && cp <= 0x9f))) {
+            out.append(text, i, n);
         }
-        // other C0 controls (ESC, ^C, ...) are dropped
+        // other C0 controls (ESC, ^C, ...), DEL and C1 controls are dropped
+        i += n;
     }
     return out;
+}
+
+size_t clampScrollbackLines(long long requested) {
+    if (requested <= 0) return 0;
+    return static_cast<unsigned long long>(requested) > kMaxScrollbackLines ? kMaxScrollbackLines
+                                                                           : static_cast<size_t>(requested);
+}
+
+void truncateUtf8(std::string& s, size_t max) {
+    if (s.size() <= max) return;
+    size_t n = max;
+    // Back up to the start of the sequence that straddles the cut.
+    while (n > 0 && (static_cast<unsigned char>(s[n]) & 0xC0) == 0x80) --n;
+    s.resize(n);
 }
 
 VtermSession::VtermSession(int rows, int cols) : rows_(rows), cols_(cols) {
@@ -83,17 +132,34 @@ VtermSession::VtermSession(int rows, int cols) : rows_(rows), cols_(cols) {
 }
 
 VtermSession::~VtermSession() {
-    hangup();
+    hangup(0);  // the owner (TerminalView) hangs up and reaps first; this is the safety net
     if (fd_ >= 0) close(fd_);
     vterm_free(vt_);
 }
 
-void VtermSession::hangup() {
-    if (pid_ > 0) {
-        kill(-pid_, SIGHUP);  // the child is a session/process-group leader
-        kill(pid_, SIGHUP);
-        pid_ = -1;  // reaped by the GLib child watch (or init when we exit)
+pid_t VtermSession::hangup(int waitMs) {
+    if (pid_ <= 0) return -1;
+    const pid_t pid = pid_;
+    pid_ = -1;
+    kill(-pid, SIGHUP);  // the child is a session/process-group leader
+    kill(pid, SIGHUP);
+    // Closing the master also hangs up the PTY for programs that ignore SIGHUP from kill(2).
+    for (int waited = 0;; waited += 5) {
+        int st;
+        const pid_t r = waitpid(pid, &st, WNOHANG);
+        if (r == pid || (r < 0 && errno == ECHILD)) return -1;  // reaped (or reaped elsewhere)
+        if (waited >= waitMs) return pid;
+        usleep(5000);
     }
+}
+
+// Closes every fd >= 3 in the forked child; only async-signal-safe calls. close_range(2) needs
+// Linux 5.9; older kernels (ENOSYS) or seccomp filters (EPERM) get the close() loop.
+void closeFrom3(int maxFd) {
+#ifdef SYS_close_range
+    if (syscall(SYS_close_range, 3u, ~0u, 0u) == 0) return;
+#endif
+    for (int fd = 3; fd < maxFd; ++fd) close(fd);
 }
 
 bool VtermSession::spawn(const SpawnOptions& opts) {
@@ -138,6 +204,11 @@ bool VtermSession::spawn(const SpawnOptions& opts) {
     std::string homeDir = home ? home : "/";
     std::string cwd = opts.cwd;
     std::string failMsg = "lunduke-terminal: cannot run " + file + ": ";
+    // Upper bound for the close() fallback, computed here (getrlimit is not async-signal-safe).
+    struct rlimit rl {};
+    int maxFd = 65536;
+    if (getrlimit(RLIMIT_NOFILE, &rl) == 0 && rl.rlim_cur != RLIM_INFINITY)
+        maxFd = static_cast<int>(std::min<rlim_t>(rl.rlim_cur, 1 << 20));
 
     pid_t pid = fork();
     if (pid < 0) {
@@ -158,7 +229,7 @@ bool VtermSession::spawn(const SpawnOptions& opts) {
         dup2(slave, 0);
         dup2(slave, 1);
         dup2(slave, 2);
-        for (int fd = 3; fd < 1024; ++fd) close(fd);  // incl. master, GL/X11 sockets
+        closeFrom3(maxFd);  // incl. master, GL/X11 sockets
         sigset_t none;
         sigemptyset(&none);
         sigprocmask(SIG_SETMASK, &none, nullptr);
@@ -235,9 +306,64 @@ void VtermSession::scanModes(const char* bytes, size_t len) {
     }
 }
 
+void VtermSession::feedRaw(const char* bytes, size_t len) {
+    if (len) vterm_input_write(vt_, bytes, len);
+}
+
+void VtermSession::snapshotWraps() {
+    wrapSnap_.assign(static_cast<size_t>(rows_) + 1, 0);
+    for (int r = 0; r < rows_; ++r) {
+        const VTermLineInfo* li = vterm_state_get_lineinfo(state_, r);
+        wrapSnap_[static_cast<size_t>(r)] = li && li->continuation;
+    }
+    wrapSnapActive_ = true;
+    wrapSnapPushes_ = 0;
+}
+
+// Feeds the bytes to libvterm, but every CSI S (scroll up) and CSI M (delete lines) on its own,
+// with the line continuation flags saved just before it, so lines that leave the screen
+// several at a time keep their soft-wrap flag (see cbPushLine).
 void VtermSession::feed(const char* bytes, size_t len) {
+    size_t done = 0;
+    for (size_t i = 0; i < len; ++i) {
+        const char c = bytes[i];
+        switch (csiState_) {
+        case 0:
+            if (c == 0x1b) {
+                csiState_ = 1;
+                csiStart_ = static_cast<long>(i);
+            }
+            break;  // (8-bit CSI 0x9B is not a control in UTF-8 mode, which we always use)
+        case 1:
+            if (c == '[') csiState_ = 2;
+            else if (c == 0x1b) csiStart_ = static_cast<long>(i);
+            else csiState_ = 0;
+            break;
+        case 2:
+            if (c >= 0x40 && c <= 0x7e) {  // final byte
+                if (c == 'S' || c == 'M') {
+                    // The sequence may have started in an earlier chunk; nothing up to here
+                    // changed the screen since then, so the snapshot is still exact.
+                    const size_t start = csiStart_ >= 0 ? static_cast<size_t>(csiStart_) : done;
+                    feedRaw(bytes + done, start - done);
+                    snapshotWraps();
+                    feedRaw(bytes + start, i + 1 - start);
+                    wrapSnapActive_ = false;
+                    done = i + 1;
+                }
+                csiState_ = 0;
+            } else if (c == 0x1b) {
+                csiState_ = 1;
+                csiStart_ = static_cast<long>(i);
+            } else if (c == 0x18 || c == 0x1a) {
+                csiState_ = 0;  // CAN / SUB abort the sequence; other C0 controls do not end it
+            }
+            break;
+        }
+    }
+    feedRaw(bytes + done, len - done);
+    csiStart_ = -1;  // a sequence still open continues in the next chunk
     scanModes(bytes, len);
-    vterm_input_write(vt_, bytes, len);
     vterm_screen_flush_damage(screen_);
 }
 
@@ -245,9 +371,11 @@ void VtermSession::resize(int rows, int cols) {
     if (rows < 1) rows = 1;
     if (cols < 1) cols = 1;
     if (rows == rows_ && cols == cols_) return;
+    snapshotWraps();  // shrinking pushes the top rows to the scrollback, several at once
     rows_ = rows;
     cols_ = cols;
     vterm_set_size(vt_, rows, cols);  // reflow + scrollback push/pop happen in here
+    wrapSnapActive_ = false;
     vterm_screen_flush_damage(screen_);
     if (fd_ >= 0) {
         struct winsize ws {};
@@ -413,7 +541,7 @@ bool VtermSession::wrapped(long line) const {
 }
 
 void VtermSession::setScrollbackLimit(size_t lines) {
-    sbLimit_ = lines;
+    sbLimit_ = std::min(lines, kMaxScrollbackLines);
     while (sb_.size() > sbLimit_) sb_.pop_front();
 }
 
@@ -429,12 +557,18 @@ int VtermSession::cbPushLine(int cols, const VTermScreenCell* cells, void* user)
            !cells[n - 1].attrs.reverse)
         --n;
     l.cells.assign(cells, cells + n);
-    // libvterm shifts its line info before the screen pushes the scrolled-out rows, so for the
-    // usual one-line scroll (a linefeed at the bottom) the old row 1 - the line that would
-    // continue this one - is now row 0. Multi-line scrolls (CSI S) lose the flag for all but
-    // the last pushed row; selection then just inserts a newline there.
-    const VTermLineInfo* li = vterm_state_get_lineinfo(s->state_, 0);
-    l.wrapped = li && li->continuation;
+    // Line k of a push batch is wrapped when old row k+1 is a continuation. libvterm shifts its
+    // line info before the screen pushes the scrolled-out rows, so for the usual one-line
+    // scroll (a linefeed at the bottom) the old row 1 is now row 0. Multi-line pushes (CSI S,
+    // CSI M at the top, a resize) lose the flags of all but the last pushed row, so those use
+    // the snapshot taken just before (feed() / resize()).
+    if (s->wrapSnapActive_) {
+        const size_t k = static_cast<size_t>(s->wrapSnapPushes_++) + 1;
+        l.wrapped = k < s->wrapSnap_.size() && s->wrapSnap_[k];
+    } else {
+        const VTermLineInfo* li = vterm_state_get_lineinfo(s->state_, 0);
+        l.wrapped = li && li->continuation;
+    }
     s->sb_.push_back(std::move(l));
     if (s->sb_.size() > s->sbLimit_) s->sb_.pop_front();
     ++s->pushed_;
@@ -547,8 +681,11 @@ int VtermSession::cbSetTermProp(VTermProp prop, VTermValue* val, void* user) {
         break;
     case VTERM_PROP_TITLE:
         if (val->string.initial) s->titleBuf_.clear();
-        s->titleBuf_.append(val->string.str, val->string.len);
+        // Bounded: a program (or `cat` of a hostile file) can send an endless OSC 0.
+        if (s->titleBuf_.size() <= kMaxTitleBytes)
+            s->titleBuf_.append(val->string.str, std::min(val->string.len, kMaxTitleBytes + 1 - s->titleBuf_.size()));
         if (val->string.final) {
+            truncateUtf8(s->titleBuf_, kMaxTitleBytes);
             s->title_ = s->titleBuf_;
             if (s->onTitle) s->onTitle();
         }

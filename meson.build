@@ -59,3 +59,13 @@ test('gl-match', executable('gl_match_test', 'tests/gl_match_test.cpp',
 test('session', executable('session_test', 'tests/session_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
   timeout : 60)
+test('fixes', executable('fixes_test', 'tests/fixes_test.cpp',
+  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
+  timeout : 60)
+# GTK-level fixes; AddressSanitizer makes a use-after-free fail loudly. Skips without $DISPLAY.
+view_test_exe = executable('view_test', 'tests/view_test.cpp', 'src/terminal_view.cpp',
+  include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
+  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep, dependency('x11')],
+  cpp_args : ['-fsanitize=address', '-fno-omit-frame-pointer'], link_args : ['-fsanitize=address'])
+test('view', view_test_exe, env : ['ASAN_OPTIONS=detect_leaks=0:abort_on_error=1', 'LIBGL_ALWAYS_SOFTWARE=1'],
+  timeout : 60, is_parallel : false)
