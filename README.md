@@ -6,7 +6,7 @@ Work in progress, not part of LCOS 1.0.
 
 License: GPL-3.0-or-later (see `LICENSE`).
 
-## Status: M2 in progress (branch `m2-core`; M1 on `m1-core`)
+## Status: M3 in progress (branch `m3-core`; M2 on `m2-core`)
 
 M0 (the spike, PR #1) answered the feasibility questions; see
 [`docs/M0-RECOMMENDATION.md`](docs/M0-RECOMMENDATION.md). M1 checkpoint A: the GLSL effects run on a
@@ -27,6 +27,11 @@ Stage 3: three more CRT 1.2.0-derived profiles (`vintage`, `futuristic`, `paper-
 own palette and licence-clean fonts only), tabs, scrollback search with highlighting, a settings
 dialog, and packaging prep (`.desktop`, AppStream metainfo, icon placeholder, `meson install`,
 an unbuilt `debian/`; see [`docs/PACKAGING.md`](docs/PACKAGING.md)). The default stays `plain`.
+
+M3 item 1 (see [`docs/M3-NOTES.md`](docs/M3-NOTES.md)): the search does not block typing (an idle-built
+cache, 10000-match cap), the governor measures render cost only and recovers, closing a tab
+does not wait for the shell (SIGHUP, SIGKILL after 2 s), tabs close by id, and a corrupt settings
+file no longer blocks Save.
 
 | Part | Where |
 |---|---|
@@ -50,7 +55,7 @@ Without them, the profiles fall back to DejaVu Sans Mono. See `docs/FONTS.md`.
 
     meson setup build
     ninja -C build -j2
-    meson test -C build          # effects, vterm, session, profiles, fonts, painter, search, view and CPU-vs-GL (incl. resize-leak) tests
+    meson test -C build          # governor, effects, vterm, session, profiles, fonts, painter, search, view and CPU-vs-GL (incl. resize-leak) tests
     meson install -C build --destdir /tmp/stage   # binary, .desktop, metainfo, icon, docs
 
 ### Run
@@ -88,7 +93,7 @@ tabs, and hidden tabs do not animate. Search: Ctrl+Shift+F opens the search bar 
 (matches highlighted, current one in orange, "N of M"); Enter goes to the next older match,
 Shift+Enter to the newer one, Escape closes. Settings: Ctrl+Shift+S opens a dialog for profile,
 font and size, effects quality, scrollback lines and bezel; changes apply live to every tab in the window and to new tabs;
-"Save as default" writes them to the settings file (other keys are kept). Defaults can be set in
+"Save as default" writes them to the settings file (other keys are kept; a corrupt file is kept as `settings.ini.corrupt` and replaced). Defaults can be set in
 `~/.config/lunduke-terminal/settings.ini` (group `[terminal]`, keys `profile`, `effects`,
 `renderer`, `threads`, `effects-fps`, `max-fps`, `pause-unfocused`, `font`, `font-px`,
 `scrollback-lines`, `login-shell`, `cwd`, `on-exit`, `bell`, `cursor-shape`, `cursor-blink`, `word-chars`,
