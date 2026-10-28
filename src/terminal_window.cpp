@@ -515,6 +515,7 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     status.set_line_wrap(true);
     status.set_max_width_chars(60);
     status.set_xalign(0);
+    save.set_valign(Gtk::ALIGN_START);  // a wrapped warning must not stretch the button
     grid->attach(save, 0, row, 1, 1);
     grid->attach(status, 1, row, 1, 1);
     get_content_area()->pack_start(*grid, true, true);
