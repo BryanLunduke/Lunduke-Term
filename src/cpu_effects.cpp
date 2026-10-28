@@ -43,9 +43,45 @@ void CpuEffects::resize(int width, int height) {
     bloomB_.assign(down_.size(), 0.0f);
     haveBurn_ = false;
     buildLut();
+    buildFrame();
+}
+
+void CpuEffects::buildFrame() {
+    frame_.clear();
+    refl_.clear();
+    spans_.clear();
+    if (!p_.frame) return;
+    frame_.assign(static_cast<size_t>(w_) * h_ * 4, 0.0f);
+    std::vector<float> refl(frame_.size());
+    pool_->parallelFor(h_, [&](int y0, int y1) {
+        frameLayerRows(p_, w_, h_, y0, y1, &frame_[static_cast<size_t>(y0) * w_ * 4],
+                       &refl[static_cast<size_t>(y0) * w_ * 4]);
+    });
+    spans_.resize(h_);
+    for (int y = 0; y < h_; ++y) {
+        int start = -1;
+        for (int x = 0; x <= w_; ++x) {
+            bool on = false;
+            if (x < w_) {
+                const float* f = &frame_[(static_cast<size_t>(y) * w_ + x) * 4];
+                on = f[0] != 0.0f || f[1] != 0.0f || f[2] != 0.0f || f[3] != 0.0f;
+            }
+            if (on && start < 0) start = x;
+            if (!on && start >= 0) {
+                spans_[y].emplace_back(start, x);
+                start = -1;
+            }
+        }
+    }
+    if (p_.bloom > 0 && p_.frameShininess > 0) {
+        for (size_t i = 0; i < static_cast<size_t>(w_) * h_; ++i)
+            if (refl[i * 4] > 0.0f) refl_.push_back(Refl{static_cast<uint32_t>(i), refl[i * 4], refl[i * 4 + 1], refl[i * 4 + 2]});
+    }
+    base_ = frame_;
 }
 
 void CpuEffects::buildLut() {
+    geom_ = frameGeometry(p_, w_, h_);
     warp_.assign(static_cast<size_t>(w_) * h_ * 4, 0.0f);
     pool_->parallelFor(h_, [&](int y0, int y1) {
         for (int y = y0; y < y1; ++y) {
@@ -53,18 +89,15 @@ void CpuEffects::buildLut() {
             for (int x = 0; x < w_; ++x) {
                 float u = (x + 0.5f) / w_;
                 float* o = &warp_[(static_cast<size_t>(y) * w_ + x) * 4];
-                float su, sv;
-                if (d_.curvature != 0.0f) {
-                    barrel(u, v, d_.curvature, su, sv);
-                } else {
-                    su = u;
-                    sv = v;
-                }
-                float cx = 0.5f - u, cy = 0.5f - v;
+                float su, sv, lu, lv;
+                screenCoords(u, v, geom_, d_.curvature, su, sv, lu, lv);
+                // Distance from the centre of the (unwarped) glass: noise and ambient light.
+                float cx = 0.5f - (u - geom_.ix) / (1.0f - 2.0f * geom_.ix);
+                float cy = 0.5f - (v - geom_.iy) / (1.0f - 2.0f * geom_.iy);
                 o[0] = su;
                 o[1] = sv;
                 o[2] = std::sqrt(cx * cx + cy * cy);
-                o[3] = std::min(step(0.0f, su) - step(1.0f, su), step(0.0f, sv) - step(1.0f, sv));
+                o[3] = std::min(step(0.0f, lu) - step(1.0f, lu), step(0.0f, lv) - step(1.0f, lv));
             }
         }
     });
@@ -177,14 +210,22 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
     t0 = Clock::now();
     const Rgb fc = p_.fontColor, bg = p_.backgroundColor;
     const float chroma = p_.chromaColor;
+    const float shift = rgbShiftPx(p_) / std::max(1, w_);  // uv
     pool_->parallelFor(h_, [&](int y0, int y1) {
-        float t[4], b[4];
+        float t[4], b[4], rc[4], lc[4];
         for (int y = y0; y < y1; ++y) {
             for (int x = 0; x < w_; ++x) {
                 const size_t idx = static_cast<size_t>(y) * w_ + x;
                 const float* lut = &warp_[idx * 4];
                 const float cu = lut[0], cv = lut[1];
                 sampleClamp<3>(src_.data(), w_, h_, cu, cv, t);
+                if (shift != 0.0f) {  // CRT rbgShift
+                    sampleClamp<3>(src_.data(), w_, h_, cu + shift, cv, rc);
+                    sampleClamp<3>(src_.data(), w_, h_, cu - shift, cv, lc);
+                    t[0] = lc[0] * 0.10f + rc[0] * 0.30f + t[0] * 0.60f;
+                    t[1] = lc[1] * 0.20f + rc[1] * 0.20f + t[1] * 0.60f;
+                    t[2] = lc[2] * 0.30f + rc[2] * 0.10f + t[2] * 0.60f;
+                }
                 t[0] += 0.0001f;
                 t[1] += 0.0001f;
                 t[2] += 0.0001f;
@@ -222,6 +263,23 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
             }
         }
     });
+    // 4. bezel reflection: the glow mirrored at the glass edge, only on the frame's pixels.
+    if (!refl_.empty()) {
+        const float bs = d_.bloomStrength, sb = d_.screenBrightness;
+        pool_->parallelFor(static_cast<int>(refl_.size()), [&](int i0, int i1) {
+            float b[4];
+            for (int i = i0; i < i1; ++i) {
+                const Refl& r = refl_[i];
+                sampleClamp<3>(bloomA_.data(), hw_, hh_, r.u, r.v, b);
+                const float g2 = rgb2grey(b[0], b[1], b[2]);
+                const float* s0 = &base_[static_cast<size_t>(r.idx) * 4];
+                float* o = &frame_[static_cast<size_t>(r.idx) * 4];
+                o[0] = s0[0] + r.w * std::min(std::max(fc.r * mixf(g2, b[0], chroma) * bs, 0.0f), 0.5f) * sb;
+                o[1] = s0[1] + r.w * std::min(std::max(fc.g * mixf(g2, b[1], chroma) * bs, 0.0f), 0.5f) * sb;
+                o[2] = s0[2] + r.w * std::min(std::max(fc.b * mixf(g2, b[2], chroma) * bs, 0.0f), 0.5f) * sb;
+            }
+        });
+    }
     lastStaticMs = msSince(t0);
 }
 
@@ -238,8 +296,10 @@ void CpuEffects::renderTo(float timeMs, uint8_t* out, int stride, PixelOrder ord
     float noiseAmount = p_.staticNoise;
     if (p_.horizontalSync != 0.0f && p_.staticNoise != 0.0f) noiseAmount += fu.hsyncScale * 7.0f;
 
+    const bool frame = !spans_.empty();
     pool_->parallelFor(h_, [&](int y0, int y1) {
         float nt[4] = {0, 0, 0, 0}, t[4], b[4];
+        std::vector<float> rowf(frame ? static_cast<size_t>(w_) * 3 : 0);  // unquantised, for the bezel
         for (int y = y0; y < y1; ++y) {
             const float v = (y + 0.5f) / h_;
             float dx = 0.0f;
@@ -295,10 +355,26 @@ void CpuEffects::renderTo(float timeMs, uint8_t* out, int stride, PixelOrder ord
                 uint8_t* o = orow + x * 4;
                 for (int i = 0; i < 3; ++i) {
                     float f = t[i] * fu.flickerBrightness + amb;
-                    f = f * inScreen;  // outside the tube: black (stand-in for the bezel)
-                    o[i == 0 ? ri : (i == 2 ? bi : 1)] = static_cast<uint8_t>(clamp01(f) * 255.0f + 0.5f);
+                    f = clamp01(f * inScreen);  // outside the tube: black (or the bezel, below)
+                    if (frame) rowf[x * 3 + i] = f;
+                    o[i == 0 ? ri : (i == 2 ? bi : 1)] = static_cast<uint8_t>(f * 255.0f + 0.5f);
                 }
                 o[3] = 255;
+            }
+            if (frame) {  // bezel over the tube (premultiplied), only where the layer is not empty
+                for (const auto& sp : spans_[y]) {
+                    for (int x = sp.first; x < sp.second; ++x) {
+                        const float* f = &frame_[(static_cast<size_t>(y) * w_ + x) * 4];
+                        uint8_t* o = orow + x * 4;
+                        const float k = 1.0f - f[3];
+                        const float c0 = rowf[x * 3 + 0] * k + f[0];
+                        const float c1 = rowf[x * 3 + 1] * k + f[1];
+                        const float c2 = rowf[x * 3 + 2] * k + f[2];
+                        o[ri] = static_cast<uint8_t>(clamp01(c0) * 255.0f + 0.5f);
+                        o[1] = static_cast<uint8_t>(clamp01(c1) * 255.0f + 0.5f);
+                        o[bi] = static_cast<uint8_t>(clamp01(c2) * 255.0f + 0.5f);
+                    }
+                }
             }
         }
     });

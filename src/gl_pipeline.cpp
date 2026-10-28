@@ -18,7 +18,9 @@ GlPipeline::GlPipeline(const EffectParams& params)
     progBurn_ = compile(glsl::kBurnIn);
     progStatic_ = compile(glsl::kStatic);
     progDyn_ = compile(glsl::kDynamic);
-    ok_ = progDown_ && progBlur_ && progBurn_ && progStatic_ && progDyn_;
+    progFrame_ = compile(glsl::kFrame);
+    progFrameComp_ = compile(glsl::kFrameComposite);
+    ok_ = progDown_ && progBlur_ && progBurn_ && progStatic_ && progDyn_ && progFrame_ && progFrameComp_;
     if (!ok_) return;
     texNoise_ = makeTex(kNoiseSize, kNoiseSize, GL_RGBA32F, true, true);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, kNoiseSize, kNoiseSize, GL_RGBA, GL_FLOAT, noiseTexture().data());
@@ -33,7 +35,7 @@ void GlPipeline::release() {
         texNoise_ = 0;
         --liveTex_;
     }
-    for (unsigned* p : {&progDown_, &progBlur_, &progBurn_, &progStatic_, &progDyn_}) {
+    for (unsigned* p : {&progDown_, &progBlur_, &progBurn_, &progStatic_, &progDyn_, &progFrame_, &progFrameComp_}) {
         if (*p) glDeleteProgram(*p);
         *p = 0;
     }
@@ -115,7 +117,8 @@ unsigned GlPipeline::makeFbo(unsigned tex) {
 }
 
 void GlPipeline::freeSized() {
-    for (unsigned* f : {&fboDown_, &fboBloomA_, &fboBloomB_, &fboBurn_[0], &fboBurn_[1], &fboStatic_, &fboOut_}) {
+    for (unsigned* f : {&fboDown_, &fboBloomA_, &fboBloomB_, &fboBurn_[0], &fboBurn_[1], &fboStatic_, &fboOut_,
+                        &fboFrameBase_, &fboFrameRefl_, &fboFrame_}) {
         if (*f) {
             glDeleteFramebuffers(1, f);
             --liveFbo_;
@@ -123,7 +126,7 @@ void GlPipeline::freeSized() {
         *f = 0;
     }
     for (unsigned* t : {&texSrc_, &texDown_, &texBloomA_, &texBloomB_, &texBurn_[0], &texBurn_[1], &texStatic_,
-                        &texOut_}) {
+                        &texOut_, &texFrameBase_, &texFrameRefl_, &texFrame_}) {
         if (*t) {
             glDeleteTextures(1, t);
             --liveTex_;
@@ -156,6 +159,39 @@ void GlPipeline::resize(int width, int height) {
     fboStatic_ = makeFbo(texStatic_);
     fboOut_ = makeFbo(texOut_);
     haveBurn_ = false;
+    geom_ = frameGeometry(p_, w_, h_);
+    if (p_.frame) {
+        texFrameBase_ = makeTex(w_, h_, GL_RGBA32F, false, false);
+        texFrameRefl_ = makeTex(w_, h_, GL_RGBA32F, false, false);
+        texFrame_ = makeTex(w_, h_, GL_RGBA32F, false, false);
+        fboFrameBase_ = makeFbo(texFrameBase_);
+        fboFrameRefl_ = makeFbo(texFrameRefl_);
+        fboFrame_ = makeFbo(texFrame_);
+        // The static layer: once per size (the parameters are fixed for a pipeline).
+        GLint prevFbo = 0;
+        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+        glDisable(GL_BLEND);
+        const GLuint p = progFrame_;
+        glUseProgram(p);
+        glUniform2f(glGetUniformLocation(p, "size"), static_cast<float>(w_), static_cast<float>(h_));
+        glUniform2f(glGetUniformLocation(p, "inset"), geom_.ix, geom_.iy);
+        glUniform1f(glGetUniformLocation(p, "insetPx"), geom_.inset);
+        glUniform2f(glGetUniformLocation(p, "inner"), geom_.innerW, geom_.innerH);
+        glUniform1f(glGetUniformLocation(p, "radius"), geom_.radius);
+        glUniform1f(glGetUniformLocation(p, "curvature"), d_.curvature);
+        glUniform3f(glGetUniformLocation(p, "frameColor"), p_.frameColor.r, p_.frameColor.g, p_.frameColor.b);
+        glUniform1f(glGetUniformLocation(p, "shininess"), p_.frameShininess);
+        glUniform1f(glGetUniformLocation(p, "pixelScale"), p_.pixelScale);
+        glUniform1i(glGetUniformLocation(p, "mode"), 0);
+        drawTo(fboFrameBase_, w_, h_, p);
+        glUniform1i(glGetUniformLocation(p, "mode"), 1);
+        drawTo(fboFrameRefl_, w_, h_, p);
+        // Until the first content frame the composite is the base.
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, fboFrameBase_);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fboFrame_);
+        glBlitFramebuffer(0, 0, w_, h_, 0, 0, w_, h_, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(prevFbo));
+    }
 }
 
 void GlPipeline::drawTo(unsigned fbo, int w, int h, unsigned prog) {
@@ -246,7 +282,22 @@ void GlPipeline::updateSource(const uint8_t* px, int stride, PixelOrder order, f
     glUniform1f(glGetUniformLocation(p, "bloomStrength"), d_.bloomStrength);
     glUniform1f(glGetUniformLocation(p, "screenBrightness"), d_.screenBrightness);
     glUniform1i(glGetUniformLocation(p, "useBloom"), p_.bloom > 0);
+    glUniform2f(glGetUniformLocation(p, "inset"), geom_.ix, geom_.iy);
+    glUniform1f(glGetUniformLocation(p, "rgbShift"), rgbShiftPx(p_) / static_cast<float>(w_));
     drawTo(fboStatic_, w_, h_, p);
+    if (p_.frame && p_.bloom > 0 && p_.frameShininess > 0) {
+        const GLuint c = progFrameComp_;
+        glUseProgram(c);
+        bindTex(c, "baseTex", 0, texFrameBase_);
+        bindTex(c, "reflTex", 1, texFrameRefl_);
+        bindTex(c, "bloomSrc", 2, texBloomA_);
+        glUniform3f(glGetUniformLocation(c, "fontColor"), p_.fontColor.r, p_.fontColor.g, p_.fontColor.b);
+        glUniform1f(glGetUniformLocation(c, "chroma"), p_.chromaColor);
+        glUniform1f(glGetUniformLocation(c, "bloomStrength"), d_.bloomStrength);
+        glUniform1f(glGetUniformLocation(c, "screenBrightness"), d_.screenBrightness);
+        glUniform1i(glGetUniformLocation(c, "useRefl"), 1);
+        drawTo(fboFrame_, w_, h_, c);
+    }
     glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(prevFbo));
 }
 
@@ -288,6 +339,9 @@ void GlPipeline::render(float timeMs, unsigned fbo, bool flipY) {
     u1("flicker", fu.flickerBrightness);
     u1("ambient", d_.ambient);
     glUniform1i(glGetUniformLocation(p, "flipY"), flipY ? 1 : 0);
+    glUniform2f(glGetUniformLocation(p, "inset"), geom_.ix, geom_.iy);
+    glUniform1i(glGetUniformLocation(p, "useFrame"), p_.frame ? 1 : 0);
+    bindTex(p, "frameTex", 3, p_.frame ? texFrame_ : texStatic_);
     drawTo(fbo, w_, h_, p);
 }
 

@@ -39,6 +39,14 @@ private:
     std::vector<float> static_;   // RGBA float, static pass output
     std::vector<float> warp_;     // per pixel: staticCoords.u, .v, distance, inScreen
     std::vector<float> weights_;
+    // Bezel (p_.frame): the composited premultiplied layer (static base + content reflection),
+    // the pixels that carry a reflection, and per row the x spans where the layer is not empty.
+    FrameGeometry geom_;
+    std::vector<float> frame_, base_;
+    struct Refl { uint32_t idx; float w, u, v; };
+    std::vector<Refl> refl_;
+    std::vector<std::vector<std::pair<int, int>>> spans_;
+    void buildFrame();
     float burnLast_ = 0, burnPrev_ = 0;
     bool haveBurn_ = false;
 };

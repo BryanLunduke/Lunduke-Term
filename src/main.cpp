@@ -7,12 +7,15 @@
 //                    [--scrollback N] [--login] [--cwd DIR] [--on-exit close|hold|hold-on-error]
 //                    [--hold] [--bell LIST] [--cursor-shape block|underline|bar]
 //                    [--cursor-blink|--no-cursor-blink]
+//                    [--frame|--no-frame] [--frame-size PX] [--frame-color #RRGGBB]
+//                    [--frame-shininess 0..1] [--rgb-shift 0..1]
 //                    [--list-profiles] [-e COMMAND ARGS...]
 // Settings (optional): $XDG_CONFIG_HOME/lunduke-terminal/settings.ini, group [terminal], keys
 // profile, effects (true/false), renderer, threads, effects-fps, max-fps, pause-unfocused,
 // effects-quality, cpu-budget (percent of one core, software rendering only, 0 = off),
 // font, font-px, scrollback-lines, login-shell, cwd, on-exit, bell (comma list of visual,
-// urgent, audible or none), cursor-shape, cursor-blink, word-chars. Command-line options win.
+// urgent, audible or none), cursor-shape, cursor-blink, word-chars, frame (true/false),
+// frame-size, frame-color, frame-shininess, rgb-shift. Command-line options win.
 #include "terminal_view.hpp"
 
 #include <gtkmm.h>
@@ -68,6 +71,11 @@ void loadSettings(lterm::ViewOptions& o) {
         if (kf.has_key(g, "cursor-shape")) o.cursorShape = kf.get_string(g, "cursor-shape");
         if (kf.has_key(g, "cursor-blink")) o.cursorBlink = kf.get_boolean(g, "cursor-blink");
         if (kf.has_key(g, "word-chars")) o.wordChars = kf.get_string(g, "word-chars");
+        if (kf.has_key(g, "frame")) o.tube.frame = kf.get_boolean(g, "frame") ? 1 : 0;
+        if (kf.has_key(g, "frame-size")) o.tube.frameSize = static_cast<float>(kf.get_double(g, "frame-size"));
+        if (kf.has_key(g, "frame-color")) o.tube.frameColor = kf.get_string(g, "frame-color");
+        if (kf.has_key(g, "frame-shininess")) o.tube.frameShininess = static_cast<float>(kf.get_double(g, "frame-shininess"));
+        if (kf.has_key(g, "rgb-shift")) o.tube.rgbShift = static_cast<float>(kf.get_double(g, "rgb-shift"));
     } catch (const Glib::Error& e) {
         std::fprintf(stderr, "lunduke-terminal: %s: %s\n", path.c_str(), e.what().c_str());
     }
@@ -109,6 +117,12 @@ int main(int argc, char** argv) {
         else if (a == "--cursor-shape" && i + 1 < argc) opts.cursorShape = argv[++i];
         else if (a == "--cursor-blink") opts.cursorBlink = true;
         else if (a == "--no-cursor-blink") opts.cursorBlink = false;
+        else if (a == "--frame") opts.tube.frame = 1;
+        else if (a == "--no-frame") opts.tube.frame = 0;
+        else if (a == "--frame-size" && i + 1 < argc) opts.tube.frameSize = static_cast<float>(std::atof(argv[++i]));
+        else if (a == "--frame-color" && i + 1 < argc) opts.tube.frameColor = argv[++i];
+        else if (a == "--frame-shininess" && i + 1 < argc) opts.tube.frameShininess = static_cast<float>(std::atof(argv[++i]));
+        else if (a == "--rgb-shift" && i + 1 < argc) opts.tube.rgbShift = static_cast<float>(std::atof(argv[++i]));
         else if (a == "--list-profiles") {
             for (const auto& p : lterm::builtinProfiles()) {
                 const auto f = lterm::profileFont(p);

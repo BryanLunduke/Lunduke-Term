@@ -38,7 +38,21 @@ struct Profile {
     // Fraction of the window kept free around the text (the barrel warp hides the corners).
     float marginFrac = 0.0f;
     int marginMinPx = 4;
+    // M2: the bezel (fx.frame) can be switched on for this profile (--frame / settings frame).
+    bool bezelOption = false;
 };
+
+// Command-line / settings overrides of a profile's tube (negative / empty = keep the profile's).
+struct TubeOverrides {
+    int frame = -1;             // 0 off, 1 on (only for profiles with bezelOption)
+    float frameSize = -1;       // logical px
+    std::string frameColor;     // #rrggbb
+    float frameShininess = -1;  // 0..1
+    float rgbShift = -1;        // CRT rbgShift slider value, 0..1
+};
+// Applies `o` to p.fx; returns a message for an override that was ignored or invalid ("" = ok).
+std::string applyTubeOverrides(Profile& p, const TubeOverrides& o);
+bool parseHexColor(const std::string& s, Rgb& out);
 
 const std::vector<Profile>& builtinProfiles();
 // The installed font this profile will use (falls back along `fonts`, then to Monospace).

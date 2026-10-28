@@ -241,6 +241,58 @@ static void testScaleChange(const char* profile) {
     CHECK(w.view->scaleFactor() == s0 && w.view->deviceWidth() == lw * s0);
 }
 
+// M2 item 5: amber with the bezel. The grid sits inside the glass; a click on the bezel or in a
+// rounded corner selects nothing; a drag that leaves the glass clamps to the edge cells.
+static void testBezelPointer(const char* renderer) {
+    ViewOptions o;
+    o.renderer = renderer;
+    o.command = {"/bin/sh", "-c", "printf 'alpha beta gamma\\nsecond line here\\n'; exec cat"};
+    o.profile = "amber";
+    o.effects = 1;
+    o.tube.frame = 1;
+    o.tube.frameSize = 24;
+    Win w(o);
+    w.win.resize(640, 400);
+    CHECK(w.view->start());
+    pump(400);
+    CHECK(w.view->bezelActive());
+    const int lw = w.view->get_allocated_width(), lh = w.view->get_allocated_height();
+    std::printf("bezel (%s): %dx%d, grid %dx%d, margins %d,%d\n", w.view->backendName().c_str(), lw, lh,
+                w.view->session().cols(), w.view->session().rows(), w.view->marginX(), w.view->marginY());
+    CHECK(w.view->marginX() >= 24 && w.view->marginY() >= 24);  // the margins include the bezel
+    int r, c;
+    CHECK(!w.view->cellAtLogical(6, lh / 2.0, r, c));        // left bezel
+    CHECK(!w.view->cellAtLogical(lw / 2.0, 4, r, c));        // top bezel
+    CHECK(!w.view->cellAtLogical(lw - 3, lh - 3, r, c));     // corner
+    CHECK(w.view->cellAtLogical(lw / 2.0, lh / 2.0, r, c));  // glass
+    // Click on the bezel: nothing selected (a press + release elsewhere on the bezel).
+    w.view->testButton(true, 1, 8, 60);
+    w.view->testMotion(8, 120, GDK_BUTTON1_MASK);
+    w.view->testButton(false, 1, 8, 120);
+    CHECK(!w.view->selection().active());
+    // Drag from inside "alpha" out over the left/top bezel: clamps to row 0 col 0.
+    int r0, c0;
+    CHECK(w.view->cellAtLogical(lw * 0.30, lh * 0.18, r0, c0));
+    // Find a point on the first row: walk down from the top edge of the glass.
+    double y0 = -1, x0 = -1;
+    for (double y = 0; y < lh && y0 < 0; y += 1)
+        for (double x = lw * 0.35; x < lw * 0.6; x += 1)
+            if (w.view->cellAtLogical(x, y, r, c) && r == 0 && c >= 3) {
+                y0 = y + 3;
+                x0 = x;
+                break;
+            }
+    CHECK(y0 > 0);
+    w.view->cellAtLogical(x0, y0, r0, c0);
+    w.view->testButton(true, 1, x0, y0);
+    w.view->testMotion(2, 2, GDK_BUTTON1_MASK);  // onto the bezel corner
+    w.view->testButton(false, 1, 2, 2);
+    std::printf("bezel drag from cell %d,%d to the corner: '%s'\n", r0, c0, w.view->selectionText().c_str());
+    CHECK(w.view->selection().active());
+    CHECK(w.view->selection().start().col == 0);
+    CHECK(w.view->selectionText() == std::string("alpha beta gamma").substr(0, c0 + 1));
+}
+
 int main(int argc, char** argv) {
     if (!getenv("DISPLAY") || !*getenv("DISPLAY")) {
         std::printf("view test skipped: no DISPLAY\n");
@@ -254,6 +306,8 @@ int main(int argc, char** argv) {
     testReapAfterHangup();
     testScaleChange("plain");
     testScaleChange("amber");
+    testBezelPointer("auto");
+    testBezelPointer("cpu");
     if (failures) {
         std::fprintf(stderr, "%d failure(s)\n", failures);
         return 1;

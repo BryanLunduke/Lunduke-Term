@@ -56,6 +56,10 @@ TerminalView::TerminalView(const ViewOptions& opts)
         p = findProfile("plain");
     }
     profile_ = *p;
+    {
+        const std::string m = applyTubeOverrides(profile_, opts_.tube);
+        if (!m.empty()) std::fprintf(stderr, "lunduke-terminal: %s\n", m.c_str());
+    }
     effectsOn_ = opts_.effects < 0 ? profile_.effects : opts_.effects != 0;
     glFailed_ = opts_.renderer == "cpu";
     session_.reset(new VtermSession(24, 80));
@@ -283,10 +287,12 @@ void TerminalView::setProfile(const std::string& id) {
     const Profile* p = findProfile(id);
     if (!p) return;
     profile_ = *p;
+    applyTubeOverrides(profile_, opts_.tube);
     applyProfile();
     if (opts_.effects < 0) effectsOn_ = profile_.effects;
     applyColors();
     chooseMode();
+    if (w_ > 0) layoutGrid();  // the bezel (if any) takes room
     updateContent();
     requestFrame();
     updateAnimation();
@@ -296,6 +302,7 @@ void TerminalView::setEffects(bool on) {
     effectsOn_ = on;
     applyColors();
     chooseMode();
+    if (w_ > 0) layoutGrid();  // the bezel (if any) takes room
     fullRepaint_ = contentDirty_ = effectsSourceStale_ = true;
     updateContent();
     requestFrame();
@@ -455,8 +462,12 @@ bool TerminalView::onDraw(const Cairo::RefPtr<Cairo::Context>& cr) {
 }
 
 void TerminalView::layoutGrid() {
+    // A bezel takes its width on every side; the profile's margins are then inside the glass.
+    const int inset = frameActive()
+                          ? static_cast<int>(std::ceil(frameGeometry(fx_, w_, h_).inset / std::max(1, scale_)))
+                          : 0;
     const GridLayout g = computeGridLayout(w_, h_, scale_, painter_->cellWidth(), painter_->cellHeight(),
-                                           profile_.marginMinPx, profile_.marginFrac);
+                                           profile_.marginMinPx, profile_.marginFrac, inset);
     marginX_ = g.marginX;
     marginY_ = g.marginY;
     const int rows = g.rows, cols = g.cols;
@@ -814,11 +825,34 @@ void TerminalView::pasteClipboard(bool primary) {
         });
 }
 
+void TerminalView::testButton(bool press, int button, double x, double y, guint state) {
+    GdkEventButton ev{};
+    ev.type = press ? GDK_BUTTON_PRESS : GDK_BUTTON_RELEASE;
+    ev.button = static_cast<guint>(button);
+    ev.x = x;
+    ev.y = y;
+    ev.state = state;
+    if (press) onButtonPress(&ev);
+    else onButtonRelease(&ev);
+}
+
+void TerminalView::testMotion(double x, double y, guint state) {
+    GdkEventMotion ev{};
+    ev.type = GDK_MOTION_NOTIFY;
+    ev.x = x;
+    ev.y = y;
+    ev.state = state;
+    onMotion(&ev);
+}
+
+bool TerminalView::frameActive() const { return effectsOn_ && mode_ != Mode::Plain && fx_.frame; }
+
 bool TerminalView::cellAt(double x, double y, int& row, int& col) const {
     const float curvature = effectsOn_ && mode_ != Mode::Plain ? fx_.screenCurvature * 0.4f : 0.0f;
+    const FrameGeometry frame = frameActive() ? frameGeometry(fx_, w_, h_) : FrameGeometry{};
     // Event coordinates are logical pixels; the layout is in device pixels.
     return pointToCell(x * scale_, y * scale_, w_, h_, curvature, marginX_, marginY_, painter_->cellWidth(), painter_->cellHeight(),
-                       session_->rows(), session_->cols(), row, col);
+                       session_->rows(), session_->cols(), row, col, frame);
 }
 
 bool TerminalView::mouseReporting(guint state) const {
@@ -829,7 +863,10 @@ bool TerminalView::onButtonPress(GdkEventButton* ev) {
     if (mode_ == Mode::Gl) gl_.grab_focus();
     else area_.grab_focus();
     int row, col;
-    cellAt(ev->x, ev->y, row, col);
+    const bool inside = cellAt(ev->x, ev->y, row, col);
+    // A press on the bezel (or the glass's rounded corners) is not on the terminal: it neither
+    // starts a selection nor reaches a mouse-reporting application. Middle-click paste still works.
+    if (!inside && frameActive() && ev->button != 2) return true;
     const VTermModifier mod = modsOf(ev->state);
     if (mouseReporting(ev->state)) {
         if (ev->type != GDK_BUTTON_PRESS) return true;  // GTK's extra 2/3-click events

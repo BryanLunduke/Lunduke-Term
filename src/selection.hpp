@@ -3,6 +3,8 @@
 // extraction, and the pixel -> cell mapping (including the CRT curvature warp).
 #pragma once
 
+#include "effects.hpp"
+
 #include <string>
 
 namespace lterm {
@@ -62,8 +64,10 @@ private:
 // screenCurvature * 0.4) the barrel warp is applied first: the shader shows, at output point p,
 // the source pixel barrel(p), so the same forward function maps the mouse to the right cell.
 // Returns false when the point falls outside the (warped) screen. row/col are clamped.
+// With a bezel (frame.inset > 0) the warp works inside the glass and a point on the bezel,
+// including the glass's rounded corners, is outside.
 bool pointToCell(double x, double y, int width, int height, float curvature, int marginX, int marginY, int cellW,
-                 int cellH, int rows, int cols, int& row, int& col);
+                 int cellH, int rows, int cols, int& row, int& col, const FrameGeometry& frame = FrameGeometry{});
 
 // Where the grid goes inside a widget of devW x devH device pixels (HiDPI: logical size times
 // `scale`). Margins and the grid size are worked out in logical pixels and then multiplied by
@@ -73,6 +77,8 @@ struct GridLayout {
     int marginX = 0, marginY = 0;  // device pixels
     int rows = 1, cols = 1;
 };
-GridLayout computeGridLayout(int devW, int devH, int scale, int cellW, int cellH, int marginMinPx, float marginFrac);
+// frameInset: logical px taken by a bezel on every side (the margins are then inside the glass).
+GridLayout computeGridLayout(int devW, int devH, int scale, int cellW, int cellH, int marginMinPx, float marginFrac,
+                             int frameInset = 0);
 
 }  // namespace lterm

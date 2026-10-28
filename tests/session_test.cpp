@@ -238,6 +238,46 @@ static void testScale2Mapping() {
     CHECK_EQ(sel.text(s), std::string("the quick brown fox\nline 03: jumps over"));
 }
 
+// M2 item 5: pointer mapping with the bezel, at scale 1 and 2 (same logical answers).
+static void testBezelMapping() {
+    EffectParams fx;
+    fx.frame = true;
+    fx.frameSize = 28;
+    fx.screenCurvature = 0.3f;
+    const float curv = fx.screenCurvature * 0.4f;
+    for (int scale : {1, 2}) {
+        EffectParams p = scaleEffectParams(fx, scale);
+        const int W = 808 * scale, H = 464 * scale;
+        const FrameGeometry g = frameGeometry(p, W, H);
+        CHECK_EQ(static_cast<int>(g.inset), 28 * scale);
+        const GridLayout lay = computeGridLayout(W, H, scale, 10 * scale, 19 * scale, 4, 0.0f, 28);
+        CHECK_EQ(lay.marginX, (4 + 28) * scale);
+        int r, c;
+        auto at = [&](double lx, double ly) {
+            return pointToCell(lx * scale, ly * scale, W, H, curv, lay.marginX, lay.marginY, 10 * scale, 19 * scale, lay.rows,
+                               lay.cols, r, c, g);
+        };
+        CHECK(!at(10, 232));                 // left bezel
+        CHECK(!at(404, 6));                  // top bezel
+        CHECK(!at(800, 460));                // outer corner
+        CHECK(!at(29.5, 29.5));              // just inside the inset but in the glass's rounded corner
+        CHECK(at(404, 232));                 // centre of the glass
+        CHECK(at(404, 232) && r == lay.rows / 2 && (c == lay.cols / 2 || c == lay.cols / 2 - 1));
+        // Off-screen points still give clamped cells (drags clamp to the edge).
+        at(1, 1);
+        CHECK_EQ(r, 0);
+        CHECK_EQ(c, 0);
+        at(807, 463);
+        CHECK_EQ(r, lay.rows - 1);
+        CHECK_EQ(c, lay.cols - 1);
+        // Without curvature the glass interior maps 1:1 to the pixel grid.
+        pointToCell((4 + 28 + 10 * 3 + 5) * scale, (4 + 28 + 19 * 2 + 9) * scale, W, H, 0.0f, lay.marginX, lay.marginY,
+                    10 * scale, 19 * scale, lay.rows, lay.cols, r, c, g);
+        CHECK_EQ(r, 2);
+        CHECK_EQ(c, 3);
+    }
+}
+
 static void testMouse() {
     VtermSession s(24, 80);
     // No mode: nothing is reported.
@@ -471,6 +511,7 @@ int main() {
     testSelection();
     testPointToCell();
     testScale2Mapping();
+    testBezelMapping();
     testMouse();
     testPaste();
     testCursor();

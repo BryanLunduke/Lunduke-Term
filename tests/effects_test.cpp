@@ -169,5 +169,66 @@ int main() {
         CHECK(scaled > unscaled + 1.0);
     }
 
+    // M2 item 5: RGB shift and bezel.
+    {
+        // RGB shift off: frame-off output is unchanged by the new code paths (geometry is zero).
+        EffectParams p;
+        CHECK(frameGeometry(p, 640, 400).inset == 0.0f);
+        p.frame = true;
+        p.frameSize = 20;
+        const FrameGeometry g = frameGeometry(p, 640, 400);
+        CHECK(g.inset == 20.0f && g.innerW == 600.0f && g.radius == 12.0f);
+        CHECK(screenSdf(g, 0.5f, 0.5f) < -190.0f);
+        CHECK(std::fabs(screenSdf(g, 0.0f, 0.5f)) < 1e-3f);
+        CHECK(screenSdf(g, 0.0f, 0.0f) > 4.0f);  // rounded corner: outside the glass
+        // Static layer: opaque frame at the window edge, empty in the middle of the glass,
+        // a glass highlight (additive, alpha 0) top left.
+        std::vector<float> base(640 * 400 * 4), refl(base.size());
+        frameLayerRows(p, 640, 400, 0, 400, base.data(), refl.data());
+        auto at = [&](std::vector<float>& v, int x, int y) { return &v[(static_cast<size_t>(y) * 640 + x) * 4]; };
+        CHECK(at(base, 2, 200)[3] == 1.0f);
+        CHECK(at(base, 320, 300)[3] == 0.0f && at(base, 320, 300)[0] == 0.0f);
+        CHECK(at(base, 200, 90)[3] == 0.0f && at(base, 200, 90)[0] > 0.01f);
+        CHECK(at(refl, 15, 200)[0] > 0.05f);  // reflection weight next to the glass
+        CHECK(at(refl, 320, 200)[0] == 0.0f);
+        // Reflection: a bright column just inside the glass shows up mirrored on the bezel.
+        EffectParams q = p;
+        q.staticNoise = q.jitter = q.flickering = q.horizontalSync = q.glowingLine = q.burnIn = 0.0f;
+        q.screenCurvature = 0.0f;
+        std::vector<uint8_t> dark(640 * 400 * 4, 0), lit = dark, o1(dark.size()), o2(dark.size());
+        for (int y = 100; y < 300; ++y)
+            for (int x = 22; x < 40; ++x)
+                for (int c = 0; c < 3; ++c) lit[(y * 640 + x) * 4 + c] = 255;
+        for (auto* src : {&dark, &lit}) {
+            CpuEffects e(q, 2);
+            e.resize(640, 400);
+            e.setSource(src->data(), 640 * 4, 0.0f);
+            e.render(0.0f, src == &dark ? o1.data() : o2.data());
+        }
+        const int px = (200 * 640 + 14) * 4;
+        std::printf("bezel pixel next to a lit column: %d -> %d\n", o1[px], o2[px]);
+        CHECK(o2[px] > o1[px] + 3);
+        // RGB shift: a white vertical line gets a red fringe on its left and a blue one on its right
+        // (CRT's weights: left sample feeds blue, right sample feeds red).
+        EffectParams r;
+        r.staticNoise = r.jitter = r.flickering = r.horizontalSync = r.glowingLine = r.burnIn = r.bloom = 0.0f;
+        r.screenCurvature = 0.0f;
+        r.chromaColor = 1.0f;
+        r.fontColor = Rgb{1, 1, 1};
+        r.rasterization = 0;
+        r.ambientLight = 0.0f;
+        r.rgbShift = 0.3524f;  // 3.17 px
+        std::vector<uint8_t> line(64 * 32 * 4, 0), out(line.size());
+        for (int y = 0; y < 32; ++y)
+            for (int c = 0; c < 3; ++c) line[(y * 64 + 32) * 4 + c] = 255;
+        CpuEffects e(r, 1);
+        e.resize(64, 32);
+        e.setSource(line.data(), 64 * 4, 0.0f);
+        e.render(0.0f, out.data());
+        const uint8_t* lft = &out[(16 * 64 + 29) * 4];
+        const uint8_t* rgt = &out[(16 * 64 + 35) * 4];
+        std::printf("rgb shift fringes: left %d,%d,%d right %d,%d,%d\n", lft[0], lft[1], lft[2], rgt[0], rgt[1], rgt[2]);
+        CHECK(lft[0] > lft[2] && rgt[2] > rgt[0]);
+    }
     return failures ? 1 : 0;
 }

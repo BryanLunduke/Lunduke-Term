@@ -89,8 +89,37 @@ int main() {
         }
     }
 
+    // M2 item 5: RGB shift and the bezel (static layer, reflection, composite) at both scales and
+    // every quality level. "amber+bezel+rgb" has both at once.
+    struct Variant { const char* name; const char* prof; bool frame; float rgb; };
+    const Variant variants[] = {{"ibm-dos rgb", "ibm-dos", false, -1.0f},
+                                {"amber bezel", "amber", true, -1.0f},
+                                {"green-scanlines bezel", "green-scanlines", true, -1.0f},
+                                {"amber bezel+rgb", "amber", true, 0.3524f}};
+    for (int scale : {1, 2}) {
+        const auto a2 = renderSyntheticFrame(scale * W, scale * H, 0, "DejaVu Sans Mono", 14, nullptr, scale);
+        const auto b2 = renderSyntheticFrame(scale * W, scale * H, 3, "DejaVu Sans Mono", 14, nullptr, scale);
+        for (const Variant& v : variants) {
+            const Profile* pr = findProfile(v.prof);
+            if (!pr) continue;
+            EffectParams base = pr->fx;
+            base.frame = v.frame;
+            if (v.rgb >= 0) base.rgbShift = v.rgb;
+            for (EffectsQuality q : {EffectsQuality::Full, EffectsQuality::Reduced, EffectsQuality::Static}) {
+                const EffectParams p = scaleEffectParams(applyEffectsQuality(base, q), scale);
+                GlEffects gq(p);
+                const double ps = compare(gq, p, a2, b2, &mx, scale * W, scale * H);
+                std::printf("%s %s scale %d: PSNR %.2f dB, max diff %d\n", v.name, effectsQualityName(q), scale, ps, mx);
+                if (ps < 40.0) ++fails;
+            }
+        }
+    }
+
     // Resize loop: object counts must stay constant and the output must still match.
-    GlEffects gl(m1);
+    EffectParams m1f = m1;  // with the bezel: its three extra textures must not leak either
+    m1f.frame = true;
+    m1f.rgbShift = 0.3f;
+    GlEffects gl(m1f);
     gl.resize(W, H);
     gl.renderNoReadback(0.0f);
     const int tex0 = gl.pipeline()->liveTextures(), fbo0 = gl.pipeline()->liveFramebuffers();
@@ -102,8 +131,8 @@ int main() {
     }
     const int tex1 = gl.pipeline()->liveTextures(), fbo1 = gl.pipeline()->liveFramebuffers();
     const int gltex1 = countGlTextures();
-    const double ps = compare(gl, m1, a, b, &mx);
-    std::printf("after 50 resizes: textures %d -> %d, fbos %d -> %d, glIsTexture %d -> %d, PSNR %.2f dB, max diff %d\n",
+    const double ps = compare(gl, m1f, a, b, &mx);
+    std::printf("after 50 resizes (bezel on): textures %d -> %d, fbos %d -> %d, glIsTexture %d -> %d, PSNR %.2f dB, max diff %d\n",
                 tex0, tex1, fbo0, fbo1, gltex0, gltex1, ps, mx);
     if (tex1 != tex0 || fbo1 != fbo0 || gltex1 != gltex0 || ps < 40.0) ++fails;
     return fails ? 1 : 0;

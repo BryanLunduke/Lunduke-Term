@@ -53,6 +53,19 @@ struct EffectParams {
     // noise texture is sampled per logical pixel, so the grain looks the same at any scale.
     float pixelScale = 1.0f;
 
+    // M2 item 5. RGB shift (CRT 1.2.0 rbgShift): the red/blue fringes of a misconverged tube.
+    // The neighbour samples sit 12 * rgbShift * 0.75 logical px (CRT's 12 * rbgShift *
+    // totalFontScaling) left and right of each pixel; 0 = off.
+    float rgbShift = 0.0f;
+    // Bezel: a plastic frame around a rounded, curved screen, with shading on the inner bevel,
+    // a highlight on the glass and the phosphor glow reflected on the frame. The geometry,
+    // shading and highlight are a static layer rendered once per size/parameter change; only
+    // the reflection follows the content (and only on the frame's pixels).
+    bool frame = false;
+    float frameSize = 28.0f;                     // logical px between the window edge and the glass
+    Rgb frameColor{0.17f, 0.16f, 0.15f};         // plastic colour
+    float frameShininess = 0.5f;                 // 0 matte .. 1 glossy (bevel specular, glass, reflection)
+
     // True when the picture changes on its own (noise, flicker, jitter, sync, glowing line),
     // i.e. the view needs an effects tick even when the terminal content is unchanged.
     bool animated() const {
@@ -105,6 +118,26 @@ struct DerivedParams {
 };
 DerivedParams derive(const EffectParams& p);
 
+// Screen rectangle inside the bezel, in device pixels (all zero without a frame).
+struct FrameGeometry {
+    float inset = 0;           // device px from each window edge to the glass
+    float ix = 0, iy = 0;      // the same as a fraction of width / height
+    float innerW = 0, innerH = 0;
+    float radius = 0;          // corner radius of the glass, device px
+};
+FrameGeometry frameGeometry(const EffectParams& p, int width, int height);
+// Output uv (0..1 over the widget) -> source uv, through the bezel inset and the barrel warp.
+// `local` gets the warped screen-local coordinates (0..1 on the glass).
+inline void screenCoords(float u, float v, const FrameGeometry& g, float curvature, float& su, float& sv,
+                         float& lu, float& lv);
+// Signed distance (device px) from the glass edge, negative on the glass, for screen-local lu/lv.
+float screenSdf(const FrameGeometry& g, float lu, float lv);
+// The RGB shift's displacement in device px.
+inline float rgbShiftPx(const EffectParams& p) { return 12.0f * 0.75f * p.rgbShift * p.pixelScale; }
+// Static bezel layer, premultiplied RGBA float: base (frame + glass highlight + inner shadow) and
+// refl (r = reflection weight, g/b = mirrored source uv). Rows [y0, y1). Mirrored in GLSL kFrame.
+void frameLayerRows(const EffectParams& p, int width, int height, int y0, int y1, float* base, float* refl);
+
 // Deterministic 512x512 RGBA noise texture (stand-in for CRT's allNoise512.png).
 constexpr int kNoiseSize = 512;
 const std::vector<float>& noiseTexture();   // RGBA float, kNoiseSize^2*4
@@ -132,6 +165,15 @@ inline void barrel(float u, float v, float curvature, float& ou, float& ov) {
     float d = (cx * cx + cy * cy) * curvature;
     ou = u - cx * (1.0f + d) * d;
     ov = v - cy * (1.0f + d) * d;
+}
+
+inline void screenCoords(float u, float v, const FrameGeometry& g, float curvature, float& su, float& sv,
+                         float& lu, float& lv) {
+    lu = (u - g.ix) / (1.0f - 2.0f * g.ix);
+    lv = (v - g.iy) / (1.0f - 2.0f * g.iy);
+    if (curvature != 0.0f) barrel(lu, lv, curvature, lu, lv);
+    su = g.ix + lu * (1.0f - 2.0f * g.ix);
+    sv = g.iy + lv * (1.0f - 2.0f * g.iy);
 }
 
 // Abstract interface used by the benchmark, the comparison tool and the terminal window.

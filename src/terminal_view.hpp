@@ -41,6 +41,8 @@ struct ViewOptions {
     std::string cursorShape = "block";  // block | underline | bar (DECSCUSR overrides)
     bool cursorBlink = false;           // DECSCUSR / ?12 override
     std::string wordChars = Selection::defaultWordChars();
+    // M2 item 5: bezel / RGB shift overrides of the profile (see profiles.hpp).
+    TubeOverrides tube;
 };
 
 // Frame statistics (ms), kept for --stats and the benchmarks in docs/.
@@ -80,6 +82,12 @@ public:
     int deviceHeight() const { return h_; }
     // Test hook: the cell under a pointer position in logical (event) coordinates.
     bool cellAtLogical(double x, double y, int& row, int& col) const { return cellAt(x, y, row, col); }
+    // Test hooks: pointer events at logical coordinates, as GTK would deliver them.
+    void testButton(bool press, int button, double x, double y, guint state = 0);
+    void testMotion(double x, double y, guint state);
+    bool bezelActive() const { return frameActive(); }
+    int marginX() const { return marginX_; }
+    int marginY() const { return marginY_; }
     const ViewStats& stats() const { return stats_; }
     int scrollOffset() const { return scrollOffset_; }
     const Selection& selection() const { return sel_; }
@@ -99,6 +107,7 @@ private:
     bool onMotion(GdkEventMotion* ev);
     bool onScroll(GdkEventScroll* ev);
     bool cellAt(double x, double y, int& row, int& col) const;
+    bool frameActive() const;      // effects on with a bezel
     bool mouseReporting(guint state) const;
     void scrollBy(int lines);  // + = back into history
     void snapToBottom();

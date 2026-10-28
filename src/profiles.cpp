@@ -2,6 +2,7 @@
 #include "profiles.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 
 namespace lterm {
@@ -114,11 +115,17 @@ std::vector<Profile> makeProfiles() {
     amber.fontPx = 22;
     amber.marginFrac = 0.04f;
     amber.marginMinPx = 12;
+    // The bezel is an option on the monochrome tubes: dark warm plastic, a satin finish.
+    amber.bezelOption = true;
+    amber.fx.frameSize = 28.0f;
+    amber.fx.frameColor = hex(0x2a2622);
+    amber.fx.frameShininess = 0.5f;
     v.push_back(amber);
     v[0].fx = amber.fx;  // plain + effects toggled on = amber effects with the plain palette
     {
         Profile p = amber;  // "Monochrome Green": same values, green phosphor, no chroma
         p.id = "green";
+        p.fx.frameColor = hex(0x22262a);  // cooler grey next to the green phosphor
         p.label = "Green";
         p.fx.fontColor = hex(0x0ccc68);
         p.fx.chromaColor = 0.0f;
@@ -127,6 +134,7 @@ std::vector<Profile> makeProfiles() {
     {
         Profile p = amber;  // "Green Scanlines"-style: green with scanlines on
         p.id = "green-scanlines";
+        p.fx.frameColor = hex(0x22262a);
         p.label = "Green scanlines";
         p.fx.fontColor = hex(0x0ccc68);
         p.fx.chromaColor = 0.0f;
@@ -148,6 +156,8 @@ std::vector<Profile> makeProfiles() {
         p.fx.jitter = 0.1545f;
         p.fx.screenCurvature = 0.4f;
         p.fx.staticNoise = 0.0503f;
+        p.fx.rgbShift = 0.3524f;  // CRT 1.2.0 "IBM Dos" rbgShift
+        p.bezelOption = false;
         p.palette = legibleColourPalette(kCga);
         p.fg = Color8{0xaa, 0xaa, 0xaa};
         p.cursor = p.fg;
@@ -160,6 +170,7 @@ std::vector<Profile> makeProfiles() {
     {
         Profile p = amber;  // "IBM 3278": green, no animated effects at all (only burn-in)
         p.id = "ibm-3278";
+        p.bezelOption = false;
         p.label = "IBM 3278 (static)";
         p.fx.fontColor = hex(0x0ccc68);
         p.fx.chromaColor = 0.0f;
@@ -179,6 +190,30 @@ std::vector<Profile> makeProfiles() {
 }
 
 }  // namespace
+
+bool parseHexColor(const std::string& s, Rgb& out) {
+    std::string h = s;
+    if (!h.empty() && h[0] == '#') h.erase(0, 1);
+    if (h.size() != 6) return false;
+    for (char c : h)
+        if (!std::isxdigit(static_cast<unsigned char>(c))) return false;
+    out = hex(static_cast<uint32_t>(std::stoul(h, nullptr, 16)));
+    return true;
+}
+
+std::string applyTubeOverrides(Profile& p, const TubeOverrides& o) {
+    std::string msg;
+    if (o.frame >= 0) {
+        if (p.bezelOption) p.fx.frame = o.frame > 0;
+        else if (o.frame > 0) msg += "profile '" + p.id + "' has no bezel option; --frame ignored. ";
+    }
+    if (o.frameSize >= 0) p.fx.frameSize = std::min(200.0f, o.frameSize);
+    if (!o.frameColor.empty() && !parseHexColor(o.frameColor, p.fx.frameColor))
+        msg += "frame colour must be #rrggbb. ";
+    if (o.frameShininess >= 0) p.fx.frameShininess = std::min(1.0f, o.frameShininess);
+    if (o.rgbShift >= 0) p.fx.rgbShift = std::min(1.0f, o.rgbShift);
+    return msg;
+}
 
 const std::vector<Profile>& builtinProfiles() {
     static const std::vector<Profile> v = makeProfiles();
