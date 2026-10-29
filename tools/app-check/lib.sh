@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # helpers: start TERM_CMD in lunduke-terminal on :43, find its window
 export DISPLAY=${DISPLAY:-:43} LIBGL_ALWAYS_SOFTWARE=1
 [ -f "${LTERM_TOOLS_ENV:-/workspace/lterm-tools/env.sh}" ] && . "${LTERM_TOOLS_ENV:-/workspace/lterm-tools/env.sh}"

@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # M2 stage 2 item 5 in the TCG guest: tick benches and idle CPU, bezel / rgb shift vs none.
 set -u
 OUT=$1; B=/t/bin/lterm-m1-bench; T=/t/bin/lunduke-terminal; SIZE=1280x800; mkdir -p $OUT

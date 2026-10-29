@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 cd /workspace/lunduke-term-m2; T=build/lunduke-terminal; OUT=/tmp/s3/hb; SIZE=1280x800
 export DISPLAY=:43 SHELL=/bin/bash
 cpu_ticks() { awk '{print $14+$15}' "/proc/$1/stat" 2>/dev/null || echo 0; }

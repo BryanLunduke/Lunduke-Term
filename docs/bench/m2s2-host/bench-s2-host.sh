@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # host item-5 bench: tick benches + idle CPU (own Xvfb :43)
 cd /workspace/lunduke-term-m2; B=build/lterm-m1-bench; T=build/lunduke-terminal; OUT=/tmp/s2/hb; SIZE=1280x800
 export DISPLAY=:43

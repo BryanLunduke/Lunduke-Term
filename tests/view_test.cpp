@@ -15,9 +15,13 @@
 #include <gtkmm.h>
 
 #include <cerrno>
+#include <chrono>
 #include <cstdio>
+#include <functional>
 #include <cstdlib>
 #include <cstring>
+#include <vector>
+#include <algorithm>
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/prctl.h>
@@ -371,6 +375,14 @@ static void testTabs() {
     pump(300);  // late idle callbacks must not touch the dead window (ASan)
 }
 
+// setSearch() answers at once when the cache is complete; under ASan a slice may not be enough
+// for even a few hundred lines, so the search finishes from idle (searchPending()).
+static int searchSync(TerminalView& v, const std::string& q, bool cs) {
+    int n = v.setSearch(q, cs);
+    for (int i = 0; i < 2000 && v.searchPending(); ++i) pump(5);
+    return v.searchPending() ? -1 : (n ? n : v.searchCount());
+}
+
 static void testSearchView() {
     ViewOptions o;
     o.command = {"/bin/sh", "-c",
@@ -381,7 +393,7 @@ static void testSearchView() {
     for (int i = 0; i < 100 && w.view->session().scrollbackSize() < 250; ++i) pump(20);
     pump(200);
     TerminalView& v = *w.view;
-    CHECK(v.setSearch("me", false) == 2);
+    CHECK(searchSync(v, "me", false) == 2);
     CHECK(v.searchIndex() == 1);        // the newest one, on screen
     CHECK(v.scrollOffset() == 0);
     pump(100);
@@ -414,7 +426,7 @@ static void testSearchView() {
     CHECK(v.setSearch("me", true) == 0);
     CHECK(!v.searchStep(false));
     CHECK(v.setSearch("ME", true) == 2);
-    CHECK(v.setSearch("row 1", false) >= 100);  // row 1, row 10.., row 100..
+    CHECK(searchSync(v, "row 1", false) >= 100);  // row 1, row 10.., row 100..
     // Output while the search is open re-runs it (debounced).
     CHECK(v.setSearch("zebra", false) == 0);
     for (char ch : std::string("zebra\r")) v.session().sendChar(static_cast<unsigned char>(ch), VTERM_MOD_NONE);
@@ -432,6 +444,54 @@ static void testSearchView() {
     pump(60);
     w.dropView();
     pump(400);
+}
+
+// M3 1(a): a 100 000-line scrollback. Typing must not block the main loop: the cache is built in
+// short idle slices (the query is pending meanwhile), then each keystroke is a quick find().
+static void testSearchBig() {
+    ViewOptions o;
+    o.scrollbackLines = 100000;
+    Win w(o);
+    TerminalView& v = *w.view;
+    std::string chunk;
+    for (int i = 0; i < 100000; ++i) {
+        chunk += "[" + std::to_string(i) + "] build step" + (i % 1000 == 500 ? " Needle" : "") + "\r\n";
+        if (chunk.size() > 65536) {
+            v.session().feed(chunk);
+            chunk.clear();
+        }
+    }
+    v.session().feed(chunk);
+    CHECK(v.session().scrollbackSize() >= 99000);
+    v.resetSearchStats();
+    v.prepareSearch(false);  // the search bar opened
+    CHECK(v.setSearch("n", false) == 0 && v.searchPending());  // not cached yet: pending, no block
+    const double first = v.searchMaxMainMs();
+    int turns = 0;
+    for (; turns < 2000 && v.searchPending(); ++turns) pump(2);
+    CHECK(!v.searchPending());
+    const int n1 = v.searchCount();
+    double worstKey = 0;
+    for (const char* q : {"ne", "nee", "need", "needl", "needle"}) {
+        v.resetSearchStats();
+        v.setSearch(q, false);
+        CHECK(!v.searchPending());
+        worstKey = std::max(worstKey, v.searchMaxMainMs());
+    }
+    std::printf("view search, 100000 lines (ASan build): first keystroke %.2f ms (pending, %d turns), "
+                "worst later keystroke %.2f ms, 'n' %d / 'needle' %d matches\n",
+                first, turns, worstKey, n1, v.searchCount());
+    CHECK(v.searchCount() == 100);
+    CHECK(v.searchIndex() == 99);
+    CHECK(v.searchStep(true) && v.searchIndex() == 98);  // Enter: older
+    CHECK(v.searchStep(false) && v.searchIndex() == 99); // Shift+Enter: newer
+    CHECK(first < 100.0);    // bounded slice (4 ms nominal; ASan and a loaded box get slack)
+    CHECK(worstKey < 200.0);
+    // A query that is still pending when the view goes away (ASan: the idle worker must stop).
+    v.clearSearch();
+    CHECK(v.setSearch("needle", false) == 0 && v.searchPending());
+    w.dropView();
+    pump(100);
 }
 
 static void testSearchBar() {
@@ -555,6 +615,242 @@ static void testSettingsDialog() {
     g_rmdir(dir.c_str());
 }
 
+// M3 item 1b: the governor measures only the effects pass. A long burst of output keeps amber
+// auto animating at its level; an (injected) expensive renderer demotes it to static, and once
+// rendering is cheap again a probe brings auto back up.
+static bool waitFor(const std::function<bool()>& f, int ms) {
+    for (int t = 0; t < ms && !f(); t += 20) pump(20);
+    return f();
+}
+
+static void testGovernor(const char* renderer) {
+    ViewOptions o;
+    o.profile = "amber";
+    o.renderer = renderer;
+    o.pauseWhenUnfocused = false;
+    o.command = {"/bin/sh", "-c", "seq 1 400000; sleep 60"};
+    Win w(o);
+    w.view->governor().configure([&] {
+        GovernorConfig c = w.view->governor().config();
+        c.firstProbeMs = 1500;
+        return c;
+    }());
+    CHECK(w.view->start());
+    pump(300);
+    const EffectsQuality level = w.view->effectsQuality();
+    CHECK(w.view->softwareRendering());
+    CHECK(level == EffectsQuality::Reduced);
+    // Heavy output (seq) for a few seconds: no demotion, still animating.
+    const auto t0 = std::chrono::steady_clock::now();
+    pump(4000);
+    std::printf("governor %s (%s): after 4 s of output: quality %s, demoted %d, tick %.0f ms, frame %.1f ms\n",
+                renderer, w.view->backendName().c_str(), effectsQualityName(w.view->effectsQuality()),
+                w.view->qualityDemoted(), w.view->tickIntervalMs(), w.view->governor().lastFrameMs());
+    CHECK(!w.view->qualityDemoted());
+    CHECK(w.view->effectsQuality() == level);
+    CHECK(w.view->animating());
+    // A renderer that needs 400 ms per frame: over budget even at 1 fps -> static.
+    w.view->setRenderCostForTest(400);
+    CHECK(waitFor([&] { return w.view->qualityDemoted(); }, 8000));
+    CHECK(w.view->effectsQuality() == EffectsQuality::Static);
+    CHECK(!w.view->animating());
+    const double demotedAt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    // Load drops: the probe after 1.5 s brings auto back, and it stays.
+    w.view->setRenderCostForTest(0);
+    CHECK(waitFor([&] { return !w.view->qualityDemoted(); }, 4000));
+    CHECK(w.view->effectsQuality() == level);
+    CHECK(waitFor([&] { return w.view->governor().state() == EffectsGovernor::State::Normal; }, 6000));
+    CHECK(!w.view->qualityDemoted());
+    CHECK(w.view->animating());
+    // ... and the tick speeds back up. How far depends on the real frame cost (ASan + llvmpipe with
+    // other tests running can hold it above the base interval, which is the governor working), so
+    // only require clear recovery from the 1 fps floor here; governor_test checks the exact steps.
+    CHECK(waitFor([&] { return w.view->tickIntervalMs() <= w.view->governor().config().maxIntervalMs / 2; }, 15000));
+    waitFor([&] { return w.view->tickIntervalMs() <= w.view->governor().config().baseIntervalMs; }, 5000);
+    std::printf("governor %s: demoted at %.1f s, back to %s, tick %.0f ms\n", renderer, demotedAt,
+                effectsQualityName(w.view->effectsQuality()), w.view->tickIntervalMs());
+    // An explicit choice clears the state.
+    w.view->setEffectsQuality(EffectsQuality::Full);
+    CHECK(w.view->effectsQuality() == EffectsQuality::Full);
+}
+
+// M3 item 1e: a settings.ini that is not a valid key file no longer blocks Save: the dialog
+// warns, the old text is kept in settings.ini.corrupt and a fresh file is written atomically.
+static void testCorruptSettings() {
+    const std::string dir = Glib::build_filename(Glib::get_tmp_dir(), "lterm-corrupt-test-" + std::to_string(getpid()));
+    const std::string ini = Glib::build_filename(dir, "settings.ini");
+    g_mkdir_with_parents(dir.c_str(), 0700);
+    const std::string bad = "[terminal\nprofile=green\n\xff\xfe garbage\n";
+    Glib::file_set_contents(ini, bad);
+    ViewOptions o;
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    TerminalWindow w(o);
+    w.settingsFile = ini;
+    w.set_default_size(480, 320);
+    w.show();
+    w.newTab(true);
+    pump(200);
+    w.showSettings();
+    pump(100);
+    SettingsDialog* d = w.settingsDialog();
+    CHECK(d != nullptr);
+    if (!d) return;
+    d->profile.set_active_id("amber");
+    pump(100);
+    d->save.clicked();
+    pump(50);
+    const std::string st = d->status.get_text();
+    std::printf("corrupt settings: status '%s'\n", st.c_str());
+    CHECK(st.rfind("Warning:", 0) == 0);
+    CHECK(st.find("Saved") != std::string::npos);
+    try {
+        Glib::KeyFile kf;
+        kf.load_from_file(ini);
+        CHECK(kf.get_string("terminal", "profile") == "amber");
+    } catch (const Glib::Error& err) {
+        std::fprintf(stderr, "settings.ini after save: %s\n", err.what().c_str());
+        ++failures;
+    }
+    std::string kept;
+    try { kept = Glib::file_get_contents(ini + ".corrupt"); } catch (...) {}
+    CHECK(kept == bad);
+    // Saving again: no warning now. And nothing else (no temporary file) is left in the dir.
+    d->save.clicked();
+    CHECK(d->status.get_text().rfind("Saved to", 0) == 0);
+    int entries = 0;
+    if (GDir* gd = g_dir_open(dir.c_str(), 0, nullptr)) {
+        while (const char* n = g_dir_read_name(gd)) {
+            ++entries;
+            CHECK(std::string(n) == "settings.ini" || std::string(n) == "settings.ini.corrupt");
+        }
+        g_dir_close(gd);
+    }
+    CHECK(entries == 2);
+    // Still an error (not a warning) when the file cannot be written at all.
+    std::string err, warn;
+    CHECK(!saveSettings(o, "/proc/self/lterm-no-such/settings.ini", &err, &warn));
+    CHECK(!err.empty());
+    d->response(Gtk::RESPONSE_CLOSE);
+    g_unlink((ini + ".corrupt").c_str());
+    g_unlink(ini.c_str());
+    g_rmdir(dir.c_str());
+}
+
+static char procState(pid_t pid) {  // 0: gone
+    char path[64];
+    std::snprintf(path, sizeof path, "/proc/%d/stat", pid);
+    std::string st;
+    try { st = Glib::file_get_contents(path); } catch (...) { return 0; }
+    const size_t p = st.rfind(')');
+    return p != std::string::npos && p + 2 < st.size() ? st[p + 2] : '?';
+}
+
+// M3 item 1c: closing tabs never blocks on the child; one that ignores SIGHUP is killed later.
+static void testTabClose() {
+    ViewOptions o;
+    o.command = {"/bin/sh", "-c", "trap '' HUP; sleep 30"};  // ignores SIGHUP: needs the SIGKILL
+    {
+        TerminalWindow w(o);
+        w.set_default_size(480, 320);
+        w.show();
+        const int n = 20;
+        std::vector<pid_t> pids;
+        for (int i = 0; i < n; ++i) {
+            TerminalView* v = w.newTab(true);
+            CHECK(v);
+            if (v) pids.push_back(v->childPid());
+            pump(5);
+        }
+        pump(400);
+        double worst = 0, total = 0;
+        while (w.tabCount() > 1) {
+            TerminalView* v = w.view(w.tabCount() - 1);
+            const auto t0 = std::chrono::steady_clock::now();
+            w.closeTab(v);
+            const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+            worst = std::max(worst, ms);
+            total += ms;
+            pump(2);
+        }
+        CHECK(w.tabCount() == 1);
+        CHECK(TerminalView::pendingReaps() == n - 1);
+        // Right after the closes the children still run (they ignore SIGHUP)...
+        int running = 0;
+        for (int i = 1; i < n; ++i) running += procState(pids[i]) != 0;
+        // ...and are killed after the grace period and reaped: no zombies.
+        const auto c0 = std::chrono::steady_clock::now();
+        CHECK(waitFor([&] { return TerminalView::pendingReaps() == 0; }, 5000));
+        const double goneMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - c0).count();
+        int left = 0;
+        for (int i = 1; i < n; ++i) left += procState(pids[i]) != 0;
+        CHECK(left == 0);
+        std::printf("tab close (ASan build): %d closes, worst %.2f ms, total %.2f ms; %d still running right after, "
+                    "all reaped %.0f ms later\n", n - 1, worst, total, running, goneMs);
+        CHECK(worst < 25.0);  // M2: >= 50 ms per tab whose child ignores SIGHUP
+    }
+}
+
+// M3 item 1d: deferred closes use tab ids (run under ASan: a stale pointer would show).
+static void testTabIds() {
+    ViewOptions o;
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    {   // The close button clicked twice: one close.
+        TerminalWindow w(o);
+        w.show();
+        for (int i = 0; i < 4; ++i) w.newTab(true);
+        pump(200);
+        TerminalView* v1 = w.view(1);
+        Gtk::Button* b = w.closeButton(v1);
+        CHECK(b && w.tabId(v1) != 0);
+        if (b) {
+            b->clicked();
+            b->clicked();
+        }
+        pump(100);
+        CHECK(w.tabCount() == 3);
+        CHECK(w.tabId(v1) == 0);
+        // A deferred close for a tab that is closed (and maybe replaced at the same address)
+        // before it runs: the new tab survives.
+        TerminalView* v = w.view(1);
+        w.closeButton(v)->clicked();  // deferred
+        w.closeTab(v);                // closed right away
+        TerminalView* nv = w.newTab(true);
+        const bool sameAddress = nv == v;
+        pump(100);
+        CHECK(w.tabCount() == 3);
+        CHECK(nv && w.tabId(nv) != 0);
+        // Close while a close is in progress: a handler that runs while the page goes away
+        // closes the same tab and another one.
+        TerminalView* a = w.view(0);
+        TerminalView* other = w.view(2);
+        a->signal_unmap().connect([&w, a, other] {
+            w.closeTab(a);      // already out of the window: nothing
+            w.closeTab(other);  // deferred until the first close is done
+        });
+        w.setCurrent(0);
+        pump(50);
+        w.closeTab(a);
+        CHECK(w.tabId(other) != 0);  // not yet
+        pump(100);
+        CHECK(w.tabCount() == 1);
+        CHECK(w.tabId(other) == 0);
+        std::printf("tab ids: double click -> 1 close, late close after reuse%s -> new tab kept, nested close ok\n",
+                    sameAddress ? " (same address)" : "");
+        // Reordered tabs: page numbers and views agree.
+        TerminalView* x = w.newTab(true);
+        TerminalView* y = w.newTab(true);
+        pump(100);
+        w.reorderForTest(y, 0);
+        CHECK(w.view(0) == y);
+        w.setCurrent(0);
+        pump(50);
+        CHECK(w.currentView() == y && y->windowVisible() && !x->windowVisible());
+        w.closeButton(y)->clicked();  // pending when the window goes away
+    }
+    pump(100);  // the idle close must not touch the destroyed window
+    CHECK(waitFor([&] { return TerminalView::pendingReaps() == 0; }, 5000));
+}
+
 int main(int argc, char** argv) {
     if (!getenv("DISPLAY") || !*getenv("DISPLAY")) {
         std::printf("view test skipped: no DISPLAY\n");
@@ -572,8 +868,14 @@ int main(int argc, char** argv) {
     testBezelPointer("cpu");
     testTabs();
     testSearchView();
+    testSearchBig();
     testSearchBar();
     testSettingsDialog();
+    testCorruptSettings();
+    testTabClose();
+    testTabIds();
+    testGovernor("auto");
+    testGovernor("cpu");
     if (failures) {
         std::fprintf(stderr, "%d failure(s)\n", failures);
         return 1;

@@ -13,7 +13,7 @@ packages it for LCOS.
 | `/usr/bin/lunduke-terminal` | `src/main.cpp` and friends |
 | `/usr/share/applications/org.lunduke.LundukeTerminal.desktop` | `data/` |
 | `/usr/share/metainfo/org.lunduke.LundukeTerminal.metainfo.xml` | `data/` (AppStream, CC0-1.0) |
-| `/usr/share/icons/hicolor/scalable/apps/org.lunduke.LundukeTerminal.svg` | `data/icons/` (**placeholder** icon, CC0-1.0) |
+| `/usr/share/icons/hicolor/scalable/apps/org.lunduke.LundukeTerminal.svg` | `data/icons/` (original M3 icon, CC0-1.0) |
 | `/usr/share/doc/lunduke-terminal/{README.md,FONTS.md,PACKAGING.md}` | repo |
 
 The benches (`lterm-m0-bench`, `lterm-m1-bench`) and tests are not installed.
@@ -67,7 +67,8 @@ Suggests: fonts-hermit,
 - Recommends rather than Depends: every profile falls back to DejaVu Sans Mono, so a missing
   retro font is a cosmetic problem, not a broken package.
 - fonts-pc and fonts-3270 are already on the LCOS 1.0 ISO. fonts-terminus is not, and it is the
-  one font the CRT-style profiles really want.
+  one font the CRT-style profiles really want. Sizes, licence and options for adding it are in
+  [`TERMINUS-ON-ISO.md`](TERMINUS-ON-ISO.md) (a proposal only; nothing was changed on the ISO).
 
 ## Build dependencies
 
@@ -84,4 +85,6 @@ AddressSanitizer and needs `$DISPLAY`.
 - No `dpkg-buildpackage` or `sbuild` run, no lintian, no upload, no apt or ISO changes.
 - `debian/source/format` is `3.0 (native)` for now. A real LCOS package will probably want
   `3.0 (quilt)` with a release tarball.
-- The icon is a placeholder (a CRT with an amber prompt). Replace it before release.
+- The icon (M3) is an original drawing: a CRT with an amber `>_` prompt, hand-written SVG paths,
+  CC0-1.0, no third-party artwork. Only the scalable SVG is installed; PNG previews at
+  16/32/48/128/256 were rendered for review outside the repo and are not shipped.

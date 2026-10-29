@@ -11,8 +11,15 @@
 #include <cstring>
 #include <ctime>
 #include <sys/wait.h>
+#include <csignal>
 
 namespace lterm {
+
+static double processCpuMs() {
+    timespec ts{};
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
+}
 
 namespace {
 VTermModifier modsOf(guint state) {
@@ -86,6 +93,25 @@ TerminalView::TerminalView(const ViewOptions& opts)
         w->set_vexpand(true);
         pack_start(*w, true, true);
     }
+    // M3 governor: an effects frame's cost is the process CPU time of a frame-clock paint cycle
+    // in which this view drew (before-paint .. after-paint: layout, the effects pass with
+    // llvmpipe's or the C++ fallback's threads, GtkGLArea's readback, the blit), minus the
+    // source upload. Parsing terminal output and painting glyphs happen outside it.
+    area_.signal_draw().connect(sigc::mem_fun(*this, &TerminalView::onPaintBegin), false);
+    gl_.signal_draw().connect(sigc::mem_fun(*this, &TerminalView::onPaintBegin), false);
+    signal_realize().connect([this] {
+        disconnectAfterPaint();
+        if (GdkFrameClock* fc = gtk_widget_get_frame_clock(GTK_WIDGET(gobj()))) {
+            afterPaintClock_ = GDK_FRAME_CLOCK(g_object_ref(fc));
+            beforePaintId_ = g_signal_connect(fc, "before-paint", G_CALLBACK(+[](GdkFrameClock*, gpointer self) {
+                static_cast<TerminalView*>(self)->onBeforePaint();
+            }), this);
+            afterPaintId_ = g_signal_connect(fc, "after-paint", G_CALLBACK(+[](GdkFrameClock*, gpointer self) {
+                static_cast<TerminalView*>(self)->onAfterPaint();
+            }), this);
+        }
+    });
+    signal_unrealize().connect([this] { disconnectAfterPaint(); }, false);
     area_.signal_draw().connect(sigc::mem_fun(*this, &TerminalView::onDraw));
     gl_.set_required_version(3, 3);
     gl_.set_has_alpha(false);
@@ -99,18 +125,57 @@ TerminalView::TerminalView(const ViewOptions& opts)
     chooseMode();
 }
 
+// M3 item 1c: background reaping of hung-up children.
+namespace {
+int pendingReaps_ = 0;
+struct Reap {
+    pid_t pid;
+    guint timer = 0;
+};
+}  // namespace
+
+int TerminalView::pendingReaps() { return pendingReaps_; }
+
+void TerminalView::reapInBackground(pid_t pid, unsigned killAfterMs) {
+    auto* r = new Reap{pid};
+    ++pendingReaps_;
+    r->timer = g_timeout_add(killAfterMs, [](gpointer d) -> gboolean {
+        auto* r = static_cast<Reap*>(d);
+        r->timer = 0;
+        // Still ours and not reaped yet (WNOWAIT leaves a zombie for the child watch): kill the
+        // process group the child leads, and the child.
+        siginfo_t si{};
+        if (waitid(P_PID, static_cast<id_t>(r->pid), &si, WEXITED | WNOHANG | WNOWAIT) == 0 && si.si_pid == 0) {
+            kill(-r->pid, SIGKILL);
+            kill(r->pid, SIGKILL);
+        }
+        return G_SOURCE_REMOVE;
+    }, r);
+    g_child_watch_add(pid, [](GPid p, gint, gpointer d) {
+        auto* r = static_cast<Reap*>(d);
+        if (r->timer) g_source_remove(r->timer);
+        g_spawn_close_pid(p);
+        --pendingReaps_;
+        delete r;
+    }, r);
+}
+
 TerminalView::~TerminalView() {
     alive_.reset();  // pending clipboard replies must not touch this object any more
     if (childWatch_) {
         g_source_remove(childWatch_);
         childWatch_ = 0;
-        // The window closed while the child still runs: hang up, and make sure the child is
-        // reaped even if it takes its time to exit (no zombie while the process lives on).
-        const pid_t left = session_->hangup(50);
-        if (left > 0) g_child_watch_add(left, [](GPid pid, gint, gpointer) { g_spawn_close_pid(pid); }, nullptr);
+        // The window closed while the child still runs: hang up without waiting (M3: M2 polled
+        // for up to 50 ms here, on the main thread, for every tab). A GLib child watch reaps it
+        // whenever it exits; if it ignores SIGHUP, it gets SIGKILL after kHangupGraceMs.
+        const pid_t left = session_->hangup(0);
+        if (left > 0) reapInBackground(left, kHangupGraceMs);
     }
     writeWatch_.disconnect();
     searchRefresh_.disconnect();
+    searchWork_.disconnect();
+    probeTimer_.disconnect();
+    disconnectAfterPaint();
     bellTimer_.disconnect();
     blink_.disconnect();
     io_.disconnect();
@@ -397,9 +462,11 @@ bool TerminalView::onGlRender(const Glib::RefPtr<Gdk::GLContext>&) {
         const auto e0 = std::chrono::steady_clock::now();
         cairo_surface_flush(src_);
         const int y0 = effectsSourceStale_ ? 0 : srcDirtyY0_, y1 = effectsSourceStale_ ? h_ : srcDirtyY1_;
+        const double u0 = frameCpu0_ >= 0 ? processCpuMs() : 0;
         glPipe_->updateSource(cairo_image_surface_get_data(src_), cairo_image_surface_get_stride(src_),
                               PixelOrder::BGRA, static_cast<float>(t), y0, y1);
         if (opts_.stats) glFinish();
+        if (frameCpu0_ >= 0) uploadCpuMs_ += processCpuMs() - u0;
         stats_.effectsSourceMs.push_back(
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - e0).count());
         effectsSourceStale_ = false;
@@ -425,8 +492,10 @@ bool TerminalView::onDraw(const Cairo::RefPtr<Cairo::Context>& cr) {
             const auto e0 = std::chrono::steady_clock::now();
             cairo_surface_flush(src_);
             const int y0 = effectsSourceStale_ ? 0 : srcDirtyY0_, y1 = effectsSourceStale_ ? h_ : srcDirtyY1_;
+            const double u0 = frameCpu0_ >= 0 ? processCpuMs() : 0;
             cpu_->updateSource(cairo_image_surface_get_data(src_), cairo_image_surface_get_stride(src_),
                                PixelOrder::BGRA, static_cast<float>(t), y0, y1);
+            if (frameCpu0_ >= 0) uploadCpuMs_ += processCpuMs() - u0;
             stats_.effectsSourceMs.push_back(
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - e0).count());
             effectsSourceStale_ = false;
@@ -661,17 +730,11 @@ double TerminalView::baseTickIntervalMs() const {
     return quality_ == EffectsQuality::Reduced ? 2.0 * base : base;  // reduced: half-rate animation
 }
 
-static double processCpuMs() {
-    timespec ts{};
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
-    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
-}
 
 void TerminalView::updateAnimation() {
     const bool want = animationWanted();
     if (want && !tick_.connected()) {
-        govWall0_ = nowMs();
-        govCpu0_ = processCpuMs();
+        gov_.restart(nowMs());
         tick_ = Glib::signal_timeout().connect(sigc::mem_fun(*this, &TerminalView::onTick),
                                                static_cast<unsigned>(tickIntervalMs_ + 0.5));
     } else if (!want && tick_.connected()) {
@@ -690,6 +753,11 @@ void TerminalView::updateQuality() {
     quality_ = q;
     fx_ = fx;
     tickIntervalMs_ = baseTickIntervalMs();
+    GovernorConfig gc = gov_.config();
+    gc.budget = opts_.cpuBudget;
+    gc.baseIntervalMs = tickIntervalMs_;
+    gov_.configure(gc);
+    gov_.restart(nowMs());
     if (!changed) return;
     if (cpu_) {
         cpu_.reset(new CpuEffects(fx_, opts_.threads));
@@ -701,36 +769,85 @@ void TerminalView::updateQuality() {
     if (tick_.connected()) tick_.disconnect();  // restarted at the new rate by updateAnimation()
 }
 
+bool TerminalView::governed() const {
+    return software_ && opts_.cpuBudget > 0 && quality_ != EffectsQuality::Static && mode_ != Mode::Plain;
+}
+
+void TerminalView::onBeforePaint() {
+    frameCpu0_ = governed() ? processCpuMs() : -1;
+    uploadCpuMs_ = 0;
+    painted_ = false;
+}
+
+bool TerminalView::onPaintBegin(const Cairo::RefPtr<Cairo::Context>&) {
+    painted_ = true;
+    return false;  // the widget's own handler draws
+}
+
+void TerminalView::disconnectAfterPaint() {
+    if (afterPaintClock_) {
+        g_signal_handler_disconnect(afterPaintClock_, beforePaintId_);
+        g_signal_handler_disconnect(afterPaintClock_, afterPaintId_);
+        g_object_unref(afterPaintClock_);
+        afterPaintClock_ = nullptr;
+        afterPaintId_ = beforePaintId_ = 0;
+    }
+}
+
+void TerminalView::onAfterPaint() {
+    if (frameCpu0_ < 0 || !painted_) return;
+    const double cost = processCpuMs() - frameCpu0_ - uploadCpuMs_;
+    frameCpu0_ = -1;
+    painted_ = false;
+    if (governed()) gov_.addFrame(cost + testRenderCostMs_);
+}
+
 bool TerminalView::governTick() {
-    if (!software_ || opts_.cpuBudget <= 0 || quality_ == EffectsQuality::Static) return false;
-    const double wall = nowMs(), cpu = processCpuMs();
-    const double dWall = wall - govWall0_;
-    if (dWall < 1000.0) return false;  // one-second windows
-    const double load = (cpu - govCpu0_) / dWall;  // cores
-    govWall0_ = wall;
-    govCpu0_ = cpu;
-    const double budget = opts_.cpuBudget, maxInterval = 1000.0;
+    if (!governed()) return false;
     double next = tickIntervalMs_;
-    if (load > budget) next = std::min(maxInterval, tickIntervalMs_ * (load / budget) * 1.05);
-    else if (load < 0.6 * budget) next = std::max(baseTickIntervalMs(), tickIntervalMs_ * 0.85);
-    if (load > budget && tickIntervalMs_ >= maxInterval && opts_.effectsQuality == EffectsQuality::Auto) {
+    const EffectsGovernor::Action a = gov_.evaluate(nowMs(), next);
+    if (a == EffectsGovernor::Action::Demote) {
+        if (opts_.effectsQuality != EffectsQuality::Auto) return false;  // explicit: stays at 1 fps
         // Even one frame per second costs more than the budget (e.g. llvmpipe in a VM without
-        // KVM): stop animating and show the static picture.
-        std::fprintf(stderr, "lunduke-terminal: animation needs %.0f%% of a core at 1 fps; effects-quality auto -> static\n",
-                     load * 100.0);
+        // KVM): stop animating and show the static picture; probe again later.
+        gov_.demoted(nowMs());
+        std::fprintf(stderr,
+                     "lunduke-terminal: animation needs %.0f%% of a core at 1 fps (%.0f ms per frame); "
+                     "effects-quality auto -> static, retry in %.1f s\n",
+                     gov_.lastLoad() * 100.0, gov_.lastFrameMs(), gov_.probeDelayMs() / 1000.0);
         qualityDemoted_ = true;
         updateQuality();
         signalBackend.emit(backendName());
         if (mode_ == Mode::Gl) gl_.queue_render();
         else if (mode_ == Mode::Cpu) area_.queue_draw();
+        probeTimer_.disconnect();
+        probeTimer_ = Glib::signal_timeout().connect(sigc::mem_fun(*this, &TerminalView::onProbeTimer), 250);
         return true;  // updateQuality() stopped the timer
     }
-    if (std::fabs(next - tickIntervalMs_) > 0.05 * tickIntervalMs_) {
+    if (a == EffectsGovernor::Action::Interval) {
         tickIntervalMs_ = next;
         tick_ = Glib::signal_timeout().connect(sigc::mem_fun(*this, &TerminalView::onTick),
                                                static_cast<unsigned>(tickIntervalMs_ + 0.5));
         return true;  // the caller's timer source ends; the new one takes over
     }
+    return false;
+}
+
+bool TerminalView::onProbeTimer() {
+    if (!qualityDemoted_) return false;
+    if (!gov_.probeDue(nowMs())) return true;
+    // Try the auto level again; the governor demotes once more (with a longer wait) if it
+    // is still too expensive.
+    qualityDemoted_ = false;
+    gov_.startProbe(nowMs());
+    std::fprintf(stderr, "lunduke-terminal: effects-quality auto: probing the animation again\n");
+    updateQuality();
+    if (w_ > 0) layoutGrid();
+    fullRepaint_ = contentDirty_ = effectsSourceStale_ = true;
+    updateContent();
+    requestFrame();
+    updateAnimation();
+    signalBackend.emit(backendName());
     return false;
 }
 
@@ -1058,25 +1175,96 @@ bool TerminalView::onKey(GdkEventKey* ev) {
 
 // ---- M2 stage 3: search ----
 
+namespace {
+constexpr long long kSearchSliceUs = 4000;  // longest main-thread piece of a search
+}
+
+void TerminalView::noteSearchTime(gint64 t0) {
+    searchMaxMainMs_ = std::max(searchMaxMainMs_, (g_get_monotonic_time() - t0) / 1000.0);
+}
+
+bool TerminalView::searchIndexStep(long long deadlineUs) {
+    return searchIndex_.update(*session_, searchCase_, deadlineUs);
+}
+
+void TerminalView::startSearchWork() {
+    if (searchWork_.connected()) return;
+    // Below redraws and input: a slice runs only when the main loop has nothing else to do.
+    searchWork_ = Glib::signal_idle().connect(sigc::mem_fun(*this, &TerminalView::onSearchWork),
+                                              Glib::PRIORITY_DEFAULT_IDLE);
+}
+
+bool TerminalView::onSearchWork() {
+    const gint64 t0 = g_get_monotonic_time();
+    if (!searchIndexStep(t0 + kSearchSliceUs)) {
+        noteSearchTime(t0);
+        return true;  // more next turn
+    }
+    if (searchPending_) {
+        searchPending_ = false;
+        finishSearch(pendingKeep_);
+    }
+    noteSearchTime(t0);
+    return false;
+}
+
+void TerminalView::prepareSearch(bool caseSensitive) {
+    if (searchQuery_.empty()) searchCase_ = caseSensitive;
+    if (!searchIndex_.complete(*session_, searchCase_)) startSearchWork();
+}
+
 int TerminalView::setSearch(const std::string& query, bool caseSensitive) {
+    const gint64 t0 = g_get_monotonic_time();
     searchQuery_ = query;
     searchCase_ = caseSensitive;
     searchRefresh_.disconnect();
-    matches_ = findAll(*session_, query, caseSensitive);
+    if (!query.empty() && !searchIndexStep(t0 + kSearchSliceUs)) {
+        // The cache is not complete yet (big scrollback, search just opened): finish from idle.
+        searchPending_ = true;
+        pendingKeep_ = false;
+        matches_.clear();
+        matchIndex_ = -1;
+        startSearchWork();
+        contentDirty_ = true;
+        requestFrame();
+        signalSearchChanged.emit();
+        noteSearchTime(t0);
+        return 0;
+    }
+    searchPending_ = false;
+    finishSearch(false);
+    noteSearchTime(t0);
+    return searchCount();
+}
+
+void TerminalView::finishSearch(bool keepCurrent) {
+    const bool had = keepCurrent && matchIndex_ >= 0 && matchIndex_ < searchCount();
+    const SelPos cur = had ? matches_[matchIndex_].start : SelPos{};
+    matches_ = searchQuery_.empty() ? std::vector<SearchMatch>{} : searchIndex_.find(*session_, searchQuery_);
     if (session_->altScreen()) {  // full-screen apps: only what is on the screen
         const long top = session_->topLine();
         matches_.erase(std::remove_if(matches_.begin(), matches_.end(),
                                       [top](const SearchMatch& m) { return m.start.line < top; }),
                        matches_.end());
     }
-    // Start at the newest match at or above the bottom of what is shown.
-    const SelPos from{session_->topLine() - scrollOffset_ + session_->rows(), 0};
-    matchIndex_ = stepMatch(matches_, from, true);
-    if (matchIndex_ >= 0) revealMatch(matchIndex_);
+    if (!keepCurrent) {
+        // Start at the newest match at or above the bottom of what is shown.
+        const SelPos from{session_->topLine() - scrollOffset_ + session_->rows(), 0};
+        matchIndex_ = stepMatch(matches_, from, true);
+        if (matchIndex_ >= 0) revealMatch(matchIndex_);
+    } else {
+        matchIndex_ = -1;
+        if (had)
+            for (int i = 0; i < searchCount(); ++i)
+                if (!(matches_[i].start < cur)) {  // the same match, or the next one if it went away
+                    matchIndex_ = i;
+                    break;
+                }
+        if (matchIndex_ < 0 && !matches_.empty()) matchIndex_ = searchCount() - 1;
+    }
     contentDirty_ = true;
     requestFrame();
     signalSearchChanged.emit();
-    return searchCount();
 }
 
 bool TerminalView::searchStep(bool backward) {
@@ -1093,7 +1281,10 @@ bool TerminalView::searchStep(bool backward) {
 
 void TerminalView::clearSearch() {
     searchRefresh_.disconnect();
-    const bool had = !matches_.empty() || !searchQuery_.empty();
+    searchWork_.disconnect();
+    searchIndex_.reset();  // the cache is rebuilt when the search bar opens again
+    const bool had = !matches_.empty() || !searchQuery_.empty() || searchPending_;
+    searchPending_ = false;
     searchQuery_.clear();
     matches_.clear();
     matchIndex_ = -1;
@@ -1105,26 +1296,21 @@ void TerminalView::clearSearch() {
 
 void TerminalView::refreshSearch() {
     if (searchQuery_.empty()) return;
-    const bool had = matchIndex_ >= 0 && matchIndex_ < searchCount();
-    const SelPos cur = had ? matches_[matchIndex_].start : SelPos{};
-    matches_ = findAll(*session_, searchQuery_, searchCase_);
-    if (session_->altScreen()) {
-        const long top = session_->topLine();
-        matches_.erase(std::remove_if(matches_.begin(), matches_.end(),
-                                      [top](const SearchMatch& m) { return m.start.line < top; }),
-                       matches_.end());
+    const gint64 t0 = g_get_monotonic_time();
+    if (!searchIndexStep(t0 + kSearchSliceUs)) {  // e.g. after a reflow: rebuilt from idle
+        if (!searchPending_) pendingKeep_ = true;
+        searchPending_ = true;
+        startSearchWork();
+        noteSearchTime(t0);
+        return;
     }
-    matchIndex_ = -1;
-    if (had)
-        for (int i = 0; i < searchCount(); ++i)
-            if (!(matches_[i].start < cur)) {  // the same match, or the next one if it went away
-                matchIndex_ = i;
-                break;
-            }
-    if (matchIndex_ < 0 && !matches_.empty()) matchIndex_ = searchCount() - 1;
-    contentDirty_ = true;
-    requestFrame();
-    signalSearchChanged.emit();
+    if (searchPending_) {
+        searchPending_ = false;
+        finishSearch(pendingKeep_);
+    } else {
+        finishSearch(true);
+    }
+    noteSearchTime(t0);
 }
 
 void TerminalView::revealMatch(int index) {
@@ -1160,6 +1346,8 @@ void TerminalView::setFont(const std::string& family, int px) {
 void TerminalView::setEffectsQuality(EffectsQuality q) {
     opts_.effectsQuality = q;
     qualityDemoted_ = false;  // an explicit choice; auto may demote again
+    gov_.reset();
+    probeTimer_.disconnect();
     updateQuality();
     if (w_ > 0) layoutGrid();
     fullRepaint_ = contentDirty_ = effectsSourceStale_ = true;

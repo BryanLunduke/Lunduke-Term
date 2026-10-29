@@ -133,6 +133,32 @@ int main() {
         CHECK(!r.reverseVideo() && h.at(0, 0).bg.r == 0);
     }
 
+    // libvterm 0.3.3 reflow reads row -1 when the top row continues a line that has already
+    // scrolled out (M3 item 2: garbage cells and invalid UTF-8 after growing the window).
+    for (int alt = 0; alt < 2; ++alt) {
+        VtermSession w(3, 10);
+        feed(w, "1234567890abcdefghij\r\nX\r\nY");  // row 0 is now "abcdefghij", a continuation
+        if (alt) feed(w, "\x1b[?1049h");
+        w.resize(6, 12);
+        if (alt) feed(w, "\x1b[?1049l");
+        Grid rg;
+        w.fillGrid(rg);
+        int bad = 0;
+        std::string all;
+        for (int r = 0; r < rg.rows; ++r) {
+            for (int c = 0; c < rg.cols; ++c) {
+                const std::string& t = rg.at(r, c).text;
+                for (unsigned char ch : t)
+                    if (ch < 0x20 || ch >= 0x80) ++bad;  // only ASCII was fed
+            }
+            all += w.rowText(r) + "\n";
+        }
+        CHECK(bad == 0);
+        CHECK(all.find("abcdefghij") != std::string::npos || all.find("ab\ncdefghij") != std::string::npos);
+        CHECK(all.find("X") != std::string::npos && all.find("Y") != std::string::npos);
+        if (bad || all.find("abcdefghij") == std::string::npos) std::fprintf(stderr, "alt=%d rows:\n%s", alt, all.c_str());
+    }
+
     if (failures == 0) std::printf("vterm_test: OK\n");
     return failures ? 1 : 0;
 }

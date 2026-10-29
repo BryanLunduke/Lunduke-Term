@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 H=$(dirname "${BASH_SOURCE[0]}"); cp "$H/vimrc" "$S2/vimrc"; cp "$H/../../src/selection.cpp" "$S2/sample.cpp"
 start_term --size 808x464 --profile ${PROF:-plain} -e bash --norc --noprofile

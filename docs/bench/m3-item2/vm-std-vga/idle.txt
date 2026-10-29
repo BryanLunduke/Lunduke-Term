@@ -1,0 +1,21 @@
+guest baseline (no terminal): busy 30.4% of all 4 vCPUs over 20 s
+plain (default): process 0.0% of one vCPU over 20 s after 40 s; guest busy 29.0% of 4 vCPUs
+    stats: quality=reduced software=1 tick-interval 100.0 ms
+amber gl auto: process 72.2% of one vCPU over 60 s after 40 s; guest busy 44.9% of 4 vCPUs
+    lunduke-terminal: animation needs 393% of a core at 1 fps (3926 ms per frame); effects-quality auto -> static, retry in 10.0 s
+    lunduke-terminal: effects-quality auto: probing the animation again
+    lunduke-terminal: animation needs 377% of a core at 1 fps (3772 ms per frame); effects-quality auto -> static, retry in 20.0 s
+    lunduke-terminal: effects-quality auto: probing the animation again
+    lunduke-terminal: animation needs 384% of a core at 1 fps (3839 ms per frame); effects-quality auto -> static, retry in 40.0 s
+    lunduke-terminal: effects-quality auto: probing the animation again
+    lunduke-terminal: animation needs 366% of a core at 1 fps (3656 ms per frame); effects-quality auto -> static, retry in 80.0 s
+    stats: quality=static software=1 tick-interval 50.0 ms
+amber cpu auto: process 16.7% of one vCPU over 60 s after 40 s; guest busy 14.0% of 4 vCPUs
+    lunduke-terminal: animation needs 73% of a core at 1 fps (726 ms per frame); effects-quality auto -> static, retry in 10.0 s
+    lunduke-terminal: effects-quality auto: probing the animation again
+    lunduke-terminal: animation needs 71% of a core at 1 fps (707 ms per frame); effects-quality auto -> static, retry in 20.0 s
+    lunduke-terminal: effects-quality auto: probing the animation again
+    lunduke-terminal: animation needs 80% of a core at 1 fps (797 ms per frame); effects-quality auto -> static, retry in 40.0 s
+    lunduke-terminal: effects-quality auto: probing the animation again
+    lunduke-terminal: animation needs 81% of a core at 1 fps (806 ms per frame); effects-quality auto -> static, retry in 80.0 s
+    stats: quality=static software=1 tick-interval 50.0 ms

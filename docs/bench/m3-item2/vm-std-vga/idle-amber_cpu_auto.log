@@ -1,0 +1,16 @@
+lunduke-terminal: animation needs 73% of a core at 1 fps (726 ms per frame); effects-quality auto -> static, retry in 10.0 s
+lunduke-terminal: amber, effects: C++ fallback (4 threads), quality static
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: amber, effects: C++ fallback (4 threads), quality reduced
+lunduke-terminal: animation needs 71% of a core at 1 fps (707 ms per frame); effects-quality auto -> static, retry in 20.0 s
+lunduke-terminal: amber, effects: C++ fallback (4 threads), quality static
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: amber, effects: C++ fallback (4 threads), quality reduced
+lunduke-terminal: animation needs 80% of a core at 1 fps (797 ms per frame); effects-quality auto -> static, retry in 40.0 s
+lunduke-terminal: amber, effects: C++ fallback (4 threads), quality static
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: amber, effects: C++ fallback (4 threads), quality reduced
+lunduke-terminal: animation needs 81% of a core at 1 fps (806 ms per frame); effects-quality auto -> static, retry in 80.0 s
+lunduke-terminal: amber, effects: C++ fallback (4 threads), quality static
+stats: backend="amber, effects: C++ fallback (4 threads), quality static" content-frames=4 full-repaints=4 rows-painted=100 ticks=13 median paint 6.54 ms, median effects-source 433.54 ms, median tick 257.32 ms, glyphs cached 18
+stats: quality=static software=1 tick-interval 50.0 ms

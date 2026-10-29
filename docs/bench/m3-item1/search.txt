@@ -1,0 +1,42 @@
+scrollback 10000 lines x 80 cols (firstLine 0, endLine 10001)
+  findAll (M2, per keystroke) 'n': 20 matches, 21.44 ms
+  findAll (M2, per keystroke) 'ne': 10 matches, 21.58 ms
+  findAll (M2, per keystroke) 'nee': 10 matches, 20.92 ms
+  findAll (M2, per keystroke) 'need': 10 matches, 21.20 ms
+  findAll (M2, per keystroke) 'needl': 10 matches, 21.24 ms
+  findAll (M2, per keystroke) 'needle': 10 matches, 21.20 ms
+  findAll: total 127.6 ms, worst keystroke 21.58 ms
+  SearchIndex build: 4 slices, 14.1 ms total, worst slice 4.08 ms, 9977 lines, 1.2 MB
+  SearchIndex (M3, per keystroke) 'n': 20 matches, 0.06 ms
+  SearchIndex (M3, per keystroke) 'ne': 10 matches, 0.61 ms
+  SearchIndex (M3, per keystroke) 'nee': 10 matches, 0.30 ms
+  SearchIndex (M3, per keystroke) 'need': 10 matches, 0.21 ms
+  SearchIndex (M3, per keystroke) 'needl': 10 matches, 0.22 ms
+  SearchIndex (M3, per keystroke) 'needle': 10 matches, 0.17 ms
+  SearchIndex: total 1.6 ms, worst keystroke 0.61 ms
+  SearchIndex 'o': 10000 matches (cap 10000), 1.60 ms
+  findAll     'o': 10000 matches (cap 10000), 5.73 ms
+  SearchIndex 'g++': 10000 matches (cap 10000), 1.20 ms
+  findAll     'g++': 10000 matches (cap 10000), 24.55 ms
+  SearchIndex after 100 new lines: update + find 0.45 ms, 110 matches
+scrollback 100000 lines x 80 cols (firstLine 0, endLine 100001)
+  findAll (M2, per keystroke) 'n': 200 matches, 212.76 ms
+  findAll (M2, per keystroke) 'ne': 100 matches, 209.50 ms
+  findAll (M2, per keystroke) 'nee': 100 matches, 210.51 ms
+  findAll (M2, per keystroke) 'need': 100 matches, 212.38 ms
+  findAll (M2, per keystroke) 'needl': 100 matches, 210.51 ms
+  findAll (M2, per keystroke) 'needle': 100 matches, 212.39 ms
+  findAll: total 1268.0 ms, worst keystroke 212.76 ms
+  SearchIndex build: 37 slices, 149.3 ms total, worst slice 4.21 ms, 99977 lines, 9.3 MB
+  SearchIndex (M3, per keystroke) 'n': 200 matches, 0.71 ms
+  SearchIndex (M3, per keystroke) 'ne': 100 matches, 5.21 ms
+  SearchIndex (M3, per keystroke) 'nee': 100 matches, 2.57 ms
+  SearchIndex (M3, per keystroke) 'need': 100 matches, 2.13 ms
+  SearchIndex (M3, per keystroke) 'needl': 100 matches, 1.97 ms
+  SearchIndex (M3, per keystroke) 'needle': 100 matches, 1.82 ms
+  SearchIndex: total 14.4 ms, worst keystroke 5.21 ms
+  SearchIndex 'o': 10000 matches (cap 10000), 1.52 ms
+  findAll     'o': 10000 matches (cap 10000), 5.59 ms
+  SearchIndex 'g++': 10000 matches (cap 10000), 1.76 ms
+  findAll     'g++': 10000 matches (cap 10000), 21.88 ms
+  SearchIndex after 100 new lines: update + find 1.98 ms, 200 matches

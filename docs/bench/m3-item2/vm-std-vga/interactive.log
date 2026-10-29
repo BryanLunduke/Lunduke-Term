@@ -1,0 +1,2 @@
+lunduke-terminal: /tmp/tmp.6ERR9erTMN/lunduke-terminal/settings.ini: Key file contains line “[terminal” which is not a key-value pair, group, or comment
+lunduke-terminal: /tmp/tmp.6ERR9erTMN/lunduke-terminal/settings.ini was not valid (Key file contains line “[terminal” which is not a key-value pair, group, or comment); it was replaced, the old text is in /tmp/tmp.6ERR9erTMN/lunduke-terminal/settings.ini.corrupt

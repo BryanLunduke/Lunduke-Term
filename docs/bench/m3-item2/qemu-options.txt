@@ -1,0 +1,50 @@
+$ qemu-system-x86_64 --version
+QEMU emulator version 10.0.13 (Debian 1:10.0.13+ds-0+deb13u1)
+Copyright (c) 2003-2025 Fabrice Bellard and the QEMU Project developers
+$ -display help
+Available display backend types:
+none
+curses
+
+Some display backends support suboptions, which can be set with
+   -display backend,option=value,option=value...
+For a short list of the suboptions for each display, see the top-level -help output; more detail is in the documentation.
+$ -device help (display)
+Display devices:
+name "ati-vga", bus PCI
+name "bochs-display", bus PCI
+name "cirrus-vga", bus PCI, desc "Cirrus CLGD 54xx VGA"
+name "isa-cirrus-vga", bus ISA
+name "isa-vga", bus ISA
+name "ramfb", bus System, desc "ram framebuffer standalone device"
+name "secondary-vga", bus PCI
+name "VGA", bus PCI
+name "vhost-user-gpu", bus virtio-bus
+name "vhost-user-gpu-pci", bus PCI
+name "vhost-user-vga", bus PCI
+name "virtio-gpu-device", bus virtio-bus
+name "virtio-gpu-pci", bus PCI, alias "virtio-gpu"
+name "virtio-vga", bus PCI
+name "vmware-svga", bus PCI
+
+$ -accel help
+Accelerators supported in QEMU binary:
+tcg
+kvm
+$ ls /dev/kvm
+crw-rw---- 1 root pulse-access 10, 232 Oct 28 09:33 /dev/kvm
+$ qemu modules (ui/hw-display)
+hw-display-virtio-gpu-pci.so
+hw-display-virtio-gpu.so
+hw-display-virtio-vga.so
+ui-curses.so
+$ probe: virtio-vga-gl + egl-headless (needs a DRM render node)
+qemu-system-x86_64: Display 'egl-headless' is not available. Perhaps you want to install qemu-system-modules-opengl package?
+exit 0
+$ probe: virtio-vga-gl + egl-headless,rendernode=/dev/dri/renderD128
+qemu-system-x86_64: Display 'egl-headless' is not available. Perhaps you want to install qemu-system-modules-opengl package?
+$ probe: virtio-vga (2D, no gl), -display none
+qemu-system-x86_64: terminating on signal 15 from pid 337170 (timeout)
+exit (124 = ran until timeout, i.e. starts fine)
+$ probe: -device virtio-gpu-gl -display sdl,gl=on
+qemu-system-x86_64: Display 'sdl' is not available. Perhaps you want to install qemu-system-gui package?

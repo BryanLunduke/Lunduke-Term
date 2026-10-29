@@ -1,0 +1,28 @@
+# host, release, window 1280x800, LIBGL_ALWAYS_SOFTWARE=1 (llvmpipe), DISPLAY :44 (Xvfb+xfwm4); cpu over 10 s, 100% = one core
+before (d402d31) plain: cpu 0.0% [stats: quality=reduced software=1 tick-interval 100.0 ms]
+before (d402d31) amber gl auto: cpu 19.4% [stats: quality=reduced software=1 tick-interval 213.3 ms]
+before (d402d31) amber cpu auto: cpu 19.9% [stats: quality=reduced software=1 tick-interval 217.3 ms]
+after plain: cpu 0.0% [stats: quality=reduced software=1 tick-interval 100.0 ms]
+after amber gl auto: cpu 19.4% [stats: quality=reduced software=1 tick-interval 176.5 ms]
+after amber cpu auto: cpu 19.2% [stats: quality=reduced software=1 tick-interval 214.8 ms]
+== before (d402d31) run 1
+output burst took 32.1 s (idle cpu window: 75-85 s)
+(no governor messages)
+stats: quality=reduced software=1 tick-interval 188.9 ms
+idle cpu (last 10 s): 16.9%
+== after run 1
+output burst took 34.7 s (idle cpu window: 75-85 s)
+(no governor messages)
+stats: quality=reduced software=1 tick-interval 215.2 ms
+idle cpu (last 10 s): 17.3%
+== before (d402d31) run 2
+output burst took 28.9 s (idle cpu window: 75-85 s)
+(no governor messages)
+stats: quality=reduced software=1 tick-interval 186.3 ms
+idle cpu (last 10 s): 18.1%
+== after run 2
+output burst took 29.7 s (idle cpu window: 75-85 s)
+(no governor messages)
+stats: quality=reduced software=1 tick-interval 176.9 ms
+idle cpu (last 10 s): 19.4%
+# earlier base run (15M lines, quit-after 50 s) once printed: animation needs 100% of a core at 1 fps; effects-quality auto -> static (not reproduced in the runs above)
