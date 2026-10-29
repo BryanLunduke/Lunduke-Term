@@ -387,6 +387,8 @@ void VtermSession::feed(const char* bytes, size_t len) {
             if (c == '[') {
                 csiState_ = 2;
                 csiParams_.clear();
+                csiSeps_ = 0;
+                csiArgs_ = csiInter_ = false;
             } else if (c == 0x1b) csiStart_ = static_cast<long>(i);
             else if (c == '(' || c == ')') {
                 escTarget_ = c == '(' ? 0 : 1;
@@ -403,12 +405,35 @@ void VtermSession::feed(const char* bytes, size_t len) {
                 csiState_ = 0;
             }
             break;
-        case 2:
+        case 2: {
+            const unsigned char u = static_cast<unsigned char>(c);
+            if (u >= 0x30 && u <= 0x3f) {
+                // Mirror libvterm's CSI states: a parameter byte after an intermediate, or a
+                // leader byte (< = > ?) after the arguments started, ends the CSI as invalid.
+                if (csiInter_ || (u >= 0x3c && csiArgs_)) {
+                    csiState_ = 0;
+                    break;
+                }
+                if (u < 0x3c) csiArgs_ = true;
+                if (c == ';' || c == ':') ++csiSeps_;
+                if (csiSeps_ > 15) {  // see csiSeps_: drop this byte (and the rest of the arguments)
+                    feedRaw(bytes + done, i - done);
+                    done = i + 1;
+                    break;
+                }
+            } else if (u >= 0x20 && u <= 0x2f) {
+                csiInter_ = true;
+            } else if (u >= 0x80) {
+                csiState_ = 0;  // not part of a CSI in UTF-8 mode: libvterm drops the sequence
+                break;
+            }
             if (c >= 0x40 && c <= 0x7e) {  // final byte
                 if (c == 'S' || c == 'M') {
                     // The sequence may have started in an earlier chunk; nothing up to here
-                    // changed the screen since then, so the snapshot is still exact.
-                    const size_t start = csiStart_ >= 0 ? static_cast<size_t>(csiStart_) : done;
+                    // changed the screen since then, so the snapshot is still exact. (Bytes up
+                    // to `done` may already be fed when arguments were dropped.)
+                    const size_t start = csiStart_ >= 0 && static_cast<size_t>(csiStart_) >= done
+                                             ? static_cast<size_t>(csiStart_) : done;
                     feedRaw(bytes + done, start - done);
                     snapshotWraps();
                     feedRaw(bytes + start, i + 1 - start);
@@ -434,10 +459,11 @@ void VtermSession::feed(const char* bytes, size_t len) {
                 csiStart_ = static_cast<long>(i);
             } else if (c == 0x18 || c == 0x1a) {
                 csiState_ = 0;  // CAN / SUB abort the sequence; other C0 controls do not end it
-            } else if (csiParams_.size() < 16) {
+            } else if (csiParams_.size() < 16 && u >= 0x20) {
                 csiParams_ += c;
             }
             break;
+        }
         case 4:  // inside a control string, until BEL or ST (ESC \\)
             if (c == 0x07 || c == 0x18 || c == 0x1a) csiState_ = 0;
             else if (c == 0x1b) csiState_ = 5;

@@ -177,6 +177,12 @@ private:
     Charsets cs_, savedCs_;
     int escTarget_ = 0;       // feed() state 3: 0 = G0, 1 = G1 being designated
     std::string csiParams_;   // parameters of the open CSI (bounded)
+    // libvterm 0.3.3 stores CSI arguments in a fixed long[16] without a bounds check: a 17th
+    // argument overwrites the parser's callbacks pointer (crash, or worse, from any program's
+    // output). feed() counts the separators and drops the parameter bytes after the 15th.
+    int csiSeps_ = 0;
+    bool csiArgs_ = false;   // a digit or separator was seen (leader bytes are over)
+    bool csiInter_ = false;  // an intermediate byte was seen
     void restoreCharsets();
     std::string penSgr() const;
     // Continuation flags of the screen rows, taken just before an operation that may push
