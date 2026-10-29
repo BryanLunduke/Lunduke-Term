@@ -85,6 +85,12 @@ bool Selection::contains(long line, int col) const {
     return !(p < start_) && !(end_ < p);
 }
 
+// The empty last column a wide character left when it did not fit and wrapped whole: not part
+// of the text (copy and search join "abcd" + "漢" without a space).
+bool wideJumpGap(const LineSource& src, long line, int col, long end) {
+    return col == src.cols() - 1 && line + 1 < end && src.wrapped(line) && src.cellWidth(line + 1, 0) == 2;
+}
+
 std::string Selection::text(const LineSource& src) const {
     std::string out;
     if (!active_) return out;
@@ -93,12 +99,15 @@ std::string Selection::text(const LineSource& src) const {
         int c0 = l == start_.line ? start_.col : 0;
         int c1 = l == end_.line ? end_.col : cols - 1;
         std::string row;
+        const bool soft = src.wrapped(l) && l != end_.line;
         for (int c = c0; c <= c1 && c < cols; ++c) {
             if (src.cellWidth(l, c) == 0) continue;
             std::string t = src.cellText(l, c);
+            // A wide character that did not fit in the last column wrapped whole and left that
+            // column empty; it is not a space in the text ("abcd" + "漢", not "abcd 漢").
+            if (t.empty() && soft && wideJumpGap(src, l, c, src.endLine())) continue;
             row += t.empty() ? std::string(" ") : t;
         }
-        const bool soft = src.wrapped(l) && l != end_.line;
         if (!soft) {
             while (!row.empty() && row.back() == ' ') row.pop_back();
         }

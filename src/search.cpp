@@ -20,6 +20,7 @@ std::string fold(const std::string& s, bool caseSensitive) {
 }
 }  // namespace
 
+
 std::vector<SearchMatch> findAll(const LineSource& src, const std::string& query, bool caseSensitive,
                                  size_t maxMatches) {
     std::vector<SearchMatch> out;
@@ -41,6 +42,7 @@ std::vector<SearchMatch> findAll(const LineSource& src, const std::string& query
             for (int c = 0; c < cols; ++c) {
                 if (src.cellWidth(l, c) == 0) continue;  // right half of a wide character
                 std::string t = src.cellText(l, c);
+                if (t.empty() && wideJumpGap(src, l, c, end)) continue;
                 if (t.empty()) t = " ";
                 t = fold(t, caseSensitive);
                 for (size_t i = 0; i < t.size(); ++i) {
@@ -110,6 +112,10 @@ long appendLogicalLine(const LineSource& src, long line, long limit, bool caseSe
             int w = 1;
             const int n = src.cellChars(l, col, cp, 8, &w);
             if (w == 0) {  // right half of a wide character
+                simple = false;
+                continue;
+            }
+            if (n == 0 && wideJumpGap(src, l, col, src.endLine())) {
                 simple = false;
                 continue;
             }

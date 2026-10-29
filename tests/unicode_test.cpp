@@ -67,6 +67,25 @@ int main() {
         s.fillGrid(g);
         CHECK(g.cursorRow == 1 && g.cursorCol == 2);
         CHECK(g.at(1, 0).width == 2 && g.at(1, 1).width == 0 && g.at(0, 4).width == 1);
+        // Copy over the wrap: the blank the wide char left behind is not text (review: it gave
+        // "abcd 漢"). A real space in the last column is kept.
+        Selection sel;
+        sel.begin(s, SelPos{screenLine(s, 0), 0}, SelectMode::Char);
+        sel.extend(s, SelPos{screenLine(s, 1), 1});
+        CHECK(sel.text(s) == "abcd" + kan);
+        VtermSession t(3, 5);
+        feed(t, "abcd " + kan);
+        Selection st;
+        st.begin(t, SelPos{screenLine(t, 0), 0}, SelectMode::Char);
+        st.extend(t, SelPos{screenLine(t, 1), 1});
+        CHECK(st.text(t) == "abcd " + kan);
+        // Search joins them the same way, and finds both halves of the match.
+        auto m = findAll(s, "d" + kan, true);
+        CHECK(m.size() == 1 && m[0].start.col == 3 && m[0].end.line == screenLine(s, 1) && m[0].end.col == 1);
+        SearchIndex idx;
+        idx.update(s, true);
+        CHECK(idx.find(s, "d" + kan).size() == 1 && idx.find(s, "d" + kan)[0] == m[0]);
+        CHECK(findAll(t, "d " + kan, true).size() == 1);
     }
     {
         VtermSession s(3, 5);
