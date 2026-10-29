@@ -1,0 +1,43 @@
+# review probe (/workspace/lterm-review-m4/probe/probe.cpp, system libvterm0 0.3.3-3+b1), Thu Oct 29 00:16:11 EDT 2026
+## guard at 8ddda4c
+case 0 whole: exit 0 case 0 ok row0=[A]
+case 0 b: exit 0 case 0 ok row0=[A]
+case 1 whole: exit 139 
+case 1 b: exit 139 
+case 2 whole: exit 139 
+case 2 b: exit 139 
+case 3 whole: exit 0 case 3 ok row0=[aaaaaZ]
+case 3 b: exit 0 case 3 ok row0=[aaaaaZ]
+case 4 whole: exit 0 case 4 ok row0=[A]
+case 4 b: exit 0 case 4 ok row0=[A]
+case 5 whole: exit 124 
+case 5 b: exit 124 
+case 6 whole: exit 124 
+case 6 b: exit 124 
+case 7 whole: exit 124 
+case 7 b: exit 124 
+case 8 whole: exit 0 case 8 ok row0=[Z]
+case 8 b: exit 0 case 8 ok row0=[Z]
+case 9 whole: exit 0 case 9 ok row0=[]
+case 9 b: exit 0 case 9 ok row0=[]
+## guard at 727b697
+case 0 whole: exit 0 case 0 ok row0=[A]
+case 0 b: exit 0 case 0 ok row0=[A]
+case 1 whole: exit 0 case 1 ok row0=[A]
+case 1 b: exit 0 case 1 ok row0=[A]
+case 2 whole: exit 0 case 2 ok row0=[A]
+case 2 b: exit 0 case 2 ok row0=[A]
+case 3 whole: exit 0 case 3 ok row0=[aaaaaZ]
+case 3 b: exit 0 case 3 ok row0=[aaaaaZ]
+case 4 whole: exit 0 case 4 ok row0=[A]
+case 4 b: exit 0 case 4 ok row0=[A]
+case 5 whole: exit 0 case 5 ok row0=[Z]
+case 5 b: exit 0 case 5 ok row0=[Z]
+case 6 whole: exit 0 case 6 ok row0=[Z]
+case 6 b: exit 0 case 6 ok row0=[Z]
+case 7 whole: exit 0 case 7 ok row0=[ZEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE]
+case 7 b: exit 0 case 7 ok row0=[ZEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE]
+case 8 whole: exit 0 case 8 ok row0=[Z]
+case 8 b: exit 0 case 8 ok row0=[Z]
+case 9 whole: exit 0 case 9 ok row0=[]
+case 9 b: exit 0 case 9 ok row0=[]
