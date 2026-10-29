@@ -211,6 +211,37 @@ int main() {
             if (u.rowText(r).find('z') != std::string::npos) zr = r;
         CHECK(zr >= 0 && zr < 10);
     }
+    // F10: a scroll region below the new bottom (vttest's "[12..13]" then a shrink to 5 rows):
+    // libvterm clamped only the bottom margin, top > bottom, and the next LF memmove()d a
+    // negative size. resize() resets the margins when a region was set and the screen shrinks.
+    {
+        VtermSession s(24, 80);
+        feed(s, "\x1b[12;13r\x1b[13;5H");
+        s.resize(5, 40);
+        feed(s, "a\nb\nc\nd\ne\nf");
+        CHECK(s.rowText(4).find('f') != std::string::npos);  // full-screen scrolling again
+        // A shrink in the middle of a sequence: it is cancelled, the guard stays in step.
+        VtermSession t(24, 80);
+        feed(t, "\x1b[12;13r\x1b[1;3");
+        t.resize(5, 40);
+        feed(t, "1mX\n\n\n\n\nY");
+        CHECK(t.rowText(4).find('Y') != std::string::npos);
+        // Left/right margins (DECLRMM) past the new width.
+        VtermSession u(10, 80);
+        feed(u, "\x1b[?69h\x1b[60;70s\x1b[1;65H");
+        u.resize(10, 30);
+        feed(u, "\x1b[?69hz\r\n");
+        Grid g;
+        u.fillGrid(g);
+        CHECK(u.rowText(0).find('z') != std::string::npos);
+        // Without a region set, a shrink does not touch the cursor or anything else.
+        VtermSession v(24, 80);
+        feed(v, "\x1b[10;20H");
+        v.resize(20, 70);
+        feed(v, "q");
+        v.fillGrid(g);
+        CHECK(g.at(9, 19).text == "q");
+    }
     if (failures == 0) std::printf("fuzz_regress_test: OK\n");
     return failures ? 1 : 0;
 }

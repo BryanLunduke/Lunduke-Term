@@ -210,6 +210,12 @@ private:
     // DECRC after shrinking puts the cursor outside the screen and the next character reads
     // past lineinfo[] (fuzz finding F9). Called after every cursor restore.
     void clampCursorAfterRestore();
+    // Moves the cursor to (row, col), also in origin mode (see clampCursorAfterRestore).
+    void placeCursor(int row, int col);
+    // A DECSTBM / DECSLRM with parameters was seen. libvterm 0.3.3 only clamps the bottom/right
+    // margin on resize, so shrinking below the region's top/left leaves top > bottom and the next
+    // LF memmove()s a negative size (fuzz finding F10); resize() resets the margins then.
+    bool regionSet_ = false;
     std::string penSgr() const;
     // Continuation flags of the screen rows, taken just before an operation that may push
     // several lines to the scrollback at once (CSI S, CSI M, resize). libvterm shifts its line

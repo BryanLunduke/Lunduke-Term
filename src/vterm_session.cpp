@@ -378,6 +378,10 @@ void VtermSession::clampCursorAfterRestore() {
     // CUP is relative to the scroll region / margins in origin mode (DECOM), which libvterm does
     // not expose: find the origin with CUP 1;1 first, then move relative to it (libvterm keeps
     // the cursor inside the region in that mode, as a VT does).
+    placeCursor(r, c);
+}
+
+void VtermSession::placeCursor(int r, int c) {
     feedRaw("\x1b[H", 3);
     VTermPos o;
     vterm_state_get_cursorpos(state_, &o);
@@ -520,6 +524,7 @@ void VtermSession::feed(const char* bytes, size_t len) {
                 break;
             }
             if (c >= 0x40 && c <= 0x7e) {  // final byte
+                if ((c == 'r' || c == 's') && !csiParams_.empty()) regionSet_ = true;
                 if (c == 'b' && !csiInter_ && (csiParams_.empty() || csiParams_[0] < 0x3c) &&
                     (lastCp_ == 0 || libvtermZeroWidth(lastCp_))) {
                     // REP after a width-0 glyph: libvterm would loop forever (F7). CAN instead
@@ -661,6 +666,7 @@ void VtermSession::resize(int rows, int cols) {
     }
     snapshotWraps();  // shrinking pushes the top rows to the scrollback, several at once
     ++epoch_;         // reflow: search caches start over
+    const int oldRows = rows_, oldCols = cols_;
     rows_ = rows;
     cols_ = cols;
     // libvterm fills the cells a resize/reflow creates with the *current* pen, which in a
@@ -680,6 +686,22 @@ void VtermSession::resize(int rows, int cols) {
     clearTopContinuation();
     vterm_set_size(vt_, rows, cols);  // reflow + scrollback push/pop happen in here
     if (noReflow) vterm_screen_enable_reflow(screen_, true);
+    if (regionSet_ && (rows < oldRows || cols < oldCols)) {
+        // F10: reset the margins (xterm resets them on every resize). A sequence still open
+        // here is cancelled first (CAN), so libvterm and the guard agree on the parser state;
+        // C0 controls inside it would otherwise already hit the broken region.
+        if (csiState_ != 0) {
+            feedRaw("\x18", 1);
+            csiState_ = 0;
+            lastCp_ = 0;
+            u8need_ = 0;
+        }
+        VTermPos p;
+        vterm_state_get_cursorpos(state_, &p);
+        feedRaw("\x1b[r\x1b[s", 6);  // DECSTBM / DECSLRM defaults (libvterm: CSI s is always DECSLRM)
+        placeCursor(std::min(p.row, rows - 1), std::min(p.col, cols - 1));
+        regionSet_ = false;
+    }
     if (swapPen) feedRaw(pen.data(), pen.size());
     wrapSnapActive_ = false;
     vterm_screen_flush_damage(screen_);
