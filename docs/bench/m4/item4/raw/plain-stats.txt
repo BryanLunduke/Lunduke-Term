@@ -1,0 +1,4 @@
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="plain, no effects" content-frames=13 full-repaints=1 rows-painted=73 ticks=0 median paint 0.42 ms, median effects-source 0.00 ms, median tick 0.00 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+zombies: 0

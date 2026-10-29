@@ -1,0 +1,130 @@
+
+(lunduke-terminal:512482): dbind-WARNING **: 19:35:44.465: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+stats-mem t=5 tabs=1 heap-arena=22421504 heap-mmap=52289536 heap-mmap-n=13 heap-inuse=73950336 heap-free=760704 heap-releasable=128288 sb-lines=10000 sb-bytes=17075840 glyphs=50 glyph-bytes=37800 textures=0 texture-bytes=0 surface-bytes=5242880 stat-samples=75
+stats-mem t=10 tabs=4 heap-arena=73175040 heap-mmap=135991296 heap-mmap-n=20 heap-inuse=208471888 heap-free=694448 heap-releasable=115136 sb-lines=10058 sb-bytes=17096976 glyphs=218 glyph-bytes=164808 textures=0 texture-bytes=0 surface-bytes=19759104 stat-samples=187
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=7 full-repaints=1 rows-painted=46 ticks=12 median paint 0.35 ms, median effects-source 8.40 ms, median tick 7.48 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 112.5 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=14 full-repaints=1 rows-painted=53 ticks=17 median paint 0.23 ms, median effects-source 10.42 ms, median tick 6.52 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 115.9 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=11 full-repaints=1 rows-painted=50 ticks=15 median paint 0.26 ms, median effects-source 9.62 ms, median tick 6.62 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 118.7 ms
+stats-mem t=15 tabs=2 heap-arena=123871232 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=135143024 heap-free=8389008 heap-releasable=132704 sb-lines=10000 sb-bytes=17073440 glyphs=80 glyph-bytes=60480 textures=0 texture-bytes=0 surface-bytes=9879552 stat-samples=183
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=8 full-repaints=1 rows-painted=47 ticks=11 median paint 0.44 ms, median effects-source 12.95 ms, median tick 7.67 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 128.3 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=11 full-repaints=1 rows-painted=50 ticks=13 median paint 0.29 ms, median effects-source 9.82 ms, median tick 7.07 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 124.5 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=8 full-repaints=1 rows-painted=47 ticks=15 median paint 0.45 ms, median effects-source 9.08 ms, median tick 7.09 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 122.3 ms
+stats-mem t=20 tabs=1 heap-arena=94248960 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=87547248 heap-free=26362512 heap-releasable=12482768 sb-lines=10000 sb-bytes=17074000 glyphs=50 glyph-bytes=37800 textures=0 texture-bytes=0 surface-bytes=2240000 stat-samples=204
+stats-mem t=25 tabs=4 heap-arena=212754432 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=224943456 heap-free=7471776 heap-releasable=132912 sb-lines=10058 sb-bytes=17096976 glyphs=219 glyph-bytes=165564 textures=0 texture-bytes=0 surface-bytes=19759104 stat-samples=321
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=7 full-repaints=1 rows-painted=46 ticks=13 median paint 0.32 ms, median effects-source 11.80 ms, median tick 6.94 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 122.8 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=16 full-repaints=1 rows-painted=57 ticks=16 median paint 0.19 ms, median effects-source 11.69 ms, median tick 7.60 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 122.9 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=11 full-repaints=1 rows-painted=50 ticks=15 median paint 0.27 ms, median effects-source 9.84 ms, median tick 8.08 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 124.1 ms
+stats-mem t=30 tabs=2 heap-arena=123871232 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=135239536 heap-free=8292496 heap-releasable=133200 sb-lines=10029 sb-bytes=17085208 glyphs=120 glyph-bytes=90720 textures=0 texture-bytes=0 surface-bytes=9879552 stat-samples=322
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=7 full-repaints=1 rows-painted=46 ticks=13 median paint 0.34 ms, median effects-source 8.89 ms, median tick 6.50 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 112.3 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=9 full-repaints=1 rows-painted=48 ticks=16 median paint 0.33 ms, median effects-source 12.74 ms, median tick 7.70 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 123.9 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=10 full-repaints=1 rows-painted=49 ticks=16 median paint 0.40 ms, median effects-source 12.31 ms, median tick 7.25 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 130.2 ms
+stats-mem t=35 tabs=1 heap-arena=94248960 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=92688704 heap-free=21221056 heap-releasable=12482768 sb-lines=9983 sb-bytes=17045576 glyphs=50 glyph-bytes=37800 textures=0 texture-bytes=0 surface-bytes=7296000 stat-samples=337
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=7 full-repaints=1 rows-painted=46 ticks=13 median paint 0.39 ms, median effects-source 10.22 ms, median tick 7.41 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 120.1 ms
+stats-mem t=40 tabs=3 heap-arena=183132160 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=180170048 heap-free=22622912 heap-releasable=14952384 sb-lines=10058 sb-bytes=17097016 glyphs=190 glyph-bytes=143640 textures=0 texture-bytes=0 surface-bytes=14819328 stat-samples=435
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=8 full-repaints=1 rows-painted=47 ticks=16 median paint 0.36 ms, median effects-source 9.69 ms, median tick 7.27 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 116.8 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=14 full-repaints=1 rows-painted=53 ticks=17 median paint 0.25 ms, median effects-source 10.05 ms, median tick 7.77 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 122.5 ms
+stats-mem t=45 tabs=3 heap-arena=168312832 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=180087184 heap-free=7886448 heap-releasable=133056 sb-lines=10029 sb-bytes=17085248 glyphs=149 glyph-bytes=112644 textures=0 texture-bytes=0 surface-bytes=14819328 stat-samples=472
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=6 full-repaints=1 rows-painted=45 ticks=12 median paint 0.51 ms, median effects-source 10.82 ms, median tick 7.76 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 122.9 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=10 full-repaints=1 rows-painted=49 ticks=15 median paint 0.36 ms, median effects-source 12.42 ms, median tick 8.28 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 130.9 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=15 full-repaints=1 rows-painted=54 ticks=14 median paint 0.27 ms, median effects-source 12.56 ms, median tick 8.81 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 165.9 ms
+stats-mem t=50 tabs=1 heap-arena=94248960 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=80958160 heap-free=32951600 heap-releasable=12481360 sb-lines=10000 sb-bytes=11506880 glyphs=50 glyph-bytes=37800 textures=0 texture-bytes=0 surface-bytes=1200000 stat-samples=474
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=16 full-repaints=1 rows-painted=57 ticks=11 median paint 0.13 ms, median effects-source 9.59 ms, median tick 9.00 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 145.6 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=9 full-repaints=1 rows-painted=50 ticks=15 median paint 0.39 ms, median effects-source 10.48 ms, median tick 7.92 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 133.0 ms
+stats-mem t=55 tabs=2 heap-arena=123871232 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=135293200 heap-free=8238832 heap-releasable=133200 sb-lines=10029 sb-bytes=17085248 glyphs=119 glyph-bytes=89964 textures=0 texture-bytes=0 surface-bytes=9879552 stat-samples=545
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=22 full-repaints=1 rows-painted=61 ticks=16 median paint 0.11 ms, median effects-source 9.77 ms, median tick 6.69 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 119.8 ms
+stats-mem t=60 tabs=3 heap-arena=168312832 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=180127728 heap-free=7845904 heap-releasable=133056 sb-lines=10029 sb-bytes=17085248 glyphs=165 glyph-bytes=124740 textures=0 texture-bytes=0 surface-bytes=14819328 stat-samples=615
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=8 full-repaints=1 rows-painted=47 ticks=12 median paint 0.50 ms, median effects-source 10.21 ms, median tick 7.74 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 119.6 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=21 full-repaints=1 rows-painted=60 ticks=14 median paint 0.15 ms, median effects-source 11.66 ms, median tick 7.93 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 127.5 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=11 full-repaints=1 rows-painted=50 ticks=14 median paint 0.41 ms, median effects-source 10.51 ms, median tick 7.02 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 122.6 ms
+stats-mem t=65 tabs=1 heap-arena=94248960 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=89567504 heap-free=24342256 heap-releasable=12472592 sb-lines=10000 sb-bytes=15948880 glyphs=50 glyph-bytes=37800 textures=0 texture-bytes=0 surface-bytes=5242880 stat-samples=608
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=6 full-repaints=1 rows-painted=45 ticks=12 median paint 0.50 ms, median effects-source 9.55 ms, median tick 7.31 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 121.4 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=15 full-repaints=1 rows-painted=54 ticks=17 median paint 0.23 ms, median effects-source 9.01 ms, median tick 6.94 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 114.2 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=9 full-repaints=1 rows-painted=48 ticks=16 median paint 0.38 ms, median effects-source 9.66 ms, median tick 6.69 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 121.5 ms
+stats-mem t=70 tabs=1 heap-arena=94257152 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=90711488 heap-free=23206464 heap-releasable=12483680 sb-lines=9999 sb-bytes=17072968 glyphs=50 glyph-bytes=37800 textures=0 texture-bytes=0 surface-bytes=5242880 stat-samples=632
+stats-mem t=75 tabs=4 heap-arena=212754432 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=224992352 heap-free=7422880 heap-releasable=132912 sb-lines=10058 sb-bytes=17097176 glyphs=219 glyph-bytes=165564 textures=0 texture-bytes=0 surface-bytes=19759104 stat-samples=745
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=8 full-repaints=1 rows-painted=47 ticks=12 median paint 0.41 ms, median effects-source 11.99 ms, median tick 7.49 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 123.4 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=10 full-repaints=1 rows-painted=49 ticks=16 median paint 0.34 ms, median effects-source 10.24 ms, median tick 7.44 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 122.1 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=9 full-repaints=1 rows-painted=48 ticks=15 median paint 0.37 ms, median effects-source 10.19 ms, median tick 6.65 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 126.0 ms
+stats-mem t=80 tabs=2 heap-arena=123871232 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=135211360 heap-free=8320672 heap-releasable=133200 sb-lines=10000 sb-bytes=17073480 glyphs=80 glyph-bytes=60480 textures=0 texture-bytes=0 surface-bytes=9879552 stat-samples=749
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=35 full-repaints=1 rows-painted=74 ticks=12 median paint 0.41 ms, median effects-source 13.48 ms, median tick 7.15 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 152.5 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=20 full-repaints=1 rows-painted=59 ticks=16 median paint 0.21 ms, median effects-source 10.94 ms, median tick 7.22 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 127.6 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=12 full-repaints=1 rows-painted=51 ticks=16 median paint 0.37 ms, median effects-source 9.56 ms, median tick 6.77 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 134.0 ms
+stats-mem t=85 tabs=1 heap-arena=94248960 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=87649776 heap-free=26259984 heap-releasable=12482768 sb-lines=9999 sb-bytes=17072968 glyphs=50 glyph-bytes=37800 textures=0 texture-bytes=0 surface-bytes=2240000 stat-samples=771
+stats-mem t=90 tabs=4 heap-arena=212754432 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=224995888 heap-free=7419344 heap-releasable=132912 sb-lines=10058 sb-bytes=17097176 glyphs=220 glyph-bytes=166320 textures=0 texture-bytes=0 surface-bytes=19759104 stat-samples=894
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=7 full-repaints=1 rows-painted=46 ticks=13 median paint 0.38 ms, median effects-source 11.84 ms, median tick 6.55 ms, glyphs cached 68
+stats: quality=reduced software=1 tick-interval 118.6 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=24 full-repaints=1 rows-painted=63 ticks=15 median paint 0.17 ms, median effects-source 9.28 ms, median tick 6.52 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 116.4 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=10 full-repaints=1 rows-painted=49 ticks=17 median paint 0.38 ms, median effects-source 9.25 ms, median tick 6.67 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 121.0 ms
+stats-mem t=95 tabs=2 heap-arena=125222912 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=135287488 heap-free=9596224 heap-releasable=133744 sb-lines=10029 sb-bytes=17085328 glyphs=120 glyph-bytes=90720 textures=0 texture-bytes=0 surface-bytes=9879552 stat-samples=891
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=9 full-repaints=1 rows-painted=48 ticks=11 median paint 0.38 ms, median effects-source 10.00 ms, median tick 6.55 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 114.8 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=16 full-repaints=1 rows-painted=55 ticks=16 median paint 0.26 ms, median effects-source 8.86 ms, median tick 6.95 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 116.2 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=11 full-repaints=1 rows-painted=52 ticks=15 median paint 0.33 ms, median effects-source 9.93 ms, median tick 7.06 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 124.5 ms
+stats-mem t=100 tabs=1 heap-arena=95600640 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=98465792 heap-free=16795648 heap-releasable=12483312 sb-lines=10000 sb-bytes=22772840 glyphs=50 glyph-bytes=37800 textures=0 texture-bytes=0 surface-bytes=7296000 stat-samples=901
+stats-mem t=105 tabs=4 heap-arena=214106112 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=225064256 heap-free=8702656 heap-releasable=133456 sb-lines=10087 sb-bytes=17109024 glyphs=259 glyph-bytes=195804 textures=0 texture-bytes=0 surface-bytes=19759104 stat-samples=1034
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=6 full-repaints=1 rows-painted=45 ticks=13 median paint 0.56 ms, median effects-source 10.12 ms, median tick 7.23 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 118.1 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=16 full-repaints=1 rows-painted=55 ticks=17 median paint 0.24 ms, median effects-source 11.12 ms, median tick 6.71 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 122.8 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=10 full-repaints=1 rows-painted=49 ticks=17 median paint 0.41 ms, median effects-source 9.65 ms, median tick 6.98 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 122.4 ms
+stats-mem t=110 tabs=3 heap-arena=169664512 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=179976832 heap-free=9348480 heap-releasable=133600 sb-lines=10029 sb-bytes=17085328 glyphs=120 glyph-bytes=90720 textures=0 texture-bytes=0 surface-bytes=14819328 stat-samples=1026
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=7 full-repaints=1 rows-painted=46 ticks=11 median paint 0.39 ms, median effects-source 10.02 ms, median tick 7.43 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 116.7 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=19 full-repaints=1 rows-painted=58 ticks=16 median paint 0.11 ms, median effects-source 9.03 ms, median tick 6.58 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 115.6 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=9 full-repaints=1 rows-painted=48 ticks=16 median paint 0.40 ms, median effects-source 10.24 ms, median tick 7.53 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 124.6 ms
+stats-mem t=115 tabs=1 heap-arena=95600640 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=99962096 heap-free=15299344 heap-releasable=5505648 sb-lines=9998 sb-bytes=30467336 glyphs=50 glyph-bytes=37800 textures=0 texture-bytes=0 surface-bytes=1200000 stat-samples=1038
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=9 full-repaints=1 rows-painted=48 ticks=13 median paint 0.37 ms, median effects-source 10.14 ms, median tick 7.74 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 116.6 ms
+stats-mem t=120 tabs=3 heap-arena=184483840 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=180195056 heap-free=23949584 heap-releasable=14952432 sb-lines=10058 sb-bytes=17097176 glyphs=189 glyph-bytes=142884 textures=0 texture-bytes=0 surface-bytes=14819328 stat-samples=1140
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=16 full-repaints=1 rows-painted=55 ticks=17 median paint 0.22 ms, median effects-source 9.70 ms, median tick 6.65 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 113.5 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=12 full-repaints=1 rows-painted=51 ticks=15 median paint 0.30 ms, median effects-source 9.14 ms, median tick 6.69 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 116.0 ms
+stats-mem t=125 tabs=3 heap-arena=169664512 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=180114864 heap-free=9210448 heap-releasable=133600 sb-lines=10029 sb-bytes=17085328 glyphs=150 glyph-bytes=113400 textures=0 texture-bytes=0 surface-bytes=14819328 stat-samples=1156
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=10 full-repaints=1 rows-painted=49 ticks=11 median paint 0.31 ms, median effects-source 10.17 ms, median tick 7.80 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 122.2 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=17 full-repaints=1 rows-painted=58 ticks=17 median paint 0.19 ms, median effects-source 9.41 ms, median tick 7.51 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 120.8 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=9 full-repaints=1 rows-painted=50 ticks=14 median paint 0.38 ms, median effects-source 10.62 ms, median tick 8.07 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 139.1 ms
+stats-mem t=130 tabs=1 heap-arena=95600640 heap-mmap=19660800 heap-mmap-n=5 heap-inuse=89580480 heap-free=25680960 heap-releasable=12483312 sb-lines=10000 sb-bytes=15948880 glyphs=50 glyph-bytes=37800 textures=0 texture-bytes=0 surface-bytes=5242880 stat-samples=1169

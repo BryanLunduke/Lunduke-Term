@@ -1,0 +1,182 @@
+
+(lunduke-terminal:503342): dbind-WARNING **: 19:31:02.809: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats-mem t=5 tabs=1 heap-arena=83304448 heap-mmap=57802752 heap-mmap-n=21 heap-inuse=137518768 heap-free=3588432 heap-releasable=179040 sb-lines=0 sb-bytes=0 glyphs=50 glyph-bytes=37800 textures=9 texture-bytes=40894464 surface-bytes=5242880 stat-samples=74
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats-mem t=10 tabs=3 heap-arena=211767296 heap-mmap=101380096 heap-mmap-n=26 heap-inuse=309609264 heap-free=3538128 heap-releasable=173712 sb-lines=0 sb-bytes=0 glyphs=189 glyph-bytes=142884 textures=27 texture-bytes=118398976 surface-bytes=14819328 stat-samples=174
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=7 full-repaints=1 rows-painted=48 ticks=10 median paint 0.28 ms, median effects-source 6.53 ms, median tick 2.14 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=15 full-repaints=1 rows-painted=54 ticks=15 median paint 0.17 ms, median effects-source 7.83 ms, median tick 2.39 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=9 full-repaints=1 rows-painted=48 ticks=16 median paint 0.34 ms, median effects-source 7.31 ms, median tick 2.40 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats-mem t=15 tabs=1 heap-arena=273489920 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=138666112 heap-free=148017024 heap-releasable=219648 sb-lines=0 sb-bytes=0 glyphs=50 glyph-bytes=37800 textures=9 texture-bytes=40894464 surface-bytes=5242880 stat-samples=174
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=7 full-repaints=1 rows-painted=46 ticks=11 median paint 0.43 ms, median effects-source 7.69 ms, median tick 2.44 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=8 full-repaints=1 rows-painted=47 ticks=16 median paint 0.30 ms, median effects-source 7.59 ms, median tick 2.50 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=8 full-repaints=1 rows-painted=49 ticks=15 median paint 0.32 ms, median effects-source 6.97 ms, median tick 2.70 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats-mem t=20 tabs=1 heap-arena=385687552 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=138679872 heap-free=260200896 heap-releasable=170608 sb-lines=0 sb-bytes=0 glyphs=50 glyph-bytes=37800 textures=9 texture-bytes=40894464 surface-bytes=5242880 stat-samples=198
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats-mem t=25 tabs=4 heap-arena=385687552 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=395404912 heap-free=3475856 heap-releasable=111296 sb-lines=0 sb-bytes=0 glyphs=220 glyph-bytes=166320 textures=36 texture-bytes=157151232 surface-bytes=19759104 stat-samples=308
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=7 full-repaints=1 rows-painted=46 ticks=11 median paint 0.38 ms, median effects-source 8.53 ms, median tick 2.61 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=9 full-repaints=1 rows-painted=48 ticks=15 median paint 0.33 ms, median effects-source 7.75 ms, median tick 2.59 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=14 full-repaints=1 rows-painted=53 ticks=16 median paint 0.22 ms, median effects-source 7.68 ms, median tick 2.69 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats-mem t=30 tabs=2 heap-arena=385687552 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=224094384 heap-free=174786384 heap-releasable=111296 sb-lines=0 sb-bytes=0 glyphs=80 glyph-bytes=60480 textures=18 texture-bytes=79646720 surface-bytes=9879552 stat-samples=309
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=13 full-repaints=1 rows-painted=54 ticks=9 median paint 0.19 ms, median effects-source 10.16 ms, median tick 2.85 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 133.1 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=9 full-repaints=1 rows-painted=48 ticks=16 median paint 0.33 ms, median effects-source 8.31 ms, median tick 2.73 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=14 full-repaints=1 rows-painted=53 ticks=16 median paint 0.24 ms, median effects-source 8.88 ms, median tick 2.72 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats-mem t=35 tabs=1 heap-arena=385822720 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=113278240 heap-free=285737696 heap-releasable=227600 sb-lines=0 sb-bytes=0 glyphs=50 glyph-bytes=37800 textures=9 texture-bytes=19874304 surface-bytes=2240000 stat-samples=331
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats-mem t=40 tabs=4 heap-arena=385822720 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=395407456 heap-free=3608480 heap-releasable=227600 sb-lines=0 sb-bytes=0 glyphs=260 glyph-bytes=196560 textures=36 texture-bytes=157151232 surface-bytes=19759104 stat-samples=454
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=8 full-repaints=1 rows-painted=47 ticks=10 median paint 0.35 ms, median effects-source 7.26 ms, median tick 2.59 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=16 full-repaints=1 rows-painted=55 ticks=16 median paint 0.15 ms, median effects-source 9.35 ms, median tick 2.70 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=9 full-repaints=1 rows-painted=48 ticks=16 median paint 0.26 ms, median effects-source 8.46 ms, median tick 2.76 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats-mem t=45 tabs=2 heap-arena=385822720 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=224095472 heap-free=174920464 heap-releasable=314240 sb-lines=0 sb-bytes=0 glyphs=120 glyph-bytes=90720 textures=18 texture-bytes=79646720 surface-bytes=9879552 stat-samples=453
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=14 full-repaints=1 rows-painted=53 ticks=11 median paint 0.16 ms, median effects-source 8.93 ms, median tick 2.60 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=8 full-repaints=1 rows-painted=47 ticks=16 median paint 0.32 ms, median effects-source 9.59 ms, median tick 2.76 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=8 full-repaints=1 rows-painted=47 ticks=16 median paint 0.35 ms, median effects-source 7.63 ms, median tick 2.75 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats-mem t=50 tabs=1 heap-arena=385822720 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=156511472 heap-free=242504464 heap-releasable=175904 sb-lines=0 sb-bytes=0 glyphs=50 glyph-bytes=37800 textures=9 texture-bytes=55266304 surface-bytes=7296000 stat-samples=472
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=8 full-repaints=1 rows-painted=47 ticks=11 median paint 0.32 ms, median effects-source 7.58 ms, median tick 2.40 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats-mem t=55 tabs=3 heap-arena=385822720 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=309849664 heap-free=89166272 heap-releasable=159008 sb-lines=0 sb-bytes=0 glyphs=189 glyph-bytes=142884 textures=27 texture-bytes=118398976 surface-bytes=14819328 stat-samples=568
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=8 full-repaints=1 rows-painted=47 ticks=15 median paint 0.32 ms, median effects-source 7.80 ms, median tick 2.56 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=15 full-repaints=1 rows-painted=54 ticks=16 median paint 0.21 ms, median effects-source 8.17 ms, median tick 2.47 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats-mem t=60 tabs=3 heap-arena=385822720 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=309763808 heap-free=89252128 heap-releasable=159008 sb-lines=0 sb-bytes=0 glyphs=150 glyph-bytes=113400 textures=27 texture-bytes=118398976 surface-bytes=14819328 stat-samples=604
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=8 full-repaints=1 rows-painted=47 ticks=10 median paint 0.37 ms, median effects-source 6.93 ms, median tick 2.41 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=16 full-repaints=1 rows-painted=55 ticks=16 median paint 0.18 ms, median effects-source 7.10 ms, median tick 2.45 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=10 full-repaints=1 rows-painted=51 ticks=16 median paint 0.39 ms, median effects-source 7.44 ms, median tick 2.50 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats-mem t=65 tabs=1 heap-arena=385822720 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=104278416 heap-free=294737520 heap-releasable=344432 sb-lines=0 sb-bytes=0 glyphs=50 glyph-bytes=37800 textures=9 texture-bytes=12594304 surface-bytes=1200000 stat-samples=623
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=21 full-repaints=1 rows-painted=60 ticks=11 median paint 0.12 ms, median effects-source 7.78 ms, median tick 2.40 ms, glyphs cached 71
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=10 full-repaints=1 rows-painted=49 ticks=16 median paint 0.31 ms, median effects-source 6.50 ms, median tick 2.40 ms, glyphs cached 71
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats-mem t=70 tabs=2 heap-arena=385822720 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=224131296 heap-free=174884640 heap-releasable=276928 sb-lines=0 sb-bytes=0 glyphs=121 glyph-bytes=91476 textures=18 texture-bytes=79646720 surface-bytes=9879552 stat-samples=683
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=15 full-repaints=1 rows-painted=54 ticks=15 median paint 0.11 ms, median effects-source 8.10 ms, median tick 2.41 ms, glyphs cached 71
+stats: quality=reduced software=1 tick-interval 100.0 ms
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats-mem t=75 tabs=3 heap-arena=385822720 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=309730544 heap-free=89285392 heap-releasable=276928 sb-lines=0 sb-bytes=0 glyphs=170 glyph-bytes=128520 textures=27 texture-bytes=118398976 surface-bytes=14819328 stat-samples=771
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=7 full-repaints=1 rows-painted=46 ticks=11 median paint 0.31 ms, median effects-source 6.88 ms, median tick 2.39 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=15 full-repaints=1 rows-painted=56 ticks=16 median paint 0.25 ms, median effects-source 8.82 ms, median tick 2.51 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=20 full-repaints=1 rows-painted=59 ticks=15 median paint 0.21 ms, median effects-source 8.86 ms, median tick 2.48 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats-mem t=80 tabs=1 heap-arena=385822720 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=138767120 heap-free=260248816 heap-releasable=167728 sb-lines=0 sb-bytes=0 glyphs=50 glyph-bytes=37800 textures=9 texture-bytes=40894464 surface-bytes=5242880 stat-samples=761
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=12 full-repaints=1 rows-painted=51 ticks=10 median paint 0.26 ms, median effects-source 7.67 ms, median tick 2.30 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=9 full-repaints=1 rows-painted=48 ticks=15 median paint 0.28 ms, median effects-source 7.05 ms, median tick 2.30 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=8 full-repaints=1 rows-painted=47 ticks=16 median paint 0.31 ms, median effects-source 8.01 ms, median tick 2.56 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats-mem t=85 tabs=1 heap-arena=388263936 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=138835120 heap-free=262622032 heap-releasable=2681888 sb-lines=0 sb-bytes=0 glyphs=50 glyph-bytes=37800 textures=9 texture-bytes=40894464 surface-bytes=5242880 stat-samples=786
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats-mem t=90 tabs=4 heap-arena=388263936 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=395220976 heap-free=6236176 heap-releasable=2656064 sb-lines=0 sb-bytes=0 glyphs=189 glyph-bytes=142884 textures=36 texture-bytes=157151232 surface-bytes=19759104 stat-samples=896
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=7 full-repaints=1 rows-painted=46 ticks=11 median paint 0.32 ms, median effects-source 6.81 ms, median tick 2.48 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=9 full-repaints=1 rows-painted=48 ticks=14 median paint 0.35 ms, median effects-source 7.15 ms, median tick 2.68 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 110.1 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=10 full-repaints=1 rows-painted=49 ticks=16 median paint 0.39 ms, median effects-source 8.45 ms, median tick 2.57 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats-mem t=95 tabs=1 heap-arena=388263936 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=138767488 heap-free=262689664 heap-releasable=2656064 sb-lines=0 sb-bytes=0 glyphs=50 glyph-bytes=37800 textures=9 texture-bytes=40894464 surface-bytes=5242880 stat-samples=883
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=18 full-repaints=1 rows-painted=57 ticks=10 median paint 0.21 ms, median effects-source 7.55 ms, median tick 2.42 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=9 full-repaints=1 rows-painted=48 ticks=16 median paint 0.32 ms, median effects-source 9.55 ms, median tick 2.75 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=13 full-repaints=1 rows-painted=54 ticks=13 median paint 0.22 ms, median effects-source 12.15 ms, median tick 2.58 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 111.1 ms
+stats-mem t=100 tabs=1 heap-arena=388263936 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=138833824 heap-free=262623328 heap-releasable=3239456 sb-lines=0 sb-bytes=0 glyphs=50 glyph-bytes=37800 textures=9 texture-bytes=40894464 surface-bytes=5242880 stat-samples=905
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats-mem t=105 tabs=4 heap-arena=388263936 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=395483120 heap-free=5974032 heap-releasable=2653632 sb-lines=0 sb-bytes=0 glyphs=220 glyph-bytes=166320 textures=36 texture-bytes=157151232 surface-bytes=19759104 stat-samples=1013
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=7 full-repaints=1 rows-painted=46 ticks=11 median paint 0.36 ms, median effects-source 8.66 ms, median tick 2.43 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=11 full-repaints=1 rows-painted=52 ticks=15 median paint 0.29 ms, median effects-source 7.51 ms, median tick 2.42 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=19 full-repaints=1 rows-painted=58 ticks=14 median paint 0.20 ms, median effects-source 10.83 ms, median tick 2.58 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats-mem t=110 tabs=2 heap-arena=388263936 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=224043232 heap-free=177413920 heap-releasable=2653632 sb-lines=0 sb-bytes=0 glyphs=80 glyph-bytes=60480 textures=18 texture-bytes=79646720 surface-bytes=9879552 stat-samples=996
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=8 full-repaints=1 rows-painted=47 ticks=11 median paint 0.42 ms, median effects-source 7.79 ms, median tick 2.68 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=13 full-repaints=1 rows-painted=52 ticks=15 median paint 0.25 ms, median effects-source 8.34 ms, median tick 2.40 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=9 full-repaints=1 rows-painted=48 ticks=16 median paint 0.30 ms, median effects-source 10.96 ms, median tick 2.38 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats-mem t=115 tabs=1 heap-arena=388263936 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=113290112 heap-free=288167040 heap-releasable=2726640 sb-lines=0 sb-bytes=0 glyphs=50 glyph-bytes=37800 textures=9 texture-bytes=19874304 surface-bytes=2240000 stat-samples=1019
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats-mem t=120 tabs=4 heap-arena=388263936 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=395441376 heap-free=6015776 heap-releasable=2607472 sb-lines=0 sb-bytes=0 glyphs=232 glyph-bytes=175392 textures=36 texture-bytes=157151232 surface-bytes=19759104 stat-samples=1134
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=16 full-repaints=1 rows-painted=57 ticks=11 median paint 0.13 ms, median effects-source 6.77 ms, median tick 2.60 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=10 full-repaints=1 rows-painted=49 ticks=13 median paint 0.30 ms, median effects-source 7.78 ms, median tick 2.65 ms, glyphs cached 68
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=17 full-repaints=1 rows-painted=58 ticks=15 median paint 0.22 ms, median effects-source 8.40 ms, median tick 2.74 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats-mem t=125 tabs=2 heap-arena=388263936 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=224172928 heap-free=177284224 heap-releasable=2607472 sb-lines=0 sb-bytes=0 glyphs=120 glyph-bytes=90720 textures=18 texture-bytes=79646720 surface-bytes=9879552 stat-samples=1129
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=17 full-repaints=1 rows-painted=56 ticks=8 median paint 0.08 ms, median effects-source 8.60 ms, median tick 2.75 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 146.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=17 full-repaints=1 rows-painted=56 ticks=16 median paint 0.12 ms, median effects-source 9.69 ms, median tick 2.60 ms, glyphs cached 69
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=21 full-repaints=1 rows-painted=61 ticks=15 median paint 0.14 ms, median effects-source 16.49 ms, median tick 3.06 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 100.0 ms
+stats-mem t=130 tabs=1 heap-arena=388263936 heap-mmap=13193216 heap-mmap-n=10 heap-inuse=156527648 heap-free=244929504 heap-releasable=2610688 sb-lines=0 sb-bytes=0 glyphs=50 glyph-bytes=37800 textures=9 texture-bytes=55266304 surface-bytes=7296000 stat-samples=1127
