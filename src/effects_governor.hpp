@@ -17,7 +17,11 @@ struct GovernorConfig {
     double firstProbeMs = 10000;   // first probe after a demotion
     double maxProbeMs = 160000;    // probe back-off limit
     int overWindowsToDemote = 2;   // consecutive over-budget windows at the slowest tick
-    int probeWindows = 3;          // windows a probe must stay within budget to count as passed
+    int probeWindows = 3;          // consecutive windows a probe must stay within budget to pass
+    // A probe frame that alone costs more than this ends the probe at once (M4: one GL frame took
+    // ~3.9 s of CPU in the TCG VM, and a probe used to need several such frames to fail).
+    // <= 0: 2 x budget x maxIntervalMs, i.e. twice the budget even at the slowest tick.
+    double probeAbortFrameMs = 0;
 };
 
 class EffectsGovernor {
@@ -41,12 +45,17 @@ public:
     double probeDelayMs() const { return probeDelayMs_; }
     double lastLoad() const { return lastLoad_; }       // cores, estimated for the current tick
     double lastFrameMs() const { return lastFrameMs_; } // mean frame cost of the last window
+    int probeFrames() const { return probeFrames_; }    // frames rendered by the current/last probe
+    bool probeAborted() const { return probeAborted_; } // the last probe ended on one costly frame
+    double probeAbortFrameMs() const;
 
 private:
     GovernorConfig cfg_;
     State state_ = State::Normal;
     double window0_ = 0, frameCpu_ = 0;
-    int frames_ = 0, over_ = 0, probeOk_ = 0;
+    int frames_ = 0, over_ = 0, probeOk_ = 0, probeFrames_ = 0;
+    bool abortProbe_ = false, probeAborted_ = false;
+    double abortFrame_ = 0;
     double nextProbeMs_ = 0, probeDelayMs_ = -1;
     double lastLoad_ = 0, lastFrameMs_ = 0;
 };

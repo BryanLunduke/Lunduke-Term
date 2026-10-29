@@ -113,6 +113,70 @@ int main() {
         CHECK(g.evaluate(5000, iv) == EffectsGovernor::Action::None);
         CHECK(iv == 100);
     }
+    // M4 item 2: a probe needs probeWindows CONSECUTIVE good windows.
+    auto demotedGov = [] {
+        EffectsGovernor g;
+        GovernorConfig c;  // budget 0.25, base 100 ms, max 1000 ms, 1 s windows, 3 probe windows
+        g.configure(c);
+        g.restart(0);
+        g.demoted(0);
+        return g;
+    };
+    {
+        EffectsGovernor g = demotedGov();
+        double t = 20000, iv = 100;
+        g.startProbe(t);
+        // good, bad, good, bad, good, bad, good: never 3 in a row, so the probe never passes
+        // (M3 counted good windows in total and would have passed after the 5th window).
+        for (int w = 0; w < 7; ++w) {
+            g.addFrame(w % 2 ? 200.0 : 5.0);  // 200 ms at <= 840 ms ticks is over 0.25 cores
+            t += 1000;
+            g.evaluate(t, iv);
+            CHECK(g.state() == EffectsGovernor::State::Probing);
+        }
+        for (int w = 0; w < 3; ++w) {  // now three good windows in a row
+            g.addFrame(1.0);
+            t += 1000;
+            g.evaluate(t, iv);
+        }
+        CHECK(g.state() == EffectsGovernor::State::Normal);
+        CHECK(!g.probeAborted());
+    }
+    {   // one frame far over budget ends the probe at once, and the back-off still doubles
+        EffectsGovernor g = demotedGov();
+        CHECK(g.probeAbortFrameMs() == 500.0);  // 2 x 0.25 cores x 1000 ms
+        CHECK(g.probeDelayMs() == 10000);
+        double iv = 100;
+        g.startProbe(10000);
+        g.addFrame(3900);  // the M3 TCG VM GL frame
+        CHECK(g.evaluate(10001, iv) == EffectsGovernor::Action::Demote);  // no full window needed
+        CHECK(g.probeAborted() && g.probeFrames() == 1);
+        CHECK(g.lastFrameMs() == 3900 && g.lastLoad() > 3.8 && g.lastLoad() < 4.0);
+        g.demoted(10001);
+        CHECK(g.state() == EffectsGovernor::State::Demoted && g.probeDelayMs() == 20000);
+        // A frame under the abort threshold does not end the probe early.
+        g.startProbe(40000);
+        g.addFrame(400);
+        CHECK(g.evaluate(40001, iv) == EffectsGovernor::Action::None);
+        CHECK(!g.probeAborted() && g.state() == EffectsGovernor::State::Probing);
+        // An explicit threshold wins.
+        GovernorConfig c = g.config();
+        c.probeAbortFrameMs = 300;
+        g.configure(c);
+        g.addFrame(350);
+        CHECK(g.evaluate(40002, iv) == EffectsGovernor::Action::Demote && g.probeAborted());
+    }
+    {   // the M3 simulation with 3900 ms frames: each failed probe now costs one frame
+        Sim s = make();
+        s.run(15000, 3900);
+        const int d0 = s.demotions;
+        CHECK(d0 >= 1);
+        s.run(200000, 3900);  // probes at +10, +20, +40, +80 s, all failing
+        CHECK(s.g.probeAborted() && s.g.probeFrames() == 1);
+        CHECK(s.g.probeDelayMs() == 80000);
+        std::printf("costly probe: %d demotions, last probe %d frame(s), next in %.0f s\n", s.demotions,
+                    s.g.probeFrames(), s.g.probeDelayMs() / 1000.0);
+    }
     if (failures) std::fprintf(stderr, "%d failure(s)\n", failures);
     else std::printf("governor: all passed\n");
     return failures ? 1 : 0;

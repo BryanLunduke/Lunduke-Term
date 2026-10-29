@@ -658,9 +658,17 @@ static void testGovernor(const char* renderer) {
     CHECK(w.view->effectsQuality() == EffectsQuality::Static);
     CHECK(!w.view->animating());
     const double demotedAt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-    // Load drops: the probe after 1.5 s brings auto back, and it stays.
+    // M4 item 2: a probe whose first frame is far over budget (3900 ms, like GL in the TCG VM)
+    // fails after that one frame, and the back-off doubles (1.5 s -> 3 s).
+    w.view->setRenderCostForTest(3900);
+    CHECK(waitFor([&] { return w.view->governor().probeAborted() && w.view->qualityDemoted(); }, 6000));
+    CHECK(w.view->governor().probeFrames() == 1);
+    CHECK(w.view->governor().probeDelayMs() == 3000);
+    std::printf("governor %s: costly probe aborted after %d frame(s), retry in %.1f s\n", renderer,
+                w.view->governor().probeFrames(), w.view->governor().probeDelayMs() / 1000.0);
+    // Load drops: the next probe (3 s later) brings auto back, and it stays.
     w.view->setRenderCostForTest(0);
-    CHECK(waitFor([&] { return !w.view->qualityDemoted(); }, 4000));
+    CHECK(waitFor([&] { return !w.view->qualityDemoted(); }, 8000));
     CHECK(w.view->effectsQuality() == level);
     CHECK(waitFor([&] { return w.view->governor().state() == EffectsGovernor::State::Normal; }, 6000));
     CHECK(!w.view->qualityDemoted());
