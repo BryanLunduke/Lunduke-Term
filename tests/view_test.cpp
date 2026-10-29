@@ -5,6 +5,7 @@
 //   (d) closing the view while a clipboard request is pending
 //   (g) the child is reaped after the view hangs up on it
 // M2 stage 3: tabs, scrollback search (view + search bar), the settings dialog.
+#include "sanitizer.hpp"
 #include "terminal_view.hpp"
 #include "terminal_window.hpp"
 
@@ -480,9 +481,9 @@ static void testSearchBig() {
         CHECK(!v.searchPending());
         worstKey = std::max(worstKey, v.searchMaxMainMs());
     }
-    std::printf("view search, 100000 lines (ASan build): first keystroke %.2f ms (pending, %d turns), "
+    std::printf("view search, 100000 lines (%s): first keystroke %.2f ms (pending, %d turns), "
                 "worst later keystroke %.2f ms, 'n' %d / 'needle' %d matches\n",
-                first, turns, worstKey, n1, v.searchCount());
+                ltermBuildLabel(), first, turns, worstKey, n1, v.searchCount());
     CHECK(v.searchCount() == 100);
     CHECK(v.searchIndex() == 99);
     CHECK(v.searchStep(true) && v.searchIndex() == 98);  // Enter: older
@@ -786,8 +787,8 @@ static void testTabClose() {
         int left = 0;
         for (int i = 1; i < n; ++i) left += procState(pids[i]) != 0;
         CHECK(left == 0);
-        std::printf("tab close (ASan build): %d closes, worst %.2f ms, total %.2f ms; %d still running right after, "
-                    "all reaped %.0f ms later\n", n - 1, worst, total, running, goneMs);
+        std::printf("tab close (%s): %d closes, worst %.2f ms, total %.2f ms; %d still running right after, "
+                    "all reaped %.0f ms later\n", ltermBuildLabel(), n - 1, worst, total, running, goneMs);
         CHECK(worst < 25.0);  // M2: >= 50 ms per tab whose child ignores SIGHUP
     }
 }

@@ -16,6 +16,11 @@ util_dep = meson.get_compiler('cpp').find_library('util')
 
 inc = include_directories('src')
 
+# Tests label their timing output with the build kind (tests/sanitizer.hpp).
+if get_option('b_sanitize') != 'none'
+  add_project_arguments('-DLTERM_SANITIZED_BUILD=1', language : 'cpp')
+endif
+
 effects_lib = static_library('lterm-effects',
   'src/effects.cpp', 'src/cpu_effects.cpp', 'src/thread_pool.cpp',
   'src/grid_painter.cpp', 'src/synthetic_frame.cpp', 'src/profiles.cpp',
