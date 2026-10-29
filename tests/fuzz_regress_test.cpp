@@ -99,6 +99,20 @@ int main() {
         n.resize(5, 20);
         CHECK(n.reflowFallbacks() == 0 && n.rowText(0) == "0123456789abcde");
     }
+    // F4 (found reading the code for item 5, then confirmed): rowText() used a fixed 4 KiB
+    // buffer, but a row can need more (250 cells of a letter + 5 four-byte combining marks =
+    // 5250 bytes), and libvterm returns the length it needed: std::string(buf, n) read past it.
+    {
+        VtermSession s(2, 250);
+        std::string cell = "a";
+        for (int i = 0; i < 5; ++i) cell += "\xf0\x9d\x85\xa7";  // U+1D167 COMBINING TREMOLO-1
+        std::string row;
+        for (int i = 0; i < 250; ++i) row += cell;
+        feed(s, row);
+        const std::string t = s.rowText(0);
+        CHECK(t.size() == row.size());
+        CHECK(t == row);
+    }
     if (failures == 0) std::printf("fuzz_regress_test: OK\n");
     return failures ? 1 : 0;
 }

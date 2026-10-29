@@ -867,10 +867,17 @@ void VtermSession::focus(bool in) {
 }
 
 std::string VtermSession::rowText(int row) const {
+    // vterm_screen_get_text() returns the length the text needs, which can be more than the
+    // buffer it was given (wide rows of combining characters: up to 6 code points of 4 bytes
+    // per cell); the old fixed 4 KiB buffer was then read past its end. Ask again with room.
     char buf[4096];
     VTermRect rect{row, row + 1, 0, cols_};
     size_t n = vterm_screen_get_text(screen_, buf, sizeof buf, rect);
-    return std::string(buf, n);
+    if (n <= sizeof buf) return std::string(buf, n);
+    std::string big(n, '\0');
+    n = vterm_screen_get_text(screen_, &big[0], big.size(), rect);
+    big.resize(std::min(n, big.size()));
+    return big;
 }
 
 int VtermSession::cbDamage(VTermRect, void* user) {
