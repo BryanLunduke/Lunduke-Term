@@ -388,6 +388,22 @@ int main() {
         feed(w, "\x1b]2;T\x07");  // a plain BEL still ends the string
         CHECK(w.title() == "T" && w.guardState() == 0);
     }
+    // F17 (fuzzer, run on the review head): a line that wrapped and scrolled on the alternate
+    // screen leaves its row 0 marked as a continuation; after leaving it, a resize reflows the
+    // hidden alternate buffer too and libvterm reads row -1 (ASan heap-use-after-free in
+    // resize_buffer, only visible with the instrumented libvterm of the fuzz build; with the
+    // system libvterm0 this case just has to keep working).
+    {
+        VtermSession s(3, 10);
+        feed(s, "main\x1b[?1049ha\r\nb\r\n" + std::string(35, 'x') + "\x1b[?1049l");
+        s.resize(5, 20);
+        CHECK(!s.altScreen() && s.rowText(0) == "main");
+        feed(s, "\x1b[?1049h\x1b[H" "A");
+        CHECK(s.altScreen() && s.rowText(0) == "A");  // the alternate screen starts erased
+        s.resize(3, 12);
+        feed(s, "\x1b[?1049l");
+        CHECK(s.rowText(0) == "main");
+    }
     if (failures == 0) std::printf("fuzz_regress_test: OK\n");
     return failures ? 1 : 0;
 }

@@ -1188,6 +1188,10 @@ int VtermSession::cbSetTermProp(VTermProp prop, VTermValue* val, void* user) {
         // A resize while the alternate screen is up reflows the primary too, so it must not
         // be left with a continuation in row 0 either (see resize()).
         if (val->boolean && !s->altScreen_) s->clearTopContinuation();
+        // Leaving: still the alternate screen's line info. It is reflowed on resize too, while
+        // hidden, and read row -1 the same way (F17, ASan use-after-free / over-read in
+        // resize_buffer); its content does not matter any more (entering erases it).
+        if (!val->boolean && s->altScreen_) s->clearTopContinuation();
         s->altScreen_ = val->boolean;
         s->damaged_ = true;
         break;

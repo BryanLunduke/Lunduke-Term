@@ -167,8 +167,11 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
             break;
         }
         case 15:
-            if (kTrace) std::fprintf(stderr, "scrollback limit\n");
-            s.setScrollbackLimit(fdp.ConsumeIntegralInRange<size_t>(0, 50));
+        {
+            const size_t lim = fdp.ConsumeIntegralInRange<size_t>(0, 50);
+            if (kTrace) std::fprintf(stderr, "scrollback limit %zu\n", lim);
+            s.setScrollbackLimit(lim);
+        }
             break;
         }
         (void)s.takeOutput();
