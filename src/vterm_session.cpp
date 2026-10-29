@@ -505,9 +505,11 @@ void VtermSession::feed(const char* bytes, size_t len) {
                 }
                 break;
             }
-            csiState_ = 4;
             if (c == 0x07 || c == 0x18 || c == 0x1a) csiState_ = 0;
             else if (c == 0x1b) csiState_ = 5;
+            // libvterm executes other C0 controls (and ignores NUL/DEL) without leaving its OSC
+            // command state, so digits after them still go into the number (F14).
+            else if (static_cast<unsigned char>(c) >= 0x20 && c != 0x7f) csiState_ = 4;
             break;
         case 2: {
             const unsigned char u = static_cast<unsigned char>(c);

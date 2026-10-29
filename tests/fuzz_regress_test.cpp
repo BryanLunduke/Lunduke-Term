@@ -324,6 +324,26 @@ int main() {
         feed(w, "\x1b(!0q");
         CHECK(w.rowText(0) == "q");
     }
+    // F14 (found by the fuzzer's differential check): a C0 control inside the OSC command number
+    // made the guard take the rest for string text, while libvterm stays in its command state
+    // and keeps multiplying an int (signed overflow, UBSan in the fuzz build). With wrap-around,
+    // 4294967298 = 2^32 + 2 is OSC 2, the title, so the overflow is visible here too.
+    {
+        const std::string q = std::string("\x1b]\x01") + "4294967298;T\x07" "A";
+        VtermSession s(4, 20);
+        feed(s, q);
+        CHECK(s.title().empty() && s.rowText(0) == "A");
+        VtermSession t(4, 20);
+        for (char c : q) {
+            feed(t, std::string(1, c));
+            if (c == '\x01') CHECK(t.guardState() == 7);  // still the command number
+        }
+        CHECK(t.title().empty() && t.rowText(0) == "A");
+        // A real OSC 2 after a C0 control still sets the title; NUL / DEL are ignored there too.
+        VtermSession u(4, 20);
+        feed(u, std::string("\x1b]\x01\x7f") + std::string(1, '\0') + "2;T\x07");
+        CHECK(u.title() == "T");
+    }
     if (failures == 0) std::printf("fuzz_regress_test: OK\n");
     return failures ? 1 : 0;
 }
