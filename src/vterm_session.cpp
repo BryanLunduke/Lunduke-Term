@@ -461,8 +461,11 @@ void VtermSession::feed(const char* bytes, size_t len) {
                 csiParams_.clear();
                 csiSeps_ = csiDigits_ = 0;
                 csiArgs_ = csiInter_ = false;
-            } else if (c == '(' || c == ')') {
-                escTarget_ = c == '(' ? 0 : 1;
+            } else if (u >= 0x20 && u <= 0x2f) {
+                // Intermediates (ESC SP F, ESC # 8, ESC ( B): libvterm collects them until the
+                // final byte 0x30-0x7e (F13). ESC ( / ESC ) with one final byte designate G0/G1.
+                escTarget_ = c == '(' ? 0 : c == ')' ? 1 : -1;
+                escInters_ = 1;
                 csiState_ = 3;
             } else if (!inString && c == ']') {
                 csiState_ = 7;  // OSC command number
@@ -586,17 +589,23 @@ void VtermSession::feed(const char* bytes, size_t len) {
             if (c == 0x07 || c == 0x18 || c == 0x1a) csiState_ = 0;
             else if (c == 0x1b) csiState_ = 5;
             break;
-        case 3:  // ESC ( / ESC ) : intermediates, then the final byte names the set
-            if (c >= 0x30 && c <= 0x7e) {
-                (escTarget_ ? cs_.g1 : cs_.g0) = c;
+        case 3: {  // ESC + intermediates, until the final byte (libvterm NORMAL + in_esc)
+            const unsigned char u = static_cast<unsigned char>(c);
+            if (u >= 0x30 && u <= 0x7e) {
+                // libvterm's SCS needs exactly "( F" / ") F"; nothing here is printed text.
+                if (escInters_ == 1 && escTarget_ >= 0) (escTarget_ ? cs_.g1 : cs_.g0) = c;
                 csiState_ = 0;
+            } else if (u >= 0x20 && u <= 0x2f) {
+                ++escInters_;
             } else if (c == 0x1b) {
                 csiState_ = 1;
                 csiStart_ = static_cast<long>(i);
-            } else if (c < 0x20 || c > 0x2f) {
+            } else if (c == 0x18 || c == 0x1a) {
                 csiState_ = 0;
             }
+            // C0 controls are executed, DEL and bytes >= 0x80 ignored: the escape stays open.
             break;
+        }
         }
     }
     feedRaw(bytes + done, len - done);

@@ -176,7 +176,7 @@ private:
     bool altScreen_ = false, reverse_ = false;
     bool x10_ = false;
     int scanState_ = 0;
-    int csiState_ = 0;    // feed(): 0 ground, 1 after ESC, 2 inside CSI, 3 ESC ( ), 4 control string,
+    int csiState_ = 0;    // feed(): 0 ground, 1 after ESC, 2 inside CSI, 3 ESC + intermediates, 4 control string,
                           // 5 ESC in a string, 6 DCS command, 7 OSC number (mirrors libvterm's parser)
     long csiStart_ = -1;  // index of the ESC of the open CSI in the current chunk
     // libvterm's DECSC/DECRC (ESC 7/8, CSI ?1048/?1049) do not save the character set state
@@ -186,7 +186,8 @@ private:
         bool shifted = false;  // SO: G1 invoked into GL
     };
     Charsets cs_, savedCs_;
-    int escTarget_ = 0;       // feed() state 3: 0 = G0, 1 = G1 being designated
+    int escTarget_ = -1;      // feed() state 3: 0 = G0, 1 = G1 being designated (ESC ( / ESC )), else -1
+    int escInters_ = 0;       // feed() state 3: intermediate bytes so far
     std::string csiParams_;   // parameters of the open CSI (bounded)
     // libvterm 0.3.3 stores CSI arguments in a fixed long[16] without a bounds check: a 17th
     // argument overwrites the parser's callbacks pointer (crash, or worse, from any program's

@@ -292,6 +292,38 @@ int main() {
         v.fillGrid(g);
         CHECK(g.at(0, 0).text == "A" && g.at(0, 0).bold);
     }
+    // F13 (review): escapes with intermediates. The guard ended ESC SP F and ESC # 8 at the
+    // second byte and took F / 8 for printed text, so a REP right after (nothing printed in
+    // libvterm's eyes) hung. libvterm collects 0x20-0x2F, then the final byte ends the escape.
+    {
+        const char* cases[] = {
+            "\x1b F\x1b[bZ",         // probe case 6: S7C1T
+            "\x1b#8\x1b[bZ",         // probe case 7: DECALN (fills with E, but is not "printed")
+            "\x1b(\xc3" "B\x1b[bZ",  // probe case 8: high byte inside ESC ( (F12 + F13)
+            "\x1b( \x01" "B\x1b[bZ", // C0 inside, two intermediates
+            "\x1b#\x7f" "8\x1b[bZ",  // DEL inside
+        };
+        for (const char* q : cases) {
+            VtermSession s(4, 40);
+            feed(s, q);
+            CHECK(s.rowText(0).find('Z') != std::string::npos);
+            VtermSession t(4, 40);
+            for (const char* p = q; *p; ++p) feed(t, std::string(1, *p));
+            CHECK(t.rowText(0).find('Z') != std::string::npos);
+        }
+        // DECALN still fills the screen; designations still work, also split.
+        VtermSession u(2, 4);
+        feed(u, "\x1b#8");
+        CHECK(u.rowText(0) == "EEEE");
+        VtermSession v(2, 10);
+        feed(v, "\x1b(");
+        feed(v, "0q\x1b(Bq");
+        CHECK(v.rowText(0) == "\xe2\x94\x80q");  // DEC graphics q = U+2500, then ASCII again
+        // Two intermediates are not an SCS for libvterm, so the set is not changed.
+        VtermSession w(2, 10);
+        feed(w, "\x1b(!0q");
+        CHECK(w.rowText(0) == "q");
+    }
     if (failures == 0) std::printf("fuzz_regress_test: OK\n");
     return failures ? 1 : 0;
 }
