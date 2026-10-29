@@ -798,9 +798,13 @@ static void testTabClose() {
         int left = 0;
         for (int i = 1; i < n; ++i) left += procState(pids[i]) != 0;
         CHECK(left == 0);
+        // M2 regression: >= 50 ms per tab whose child ignores SIGHUP. The release build keeps the
+        // 25 ms limit and catches it; ASan+UBSan with every core busy measured 27.7 and 30.5 ms
+        // (review), so build-san only checks 75 ms (a gross regression, e.g. a blocking wait).
+        const double closeLimit = ltermTimingLimitMs(25.0, 75.0);
         std::printf("tab close (%s): %d closes, worst %.2f ms, total %.2f ms; %d still running right after, "
-                    "all reaped %.0f ms later\n", ltermBuildLabel(), n - 1, worst, total, running, goneMs);
-        CHECK(worst < 25.0);  // M2: >= 50 ms per tab whose child ignores SIGHUP
+                    "all reaped %.0f ms later (limit %.0f ms)\n", ltermBuildLabel(), n - 1, worst, total, running, goneMs, closeLimit);
+        CHECK(worst < closeLimit);
         CHECK(waitFor([&] { return w.trims() >= 1; }, 3000));
         pump(500);
         CHECK(w.trims() == 1);  // debounced: one trim for the 19 closes

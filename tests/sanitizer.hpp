@@ -25,3 +25,9 @@ inline const char* ltermBuildLabel() {
     if (LTERM_ASAN) return "release build, ASan in this test only";
     return "release build";
 }
+
+// Wall-clock limits that ASan+UBSan builds (2-3x slower, often with every core busy) cannot
+// keep: the release value, or a looser one in build-san.
+inline double ltermTimingLimitMs(double releaseMs, double sanitizedMs) {
+    return LTERM_SANITIZED_BUILD ? sanitizedMs : releaseMs;
+}
