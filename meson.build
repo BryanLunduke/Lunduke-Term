@@ -101,8 +101,9 @@ test('fonts', executable('fonts_test', 'tests/fonts_test.cpp',
 test('vterm', executable('vterm_test', 'tests/vterm_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]), env : test_env)
 test('gl-match', executable('gl_match_test', 'tests/gl_match_test.cpp',
-  include_directories : inc, link_with : [effects_lib, gl_lib],
-  dependencies : [pangocairo_dep, epoxy_dep, threads_dep]),
+  include_directories : inc, link_with : [vterm_lib, effects_lib, gl_lib],
+  dependencies : [vterm_dep, pangocairo_dep, epoxy_dep, threads_dep]),
+  args : [files('tests/data/unicode-sample.txt')],
   env : test_env, timeout : 120)
 test('session', executable('session_test', 'tests/session_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
