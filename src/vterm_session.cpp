@@ -109,8 +109,11 @@ void truncateUtf8(std::string& s, size_t max) {
     s.resize(n);
 }
 
-VtermSession::VtermSession(int rows, int cols) : rows_(rows), cols_(cols) {
-    vt_ = vterm_new(rows, cols);
+// At least 2 columns: libvterm 0.3.3 writes a wide character's second cell without checking it
+// exists, so a wide character on a 1-column screen is a NULL write (the system libvterm0
+// segfaults; fuzz finding F8).
+VtermSession::VtermSession(int rows, int cols) : rows_(std::max(1, rows)), cols_(std::max(2, cols)) {
+    vt_ = vterm_new(rows_, cols_);
     vterm_set_utf8(vt_, 1);
     vterm_output_set_callback(vt_, &VtermSession::cbOutput, this);
     screen_ = vterm_obtain_screen(vt_);
@@ -628,7 +631,7 @@ bool VtermSession::reflowWouldAbort(int newRows, int newCols) const {
 
 void VtermSession::resize(int rows, int cols) {
     if (rows < 1) rows = 1;
-    if (cols < 1) cols = 1;
+    if (cols < 2) cols = 2;  // see the constructor (F8)
     if (rows == rows_ && cols == cols_) return;
     clearTopContinuation();
     // See reflowWouldAbort(): in that case resize without reflow (lines are cut at the new

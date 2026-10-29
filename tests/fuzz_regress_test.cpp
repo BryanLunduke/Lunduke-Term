@@ -3,6 +3,7 @@
 // is the minimised trigger, written out by hand, plus a check that the terminal still works.
 #include "vterm_session.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -74,12 +75,13 @@ int main() {
     {
         struct Case { int r, c; const char* text; int nr, nc; };
         const Case cases[] = {{5, 3, "abcdefg", 1, 3}, {5, 3, "abcdefg", 2, 1}, {14, 1, "ab", 1, 1},
-                              {3, 1, "ab", 1, 1},      {5, 2, "abcd", 1, 2},    {24, 80, "", 1, 1}};
+                              {3, 1, "ab", 1, 1},      {5, 2, "abcd", 1, 2},    {24, 80, "", 1, 1},
+                              {14, 2, "abcdef", 1, 2}, {5, 3, "abcdefgh", 2, 2}};  // (1 column is 2 since F8)
         for (const Case& k : cases) {
             VtermSession s(k.r, k.c);
             feed(s, k.text);
             s.resize(k.nr, k.nc);  // used to abort() the process
-            CHECK(s.rows() == k.nr && s.cols() == k.nc);
+            CHECK(s.rows() == k.nr && s.cols() == std::max(2, k.nc));
             feed(s, "\r\x1b[KZ");
             CHECK(s.rowText(s.rows() - 1).find('Z') != std::string::npos || s.rowText(0).find('Z') != std::string::npos);
             s.resize(k.r, k.c);
@@ -164,6 +166,21 @@ int main() {
         feed(u, "\x1b[H\xcc\x81\x1b[9");
         feed(u, "9bz");
         CHECK(u.rowText(0) == "z");
+    }
+    // F8: a wide character on a 1-column screen: libvterm writes the (missing) second cell
+    // through a NULL pointer. Sessions are at least 2 columns wide now.
+    {
+        VtermSession s(3, 1);
+        CHECK(s.cols() == 2);
+        feed(s, "\xe6\xbc\xa2\xe5\xad\x97x");
+        CHECK(s.rowText(0) == "\xe6\xbc\xa2" && s.rowText(1) == "\xe5\xad\x97");
+        VtermSession t(3, 10);
+        t.resize(3, 1);
+        CHECK(t.cols() == 2);
+        feed(t, "\r\n\xe6\xbc\xa2");
+        t.resize(0, 0);
+        feed(t, "\xe6\xbc\xa2");
+        CHECK(t.rows() == 1 && t.cols() == 2);
     }
     if (failures == 0) std::printf("fuzz_regress_test: OK\n");
     return failures ? 1 : 0;
