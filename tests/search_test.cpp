@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Scrollback search (M2 stage 3): matches in history and on screen, case folding, soft-wrapped
 // lines, wide characters, next/previous with wrap-around, history that scrolled away.
+#include "sanitizer.hpp"
 #include "search.hpp"
 #include "vterm_session.hpp"
 
@@ -216,7 +217,9 @@ int main() {
         std::printf("100000 lines: build %d slices (worst %.2f ms), worst keystroke %.2f ms, %zu matches\n", slices,
                     worstSlice, worstKey, n);
         CHECK(n == 100);
-        CHECK(worstSlice < 60.0);
+        // A slice is 4 ms nominal; the bound is for a loaded box. ASan+UBSan is 3-10x slower
+        // (M3: 75.8 ms once), so it gets its own bound.
+        CHECK(worstSlice < (LTERM_ASAN ? 250.0 : 60.0));
         CHECK(worstKey < 200.0);
     }
     if (failures == 0) std::printf("search_test: OK\n");
