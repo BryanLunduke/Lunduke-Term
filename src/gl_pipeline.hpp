@@ -3,6 +3,9 @@
 // context in the terminal window, or the headless EGL context used by tests and benchmarks.
 #pragma once
 
+#include <cstddef>
+#include <unordered_map>
+
 #include "effects.hpp"
 
 #include <string>
@@ -39,6 +42,8 @@ public:
     // Leak accounting: textures / framebuffers currently owned by this pipeline.
     int liveTextures() const { return liveTex_; }
     int liveFramebuffers() const { return liveFbo_; }
+    // M4 item 4: bytes of texture storage those textures ask for (width x height x texel size).
+    size_t liveTextureBytes() const { return liveTexBytes_; }
 
 private:
     unsigned compile(const char* fs);
@@ -64,6 +69,9 @@ private:
     unsigned fboFrameBase_ = 0, fboFrameRefl_ = 0, fboFrame_ = 0;
     FrameGeometry geom_;
     int liveTex_ = 0, liveFbo_ = 0;
+    size_t liveTexBytes_ = 0;
+    std::unordered_map<unsigned, size_t> texBytes_;
+    void deleteTex(unsigned* t);
     int burnCur_ = 0;
     int w_ = 0, h_ = 0, hw_ = 0, hh_ = 0, bw_ = 0, bh_ = 0;
     float burnLast_ = 0, burnPrev_ = 0;

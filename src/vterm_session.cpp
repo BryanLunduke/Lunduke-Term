@@ -870,4 +870,10 @@ void VtermSession::cbOutput(const char* bytes, size_t len, void* user) {
     else s->sendBytes(bytes, len);
 }
 
+size_t VtermSession::scrollbackBytes() const {
+    size_t b = 0;
+    for (const SbLine& l : sb_) b += sizeof(SbLine) + l.cells.capacity() * sizeof(VTermScreenCell);
+    return b;
+}
+
 }  // namespace lterm

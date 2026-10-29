@@ -210,6 +210,28 @@ TerminalView::~TerminalView() {
 
 double TerminalView::nowMs() const { return (g_get_monotonic_time() - t0_) / 1000.0; }
 
+ViewMemory TerminalView::memory() const {
+    ViewMemory m;
+    if (session_) {
+        m.scrollbackLines = session_->scrollbackSize();
+        m.scrollbackBytes = session_->scrollbackBytes();
+    }
+    if (painter_) {
+        m.glyphs = painter_->cachedGlyphs();
+        m.glyphBytes = painter_->cachedGlyphBytes();
+    }
+    if (glPipe_) {
+        m.textures = glPipe_->liveTextures();
+        m.textureBytes = glPipe_->liveTextureBytes();
+    }
+    for (cairo_surface_t* s : {src_, out_})
+        if (s)
+            m.surfaceBytes += static_cast<size_t>(cairo_image_surface_get_stride(s)) *
+                              static_cast<size_t>(cairo_image_surface_get_height(s));
+    m.statSamples = stats_.paintMs.size() + stats_.effectsSourceMs.size() + stats_.tickMs.size();
+    return m;
+}
+
 std::string TerminalView::backendName() const {
     switch (mode_) {
     case Mode::Plain: return profile_.id + ", no effects";

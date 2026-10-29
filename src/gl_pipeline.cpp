@@ -30,11 +30,7 @@ GlPipeline::~GlPipeline() = default;
 
 void GlPipeline::release() {
     freeSized();
-    if (texNoise_) {
-        glDeleteTextures(1, &texNoise_);
-        texNoise_ = 0;
-        --liveTex_;
-    }
+    if (texNoise_) deleteTex(&texNoise_);
     for (unsigned* p : {&progDown_, &progBlur_, &progBurn_, &progStatic_, &progDyn_, &progFrame_, &progFrameComp_}) {
         if (*p) glDeleteProgram(*p);
         *p = 0;
@@ -98,6 +94,10 @@ unsigned GlPipeline::makeTex(int w, int h, unsigned fmt, bool linear, bool repea
     ++liveTex_;
     glBindTexture(GL_TEXTURE_2D, t);
     glTexImage2D(GL_TEXTURE_2D, 0, fmt, w, h, 0, GL_RGBA, fmt == GL_RGBA8 ? GL_UNSIGNED_BYTE : GL_FLOAT, nullptr);
+    const size_t texel = fmt == GL_RGBA8 ? 4 : fmt == GL_RGBA16F ? 8 : 16;
+    const size_t bytes = static_cast<size_t>(w) * static_cast<size_t>(h) * texel;
+    texBytes_[t] = bytes;
+    liveTexBytes_ += bytes;
     const GLint f = linear ? GL_LINEAR : GL_NEAREST;
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, f);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, f);
@@ -105,6 +105,16 @@ unsigned GlPipeline::makeTex(int w, int h, unsigned fmt, bool linear, bool repea
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
     return t;
+}
+
+void GlPipeline::deleteTex(unsigned* t) {
+    glDeleteTextures(1, t);
+    --liveTex_;
+    if (auto it = texBytes_.find(*t); it != texBytes_.end()) {
+        liveTexBytes_ -= it->second;
+        texBytes_.erase(it);
+    }
+    *t = 0;
 }
 
 unsigned GlPipeline::makeFbo(unsigned tex) {
@@ -127,11 +137,7 @@ void GlPipeline::freeSized() {
     }
     for (unsigned* t : {&texSrc_, &texDown_, &texBloomA_, &texBloomB_, &texBurn_[0], &texBurn_[1], &texStatic_,
                         &texOut_, &texFrameBase_, &texFrameRefl_, &texFrame_}) {
-        if (*t) {
-            glDeleteTextures(1, t);
-            --liveTex_;
-        }
-        *t = 0;
+        if (*t) deleteTex(t);
     }
 }
 

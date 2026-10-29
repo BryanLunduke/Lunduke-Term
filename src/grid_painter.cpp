@@ -237,4 +237,13 @@ void rgbaToSurface(const uint8_t* rgba, int w, int h, cairo_surface_t* s) {
     cairo_surface_mark_dirty(s);
 }
 
+size_t GridPainter::cachedGlyphBytes() const {
+    size_t b = 0;
+    for (const auto& kv : cache_)
+        if (kv.second)
+            b += static_cast<size_t>(cairo_image_surface_get_stride(kv.second)) *
+                 static_cast<size_t>(cairo_image_surface_get_height(kv.second));
+    return b;
+}
+
 }  // namespace lterm

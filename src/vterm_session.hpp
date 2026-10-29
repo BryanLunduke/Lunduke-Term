@@ -101,6 +101,7 @@ public:
     void setScrollbackLimit(size_t lines);  // clamped to kMaxScrollbackLines
     size_t scrollbackLimit() const { return sbLimit_; }
     size_t scrollbackSize() const { return sb_.size(); }
+    size_t scrollbackBytes() const;  // M4 item 4: cell storage of the history (capacity, not size)
     long topLine() const { return pushed_; }
     long firstLine() const override { return pushed_ - static_cast<long>(sb_.size()); }
     long endLine() const override { return pushed_ + rows_; }

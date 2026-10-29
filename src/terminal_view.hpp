@@ -55,6 +55,16 @@ struct ViewStats {
     double finalTickIntervalMs = 0;  // governor state on exit
 };
 
+// M4 item 4: what one view holds in memory (for --stats-every), all in bytes unless counts.
+struct ViewMemory {
+    size_t scrollbackLines = 0, scrollbackBytes = 0;
+    size_t glyphs = 0, glyphBytes = 0;
+    int textures = 0;
+    size_t textureBytes = 0;  // our GlPipeline's textures (llvmpipe keeps them in process memory)
+    size_t surfaceBytes = 0;  // the Cairo source / C++ output images
+    size_t statSamples = 0;   // ViewStats vectors (doubles)
+};
+
 // The terminal widget. Pipeline: libvterm -> Grid -> glyph-cached Pango/Cairo source image
 // (changed rows only) -> either a plain blit (DrawingArea), the GLSL effects on a GtkGLArea
 // (main path), or the multithreaded C++ effects (fallback, same output).
@@ -92,6 +102,7 @@ public:
     int marginX() const { return marginX_; }
     int marginY() const { return marginY_; }
     const ViewStats& stats() const { return stats_; }
+    ViewMemory memory() const;
     int scrollOffset() const { return scrollOffset_; }
     const Selection& selection() const { return sel_; }
     std::string selectionText() const { return sel_.text(*session_); }
