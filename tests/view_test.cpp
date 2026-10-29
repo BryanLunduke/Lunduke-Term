@@ -763,6 +763,7 @@ static void testTabClose() {
     {
         TerminalWindow w(o);
         w.set_default_size(480, 320);
+        w.trimDelayMs = 300;
         w.show();
         const int n = 20;
         std::vector<pid_t> pids;
@@ -785,6 +786,8 @@ static void testTabClose() {
         }
         CHECK(w.tabCount() == 1);
         CHECK(TerminalView::pendingReaps() == n - 1);
+        // M4 item 4: the burst of closes schedules one malloc_trim, after trimDelayMs.
+        CHECK(w.trims() == 0);
         // Right after the closes the children still run (they ignore SIGHUP)...
         int running = 0;
         for (int i = 1; i < n; ++i) running += procState(pids[i]) != 0;
@@ -798,6 +801,10 @@ static void testTabClose() {
         std::printf("tab close (%s): %d closes, worst %.2f ms, total %.2f ms; %d still running right after, "
                     "all reaped %.0f ms later\n", ltermBuildLabel(), n - 1, worst, total, running, goneMs);
         CHECK(worst < 25.0);  // M2: >= 50 ms per tab whose child ignores SIGHUP
+        CHECK(waitFor([&] { return w.trims() >= 1; }, 3000));
+        pump(500);
+        CHECK(w.trims() == 1);  // debounced: one trim for the 19 closes
+        std::printf("tab close trim: %d trim(s), RSS dropped %ld kB (ASan has its own allocator: ~0 here)\n", w.trims(), w.lastTrimKb());
     }
 }
 

@@ -63,6 +63,13 @@ public:
 
     bool handleKey(GdkEventKey* ev);  // window shortcuts; public for the tests
 
+    // M4 item 4: after tabs close, glibc keeps the freed GL (llvmpipe) memory in the main arena
+    // (RSS stayed ~480 MB with one tab). closeTab schedules one malloc_trim(0), trimDelayMs after
+    // the last close, which hands the free pages back. trims(): how many ran (tests).
+    int trims() const { return trims_; }
+    long lastTrimKb() const { return lastTrimKb_; }  // RSS drop of the last trim (kB, may be <= 0)
+    unsigned trimDelayMs = 1000;
+
 private:
     struct Tab {
         std::unique_ptr<TerminalView> view;
@@ -72,6 +79,10 @@ private:
         std::string title;
         unsigned long id = 0;
     };
+    void scheduleTrim();
+    int trims_ = 0;
+    long lastTrimKb_ = 0;
+    sigc::connection trimConn_;
     Tab* tabAtPage(int page) const;
     Tab* tabById(unsigned long id) const;
     void afterSwitch();

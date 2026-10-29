@@ -3,6 +3,10 @@
 
 #include <gdk/gdkkeysyms.h>
 #include <glib/gstdio.h>
+#if defined(__GLIBC__)
+#include <malloc.h>
+#endif
+#include <unistd.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -168,6 +172,7 @@ TerminalWindow::TerminalWindow(const ViewOptions& opts, const std::string& title
 
 TerminalWindow::~TerminalWindow() {
     closing_ = true;
+    trimConn_.disconnect();
     settings_.reset();
     // Views first (they hang up their shells), while the notebook still exists.
     while (!tabs_.empty()) {
@@ -209,6 +214,31 @@ TerminalWindow::Tab* TerminalWindow::tabById(unsigned long id) const {
 unsigned long TerminalWindow::tabId(const TerminalView* v) const {
     const int i = indexOf(v);
     return i < 0 ? 0 : tabs_[i]->id;
+}
+
+static long rssKb() {
+    long pages = 0, resident = 0;
+    if (FILE* f = std::fopen("/proc/self/statm", "r")) {
+        if (std::fscanf(f, "%ld %ld", &pages, &resident) != 2) resident = 0;
+        std::fclose(f);
+    }
+    return resident * (sysconf(_SC_PAGESIZE) / 1024);
+}
+
+void TerminalWindow::scheduleTrim() {
+    // Debounced: a burst of closes gives one trim. malloc_trim walks the arenas (a few ms).
+    trimConn_.disconnect();
+    trimConn_ = Glib::signal_timeout().connect(
+        [this] {
+            const long before = rssKb();
+#if defined(__GLIBC__)
+            malloc_trim(0);
+#endif
+            lastTrimKb_ = before - rssKb();
+            ++trims_;
+            return false;
+        },
+        trimDelayMs);
 }
 
 void TerminalWindow::closeTabLater(unsigned long id) {
@@ -317,6 +347,7 @@ void TerminalWindow::closeTab(TerminalView* v) {
     nb_.remove_page(*dead->view);
     dead.reset();  // the view's destructor hangs up its shell (without waiting)
     closingTab_ = false;
+    scheduleTrim();
     nb_.set_show_tabs(tabCount() > 1);
     if (tabs_.empty()) {
         hide();  // the last tab closes the window (and ends Gtk::Application::run)
