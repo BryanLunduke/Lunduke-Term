@@ -450,6 +450,10 @@ void VtermSession::feed(const char* bytes, size_t len) {
                 csiState_ = 0;
             } else if (u < 0x20 || u == 0x7f) {
                 // C0 controls (and NUL/DEL) are executed / ignored without ending the escape
+            } else if (u >= 0x80) {
+                // libvterm ignores a byte >= 0x80 after ESC and stays in the escape (a string
+                // it was in is over, though), so ESC 0xC3 [ is still a CSI (F12).
+                csiState_ = 1;
             } else if (inString && c == '\\') {
                 csiState_ = 0;
             } else if (!inString && c == '[') {

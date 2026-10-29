@@ -8,6 +8,8 @@
 #include <cstring>
 #include <string>
 
+#include <unistd.h>
+
 using namespace lterm;
 
 static int failures = 0;
@@ -22,6 +24,8 @@ static int failures = 0;
 static void feed(VtermSession& s, const std::string& str) { s.feed(str.data(), str.size()); }
 
 int main() {
+    // The F7/F12/F13 cases hang libvterm without their fix: fail (SIGALRM) instead of hanging.
+    alarm(120);
     // F1: a CSI with more than 16 arguments. libvterm 0.3.3 writes args[16+] past its fixed
     // array, over the parser's callbacks pointer: the system libvterm0 segfaults on
     // printf '\e[1;2;3;...;20m'. feed() now drops the arguments after the 16th.
@@ -256,6 +260,37 @@ int main() {
         CHECK(x.bold && x.italic);
         // Reverse is on: the background shows the foreground colour.
         CHECK(x.bg.r == 1 && x.bg.g == 2 && x.bg.b == 3);
+    }
+    // F12 (review): libvterm ignores a byte >= 0x80 after ESC and stays in the escape, so
+    // ESC 0xC3 [ is still a CSI. The guard went back to plain text there: F1 (40 arguments,
+    // segfault) and F7 (REP with nothing printed, hang) came back, also inside a title string.
+    {
+        std::string args;
+        for (int i = 0; i < 40; ++i) args += "1;";
+        const std::string cases[] = {
+            "\x1b\xc3[" + args + "mA",                 // probe case 1
+            "\x1b]0;t\x1b\xc3[" + args + "mA",         // probe case 2: ESC inside an OSC
+            "\x1bPq\x1b\xc3[" + args + "mA",           // ... and inside a DCS string
+            "\x1b\xc3\xa9\xff[" + args + "mA",         // several high bytes
+            "\x1b\xc3[99999999999999999999mA",         // F2 through the same gap
+        };
+        for (const std::string& q : cases) {
+            VtermSession s(4, 40);
+            feed(s, q);
+            CHECK(s.rowText(0) == "A");
+            VtermSession t(4, 40);  // byte at a time
+            for (char c : q) feed(t, std::string(1, c));
+            CHECK(t.rowText(0) == "A");
+        }
+        VtermSession u(4, 40);
+        feed(u, "\x1b\xc3[bZ");  // probe case 5 (used to hang)
+        CHECK(u.rowText(0) == "Z");
+        // The CSI after the high byte is a real CSI (libvterm runs it): bold A.
+        VtermSession v(4, 40);
+        feed(v, "\x1b\xc3[1mA");
+        Grid g;
+        v.fillGrid(g);
+        CHECK(g.at(0, 0).text == "A" && g.at(0, 0).bold);
     }
     if (failures == 0) std::printf("fuzz_regress_test: OK\n");
     return failures ? 1 : 0;
