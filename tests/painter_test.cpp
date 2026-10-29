@@ -3,9 +3,11 @@
 #include "grid_painter.hpp"
 #include "synthetic_frame.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <vector>
 
 using namespace lterm;
@@ -181,6 +183,108 @@ int main() {
         }
         cairo_surface_destroy(s);
         cairo_surface_destroy(s2);
+    }
+    // M4 item 5: wide glyphs span their 2 cells in both renderers (direct Pango and the glyph
+    // cache the view uses), combining marks stay in their cell, and the two agree. The GL and CPU
+    // effect back-ends both start from this painted frame (gl_match_test compares them).
+    {
+        GridPainter wp("DejaVu Sans Mono", 16);
+        const int cw = wp.cellWidth(), ch = wp.cellHeight(), cols = 12;
+        Grid wg;
+        wg.resize(1, cols);
+        struct C { const char* t; int w; };
+        const C row[cols] = {{"\xe6\xbc\xa2", 2}, {"", 0}, {"\xe5\xad\x97", 2}, {"", 0}, {"x", 1},
+                             {"e\xcc\x81", 1}, {"\xea\xb8\x80", 2}, {"", 0}, {"\xf0\x9f\x98\x80", 2}, {"", 0},
+                             {"a\xcc\x88\xcc\xa3", 1}, {"", 1}};  // 漢 字 x é 글 😀 ạ̈
+        for (int c = 0; c < cols; ++c) {
+            wg.at(0, c).text = row[c].t;
+            wg.at(0, c).width = row[c].w;
+        }
+        wg.cursorVisible = false;
+        auto render = [&](bool cached) {
+            cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_RGB24, cols * cw, ch);
+            cairo_t* c = cairo_create(s);
+            cairo_set_source_rgb(c, 0, 0, 0);
+            cairo_paint(c);
+            if (cached) wp.paintRows(c, wg, 0, 0, cur, bg, nullptr, cols * cw);
+            else wp.paint(c, wg, 0, 0, cur);
+            cairo_destroy(c);
+            return s;
+        };
+        auto ink = [&](cairo_surface_t* s, int x0, int x1) {
+            cairo_surface_flush(s);
+            const uint8_t* d = cairo_image_surface_get_data(s);
+            const int st = cairo_image_surface_get_stride(s);
+            int n = 0;
+            for (int y = 0; y < ch; ++y)
+                for (int x = std::max(0, x0); x < x1; ++x) {
+                    const uint8_t* p = d + y * st + x * 4;
+                    n += (p[0] + p[1] + p[2]) > 120;
+                }
+            return n;
+        };
+        cairo_surface_t* direct = render(false);
+        cairo_surface_t* cached = render(true);
+        for (cairo_surface_t* s : {direct, cached}) {
+            const char* name = s == direct ? "direct" : "glyph cache";
+            for (int c : {0, 2, 6, 8}) {  // each wide glyph has ink in both of its cells
+                const int l = ink(s, c * cw, (c + 1) * cw), r = ink(s, (c + 1) * cw, (c + 2) * cw);
+                std::printf("%s: wide cell %d ink left %d right %d\n", name, c, l, r);
+                if (l < 5 || r < 5) {
+                    std::fprintf(stderr, "FAIL: %s: wide glyph in cell %d does not span 2 cells\n", name, c);
+                    ++fails;
+                }
+            }
+            // The combining marks are drawn (more ink than the bare letter), inside their cell.
+            std::printf("%s: ink x %d, e+acute %d, a+2 marks %d, blank after it %d\n", name, ink(s, 4 * cw, 5 * cw),
+                        ink(s, 5 * cw, 6 * cw), ink(s, 10 * cw, 11 * cw), ink(s, 11 * cw, 12 * cw));
+            // (a + U+0308 + U+0323: HarfBuzz composes U+1EA1 and DejaVu Sans Mono has no mark
+            // anchor for U+0308 on it, so the diaeresis lands at the right edge of the cell and
+            // spills into the next one; the glyph cache clips it at its padding. Not checked.)
+            if (ink(s, 5 * cw, 6 * cw) <= ink(s, 4 * cw, 5 * cw) / 2) {
+                std::fprintf(stderr, "FAIL: %s: combining mark missing\n", name);
+                ++fails;
+            }
+        }
+        // Pixel match between the two, including the colour emoji (the glyph cache keeps colour
+        // glyphs in colour since M4 item 5; before, it drew a silhouette in the fg colour).
+        auto crop = [&](cairo_surface_t* s) {
+            std::vector<uint8_t> v = pixels(s);
+            std::vector<uint8_t> o;
+            const int st = cairo_image_surface_get_stride(s);
+            for (int y = 0; y < ch; ++y) o.insert(o.end(), v.begin() + y * st, v.begin() + y * st + 10 * cw * 4);
+            return o;
+        };
+        int wmx;
+        double wmean;
+        stats(crop(direct), crop(cached), &wmx, &wmean);
+        std::printf("wide/combining text, glyph cache vs direct Pango: mean abs diff %.4f, max diff %d\n", wmean, wmx);
+        if (wmean > 0.5) {
+            std::fprintf(stderr, "FAIL: wide text differs between the renderers\n");
+            ++fails;
+        }
+        {  // the emoji cell has colour in the glyph cache output (not grey)
+            cairo_surface_flush(cached);
+            const uint8_t* d = cairo_image_surface_get_data(cached);
+            const int st = cairo_image_surface_get_stride(cached);
+            int coloured = 0;
+            for (int y = 0; y < ch; ++y)
+                for (int x = 8 * cw; x < 10 * cw; ++x) {
+                    const uint8_t* p = d + y * st + x * 4;
+                    coloured += std::abs(int(p[2]) - int(p[0])) > 40;  // R vs B
+                }
+            std::printf("glyph cache emoji: %d coloured px\n", coloured);
+            if (coloured < 20) {
+                std::fprintf(stderr, "FAIL: emoji drawn without colour by the glyph cache\n");
+                ++fails;
+            }
+        }
+        if (const char* dir = std::getenv("LTERM_PAINTER_DUMP")) {
+            cairo_surface_write_to_png(direct, (std::string(dir) + "/painter-wide-direct.png").c_str());
+            cairo_surface_write_to_png(cached, (std::string(dir) + "/painter-wide-cached.png").c_str());
+        }
+        cairo_surface_destroy(direct);
+        cairo_surface_destroy(cached);
     }
     cairo_surface_destroy(ref);
     cairo_surface_destroy(fast);

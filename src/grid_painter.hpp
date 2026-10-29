@@ -39,7 +39,7 @@ public:
     void paintRows(cairo_t* cr, const Grid& g, int originX, int originY, Color8 cursorColor, Color8 clear,
                    const std::vector<char>* rows, int surfaceWidth);
     size_t cachedGlyphs() const { return cache_.size(); }
-    size_t cachedGlyphBytes() const;  // A8 mask pixels (stride x height), M4 item 4
+    size_t cachedGlyphBytes() const;  // A8 masks + ARGB32 colour glyphs (stride x height), M4 item 4
     void clearCache();
 
 private:
