@@ -6,7 +6,7 @@ Work in progress, not part of LCOS 1.0.
 
 License: GPL-3.0-or-later (see `LICENSE`).
 
-## Status: M3 in progress (branch `m3-core`; M2 on `m2-core`)
+## Status: M4 in progress (branch `m4-core`; M3 on `m3-core`, M2 on `m2-core`)
 
 M0 (the spike, PR #1) answered the feasibility questions; see
 [`docs/M0-RECOMMENDATION.md`](docs/M0-RECOMMENDATION.md). M1 checkpoint A: the GLSL effects run on a
@@ -33,6 +33,13 @@ cache, 10000-match cap), the governor measures render cost only and recovers, cl
 does not wait for the shell (SIGHUP, SIGKILL after 2 s), tabs close by id, and a corrupt settings
 file no longer blocks Save.
 
+M4 (see [`docs/M4-NOTES.md`](docs/M4-NOTES.md)): Unicode (wide CJK, combining marks, colour emoji
+in the glyph cache, invalid UTF-8, copy and search round-trips; the behaviour table there lists
+what libvterm 0.3.3 cannot do: no ZWJ sequences, flags, variation-selector width or bidi), and a
+libFuzzer harness (`tools/fuzz/`, [`docs/FUZZING.md`](docs/FUZZING.md)) whose findings in front
+of libvterm are fixed with regression tests (`tests/fuzz_regress_test.cpp`). No GPU on the build
+box: every GL number so far is llvmpipe; real-GPU numbers are not measured.
+
 | Part | Where |
 |---|---|
 | libvterm + PTY session, scrollback, keyboard/mouse | `src/vterm_session.*`, `src/terminal_view.*` |
@@ -46,6 +53,7 @@ file no longer blocks Save.
 | Desktop file, metainfo, icon; Debian packaging prep | `data/`, `debian/`, `docs/PACKAGING.md` |
 | Font choice and fallback (fontconfig) | `src/font_resolve.*` |
 | Benchmarks | `tools/m1_bench.cpp`, `tools/bench-m1.sh`, `tools/m0_bench.cpp` |
+| Fuzzing (libFuzzer harness, seeds) | `tools/fuzz/`, `docs/FUZZING.md` |
 
 ### Build
 
