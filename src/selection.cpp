@@ -34,6 +34,9 @@ bool Selection::isWord(const std::string& ch) const {
 
 // 0 blank, 1 word, 2 + char for other punctuation (runs of the same symbol group together).
 int Selection::classOf(const LineSource& src, long line, int col) const {
+    // The right half of a wide character belongs to it (it used to count as a blank, so a
+    // double-click on CJK text selected one character, or the blanks around it).
+    if (col > 0 && src.cellWidth(line, col) == 0) --col;
     std::string t = src.cellText(line, col);
     if (t.empty() || t == " ") return 0;
     if (isWord(t)) return 1;
