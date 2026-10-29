@@ -242,6 +242,21 @@ int main() {
         v.fillGrid(g);
         CHECK(g.at(9, 19).text == "q");
     }
+    // F11: resize() gives the application its pen back with penSgr(), fed past the guard. A pen
+    // with every attribute and two RGB colours was one SGR of 20 arguments, over libvterm's 16.
+    {
+        VtermSession s(10, 60);
+        feed(s, "\x1b[1;3;5;7;8;9;4:3;11;73m\x1b[38;2;1;2;3m\x1b[48;2;4;5;6m");
+        s.resize(9, 23);
+        feed(s, "X");
+        Grid g;
+        s.fillGrid(g);
+        const Cell& x = g.at(0, 0);
+        CHECK(x.text == "X");
+        CHECK(x.bold && x.italic);
+        // Reverse is on: the background shows the foreground colour.
+        CHECK(x.bg.r == 1 && x.bg.g == 2 && x.bg.b == 3);
+    }
     if (failures == 0) std::printf("fuzz_regress_test: OK\n");
     return failures ? 1 : 0;
 }

@@ -340,7 +340,7 @@ static void appendColorSgr(std::string& out, const VTermColor& c, bool fg) {
     out += buf;
 }
 
-// The current pen as one SGR sequence ("ESC [ m" for the default pen).
+// The current pen as SGR sequences ("ESC [ m" for the default pen). Applied after "ESC [ m".
 std::string VtermSession::penSgr() const {
     std::string p;
     VTermValue v;
@@ -360,14 +360,20 @@ std::string VtermSession::penSgr() const {
     }
     if (vterm_state_get_penattr(state_, VTERM_ATTR_FONT, &v) && v.number > 0 && v.number < 10)
         p += ";" + std::to_string(10 + v.number);
-    if (vterm_state_get_penattr(state_, VTERM_ATTR_FOREGROUND, &v)) appendColorSgr(p, v.color, true);
-    if (vterm_state_get_penattr(state_, VTERM_ATTR_BACKGROUND, &v)) appendColorSgr(p, v.color, false);
     if (vterm_state_get_penattr(state_, VTERM_ATTR_SMALL, &v) && v.boolean &&
         vterm_state_get_penattr(state_, VTERM_ATTR_BASELINE, &v))
         p += v.number == VTERM_BASELINE_RAISE ? ";73" : v.number == VTERM_BASELINE_LOWER ? ";74" : "";
-    if (p.empty()) return "\x1b[m";
-    p[0] = '[';
-    return "\x1b" + p + "m";
+    // Colours in a second sequence: everything in one could reach 20 arguments, and libvterm
+    // 0.3.3 writes past its args[16] (F1; feedRaw() bypasses the guard; fuzz finding F11).
+    // At most 10 arguments in each.
+    std::string c;
+    if (vterm_state_get_penattr(state_, VTERM_ATTR_FOREGROUND, &v)) appendColorSgr(c, v.color, true);
+    if (vterm_state_get_penattr(state_, VTERM_ATTR_BACKGROUND, &v)) appendColorSgr(c, v.color, false);
+    if (p.empty() && c.empty()) return "\x1b[m";
+    std::string out;
+    if (!p.empty()) out += "\x1b[" + p.substr(1) + "m";
+    if (!c.empty()) out += "\x1b[" + c.substr(1) + "m";
+    return out;
 }
 
 void VtermSession::clampCursorAfterRestore() {
