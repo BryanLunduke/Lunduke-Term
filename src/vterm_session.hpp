@@ -181,6 +181,10 @@ private:
     // argument overwrites the parser's callbacks pointer (crash, or worse, from any program's
     // output). feed() counts the separators and drops the parameter bytes after the 15th.
     int csiSeps_ = 0;
+    // Its argument accumulator (long * 10 + digit) also overflows (undefined behaviour), and a
+    // value >= 2^31 collides with its CSI_ARG_FLAG_MORE bit: feed() keeps at most 9 significant
+    // digits per argument (the rest are dropped, so the value stays huge and gets clamped).
+    int csiDigits_ = 0;
     bool csiArgs_ = false;   // a digit or separator was seen (leader bytes are over)
     bool csiInter_ = false;  // an intermediate byte was seen
     void restoreCharsets();

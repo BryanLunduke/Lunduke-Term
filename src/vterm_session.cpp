@@ -387,7 +387,7 @@ void VtermSession::feed(const char* bytes, size_t len) {
             if (c == '[') {
                 csiState_ = 2;
                 csiParams_.clear();
-                csiSeps_ = 0;
+                csiSeps_ = csiDigits_ = 0;
                 csiArgs_ = csiInter_ = false;
             } else if (c == 0x1b) csiStart_ = static_cast<long>(i);
             else if (c == '(' || c == ')') {
@@ -415,8 +415,13 @@ void VtermSession::feed(const char* bytes, size_t len) {
                     break;
                 }
                 if (u < 0x3c) csiArgs_ = true;
-                if (c == ';' || c == ':') ++csiSeps_;
-                if (csiSeps_ > 15) {  // see csiSeps_: drop this byte (and the rest of the arguments)
+                if (c == ';' || c == ':') {
+                    ++csiSeps_;
+                    csiDigits_ = 0;
+                } else if (u <= '9' && (csiDigits_ || c != '0')) {
+                    ++csiDigits_;
+                }
+                if (csiSeps_ > 15 || csiDigits_ > 9) {  // see csiSeps_ / csiDigits_: drop this byte
                     feedRaw(bytes + done, i - done);
                     done = i + 1;
                     break;

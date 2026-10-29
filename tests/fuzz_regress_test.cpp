@@ -53,6 +53,22 @@ int main() {
         feed(w, "a\r\nb\r\nc\r\nd\x1b[1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1S");
         CHECK(w.rowText(0) == "b");
     }
+    // F2: an argument with more digits than a long holds (signed overflow in libvterm's
+    // parser, UBSan) or >= 2^31 (collides with CSI_ARG_FLAG_MORE). At most 9 significant digits
+    // are kept; leading zeros do not count.
+    {
+        VtermSession s(5, 20);
+        feed(s, "\x1b[99999999999999999999999999;99999999999999999999999Hx");
+        Grid g;
+        s.fillGrid(g);
+        CHECK(g.at(4, 19).text == "x");  // clamped to the bottom-right corner
+        feed(s, "\x1b[00000000000000000000003;00000000000000000000000004Hy");
+        s.fillGrid(g);
+        CHECK(g.at(2, 3).text == "y");
+        feed(s, "\x1b[2147483648Cz\x1b[4294967295;1Hw");
+        s.fillGrid(g);
+        CHECK(g.at(4, 0).text == "w");
+    }
     if (failures == 0) std::printf("fuzz_regress_test: OK\n");
     return failures ? 1 : 0;
 }
