@@ -113,6 +113,35 @@ int main() {
         CHECK(t.size() == row.size());
         CHECK(t == row);
     }
+    // F5: feed()'s guard state machine must follow libvterm's. ESC P starts a DCS whose command
+    // bytes are not a string yet, so ESC [ right after it is a CSI to libvterm; feed() thought
+    // it was inside the string and let 19-digit / 17-argument CSIs through to the overflows.
+    // Inside a real string, ESC [ is not a CSI (libvterm ends the string, no C1 hoisting).
+    {
+        VtermSession s(5, 20);
+        std::string q = "\x1bP\x1b[";
+        for (int i = 0; i < 30; ++i) q += "9;";
+        q += "99999999999999999999Hx";
+        feed(s, q);
+        Grid g;
+        s.fillGrid(g);
+        CHECK(g.at(4, 8).text == "x");  // CSI 9;9 H (arguments 17+ dropped), clamped
+        VtermSession t(5, 20);
+        feed(t, "\x1b]2;abc\x1b[2Jy");  // the OSC ends; "[2Jy" is text after an unknown ESC [
+        CHECK(t.rowText(0) == "2Jy");
+        // ESC 7 right after a string's ESC is DECSC, as libvterm sees it.
+        VtermSession u(5, 20);
+        feed(u, "\x1b(0\x1b]2;t\x1b" "7\x1b(B\x1b" "8q");
+        CHECK(u.rowText(0) == "\xe2\x94\x80");  // DEC line drawing restored with the cursor
+    }
+    // F6: OSC command numbers overflow libvterm's int (UB); feed() keeps 9 digits.
+    {
+        VtermSession s(3, 20);
+        std::string seen;
+        s.onTitle = [&] { seen = s.title(); };
+        feed(s, "\x1b]99999999999999999999999;x\x07\x1b]00000000000000000002;ok\x07");
+        CHECK(seen == "ok");
+    }
     if (failures == 0) std::printf("fuzz_regress_test: OK\n");
     return failures ? 1 : 0;
 }

@@ -384,17 +384,35 @@ void VtermSession::feed(const char* bytes, size_t len) {
             else if (c == 0x0f) cs_.shifted = false;
             break;  // (8-bit CSI 0x9B is not a control in UTF-8 mode, which we always use)
         case 1:
-            if (c == '[') {
+        case 5: {
+            // After ESC. State 5: the ESC came inside a control string. libvterm then ends the
+            // string, but the next byte is not "hoisted" into a C1 control: ESC [ there is not
+            // a CSI (and ESC \ is the string terminator).
+            const bool inString = csiState_ == 5;
+            const unsigned char u = static_cast<unsigned char>(c);
+            if (c == 0x1b) {
+                csiStart_ = static_cast<long>(i);
+            } else if (c == 0x18 || c == 0x1a) {
+                csiState_ = 0;
+            } else if (u < 0x20 || u == 0x7f) {
+                // C0 controls (and NUL/DEL) are executed / ignored without ending the escape
+            } else if (inString && c == '\\') {
+                csiState_ = 0;
+            } else if (!inString && c == '[') {
                 csiState_ = 2;
                 csiParams_.clear();
                 csiSeps_ = csiDigits_ = 0;
                 csiArgs_ = csiInter_ = false;
-            } else if (c == 0x1b) csiStart_ = static_cast<long>(i);
-            else if (c == '(' || c == ')') {
+            } else if (c == '(' || c == ')') {
                 escTarget_ = c == '(' ? 0 : 1;
                 csiState_ = 3;
-            } else if (c == ']' || c == 'P' || c == '_' || c == '^' || c == 'X') {
-                csiState_ = 4;  // OSC / DCS / APC / PM / SOS string
+            } else if (!inString && c == ']') {
+                csiState_ = 7;  // OSC command number
+                csiDigits_ = 0;
+            } else if (!inString && c == 'P') {
+                csiState_ = 6;  // DCS: command bytes, not yet a string
+            } else if (!inString && (c == '_' || c == '^' || c == 'X')) {
+                csiState_ = 4;  // APC / PM / SOS string
             } else {
                 if (c == '7') savedCs_ = cs_;
                 else if (c == '8') {
@@ -404,6 +422,30 @@ void VtermSession::feed(const char* bytes, size_t len) {
                 } else if (c == 'c') cs_ = savedCs_ = Charsets{};  // RIS
                 csiState_ = 0;
             }
+            break;
+        }
+        case 6:  // DCS command (libvterm DCS_COMMAND is not a string state: ESC starts over)
+            if (c == 0x1b) {
+                csiState_ = 1;
+                csiStart_ = static_cast<long>(i);
+            } else if (c == 0x18 || c == 0x1a) {
+                csiState_ = 0;
+            } else if (c >= 0x40 && c <= 0x7e) {
+                csiState_ = 4;
+            }
+            break;
+        case 7:  // OSC command number: libvterm's int accumulator overflows too (keep 9 digits)
+            if (c >= '0' && c <= '9') {
+                if (csiDigits_ || c != '0') ++csiDigits_;
+                if (csiDigits_ > 9) {
+                    feedRaw(bytes + done, i - done);
+                    done = i + 1;
+                }
+                break;
+            }
+            csiState_ = 4;
+            if (c == 0x07 || c == 0x18 || c == 0x1a) csiState_ = 0;
+            else if (c == 0x1b) csiState_ = 5;
             break;
         case 2: {
             const unsigned char u = static_cast<unsigned char>(c);
@@ -472,9 +514,6 @@ void VtermSession::feed(const char* bytes, size_t len) {
         case 4:  // inside a control string, until BEL or ST (ESC \\)
             if (c == 0x07 || c == 0x18 || c == 0x1a) csiState_ = 0;
             else if (c == 0x1b) csiState_ = 5;
-            break;
-        case 5:
-            csiState_ = c == '\\' ? 0 : (c == 0x1b ? 5 : 4);
             break;
         case 3:  // ESC ( / ESC ) : intermediates, then the final byte names the set
             if (c >= 0x30 && c <= 0x7e) {
