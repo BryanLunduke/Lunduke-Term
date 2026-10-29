@@ -1,0 +1,36 @@
+# M4 final tests, 2026-10-28 20:31:37 CDT, code 95fd762 (head before this commit 2817d9b)
+## release (build)
+ 1/13 desktop-file OK               0.01s
+ 2/13 metainfo     OK               0.02s
+ 3/13 governor     OK               0.00s
+ 4/13 profiles     OK               0.00s
+ 5/13 painter      OK               0.07s
+ 6/13 fonts        OK               0.02s
+ 7/13 vterm        OK               0.00s
+ 8/13 effects      OK               0.24s
+ 9/13 session      OK               0.07s
+10/13 fixes        OK               0.40s
+11/13 search       OK               0.82s
+12/13 gl-match     OK              12.09s
+13/13 view         OK              80.97s
+Ok:                 13  
+Fail:               0   
+Timeout:            0   
+## ASan+UBSan (build-san, detect_leaks=1, --timeout-multiplier 4)
+ 1/13 desktop-file OK               0.01s
+ 2/13 metainfo     OK               0.02s
+ 3/13 governor     OK               0.01s
+ 4/13 profiles     OK               0.02s
+ 5/13 painter      OK               0.27s
+ 6/13 fonts        OK               0.05s
+ 7/13 vterm        OK               0.01s
+ 8/13 effects      OK               1.66s
+ 9/13 session      OK               0.12s
+10/13 fixes        OK               0.43s
+11/13 search       OK              20.00s
+12/13 gl-match     OK              76.55s
+13/13 view         OK              86.76s
+Ok:                 13  
+Fail:               0   
+Timeout:            0   
+'leak of' lines in build-san testlog: 0

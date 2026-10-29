@@ -96,6 +96,8 @@ renderer. That is the same range as M3:
 "Invalid UTF-8" counts: plain had 21 (GL) and 9 (CPU) on 69598c8. On M4 every profile has 0. That
 is the libvterm reflow fix at work. GPU: NOT MEASURED (there is none).
 
+Final tests (REAL, `docs/bench/m4/tests/final.txt`): release 13/13 OK, ASan+UBSan with leak checking 13/13 OK, 0 leak reports.
+
 ## Item 4: soak heap profile (the 222 → ~500 MB rise)
 
 ### Method
@@ -143,7 +145,7 @@ is the libvterm reflow fix at work. GPU: NOT MEASURED (there is none).
 What the variants showed:
 - **Renderer (REAL):** the CPU renderer adds about 45 MB per tab and plain about 6–14 MB. With
   either, RSS stays at 210 or 155 MB.
-- **ViewStats samples:** about 1250 per 120 s at 8 B each, about 10 KB, so negligible and left as is.
+- **ViewStats samples:** about 1250 per 120 s, 3 vectors at 8 B each, about 30 KB, so negligible and left as is.
 
 ### Explanation
 While 4 tabs are open, the GL tabs need up to 413 MB of malloc memory, almost all of it in glibc's
