@@ -206,6 +206,10 @@ private:
     uint32_t u8acc_ = 0;
     int u8need_ = 0;
     void restoreCharsets();
+    // libvterm 0.3.3 does not clamp the saved cursor (DECSC, ?1048h, ?1049h) on resize, so a
+    // DECRC after shrinking puts the cursor outside the screen and the next character reads
+    // past lineinfo[] (fuzz finding F9). Called after every cursor restore.
+    void clampCursorAfterRestore();
     std::string penSgr() const;
     // Continuation flags of the screen rows, taken just before an operation that may push
     // several lines to the scrollback at once (CSI S, CSI M, resize). libvterm shifts its line

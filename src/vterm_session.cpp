@@ -370,6 +370,22 @@ std::string VtermSession::penSgr() const {
     return "\x1b" + p + "m";
 }
 
+void VtermSession::clampCursorAfterRestore() {
+    VTermPos p;
+    vterm_state_get_cursorpos(state_, &p);
+    if (p.row < rows_ && p.col < cols_) return;
+    const int r = std::min(p.row, rows_ - 1), c = std::min(p.col, cols_ - 1);
+    // CUP is relative to the scroll region / margins in origin mode (DECOM), which libvterm does
+    // not expose: find the origin with CUP 1;1 first, then move relative to it (libvterm keeps
+    // the cursor inside the region in that mode, as a VT does).
+    feedRaw("\x1b[H", 3);
+    VTermPos o;
+    vterm_state_get_cursorpos(state_, &o);
+    const std::string cup =
+        "\x1b[" + std::to_string(std::max(0, r - o.row) + 1) + ";" + std::to_string(std::max(0, c - o.col) + 1) + "H";
+    feedRaw(cup.data(), cup.size());
+}
+
 void VtermSession::restoreCharsets() {
     cs_ = savedCs_;
     char seq[8] = {0x1b, '(', cs_.g0, 0x1b, ')', cs_.g1, static_cast<char>(cs_.shifted ? 0x0e : 0x0f), 0};
@@ -446,6 +462,7 @@ void VtermSession::feed(const char* bytes, size_t len) {
                 else if (c == '8') {
                     feedRaw(bytes + done, i + 1 - done);
                     done = i + 1;
+                    clampCursorAfterRestore();
                     restoreCharsets();
                 } else if (c == 'c') cs_ = savedCs_ = Charsets{};  // RIS
                 csiState_ = 0;
@@ -535,6 +552,7 @@ void VtermSession::feed(const char* bytes, size_t len) {
                     else {
                         feedRaw(bytes + done, i + 1 - done);
                         done = i + 1;
+                        clampCursorAfterRestore();
                         restoreCharsets();
                     }
                 }

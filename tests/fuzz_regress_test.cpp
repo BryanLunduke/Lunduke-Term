@@ -182,6 +182,35 @@ int main() {
         feed(t, "\xe6\xbc\xa2");
         CHECK(t.rows() == 1 && t.cols() == 2);
     }
+    // F9: DECSC / ?1049h save the cursor; libvterm does not clamp the saved position when the
+    // screen shrinks, so DECRC put the cursor below the screen and the next character read past
+    // libvterm's lineinfo[] (heap overflow). feed() now clamps the cursor after each restore.
+    {
+        VtermSession s(37, 100);
+        feed(s, "\x1b[30;90H\x1b" "7");
+        s.resize(6, 50);
+        feed(s, "\x1b" "8x");
+        Grid g;
+        s.fillGrid(g);
+        CHECK(g.at(5, 49).text == "x");
+        // The same through the alternate screen (?1049h saves, ?1049l restores).
+        VtermSession t(30, 80);
+        feed(t, "\x1b[25;70H\x1b[?1049h");
+        t.resize(5, 40);
+        feed(t, "\x1b[?1049ly");
+        t.fillGrid(g);
+        CHECK(g.at(4, 39).text == "y");
+        // In origin mode with a scroll region the cursor ends up inside the region.
+        VtermSession u(30, 80);
+        feed(u, "\x1b[28;70H\x1b" "7\x1b[2;4r\x1b[?6h");
+        u.resize(10, 40);
+        feed(u, "\x1b" "8z");
+        u.fillGrid(g);
+        int zr = -1;
+        for (int r = 0; r < 10; ++r)
+            if (u.rowText(r).find('z') != std::string::npos) zr = r;
+        CHECK(zr >= 0 && zr < 10);
+    }
     if (failures == 0) std::printf("fuzz_regress_test: OK\n");
     return failures ? 1 : 0;
 }
