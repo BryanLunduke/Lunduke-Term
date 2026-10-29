@@ -384,6 +384,29 @@ void VtermSession::feed(const char* bytes, size_t len) {
                 csiStart_ = static_cast<long>(i);
             } else if (c == 0x0e) cs_.shifted = true;
             else if (c == 0x0f) cs_.shifted = false;
+            else {
+                // Track the last printed code point for REP (see lastCp_). Anything unusual
+                // (broken UTF-8) makes it 0 = unknown, which only makes REP be dropped.
+                const unsigned char u = static_cast<unsigned char>(c);
+                if (u >= 0x20 && u < 0x7f) {
+                    lastCp_ = u;
+                    u8need_ = 0;
+                } else if (u >= 0x80 && u < 0xc0) {
+                    if (u8need_ > 0) {
+                        u8acc_ = (u8acc_ << 6) | (u & 0x3f);
+                        if (--u8need_ == 0) lastCp_ = u8acc_;
+                    } else {
+                        lastCp_ = 0;
+                    }
+                } else if (u >= 0xc2 && u < 0xf5) {
+                    u8need_ = u < 0xe0 ? 1 : u < 0xf0 ? 2 : 3;
+                    u8acc_ = u & (u < 0xe0 ? 0x1f : u < 0xf0 ? 0x0f : 0x07);
+                    lastCp_ = 0;
+                } else if (u >= 0x80) {
+                    u8need_ = 0;
+                    lastCp_ = 0;
+                }
+            }
             break;  // (8-bit CSI 0x9B is not a control in UTF-8 mode, which we always use)
         case 1:
         case 5: {
@@ -477,6 +500,16 @@ void VtermSession::feed(const char* bytes, size_t len) {
                 break;
             }
             if (c >= 0x40 && c <= 0x7e) {  // final byte
+                if (c == 'b' && !csiInter_ && (csiParams_.empty() || csiParams_[0] < 0x3c) &&
+                    (lastCp_ == 0 || libvtermZeroWidth(lastCp_))) {
+                    // REP after a width-0 glyph: libvterm would loop forever (F7). CAN instead
+                    // of the final byte aborts the sequence (its start may be in an earlier chunk).
+                    feedRaw(bytes + done, i - done);
+                    feedRaw("\x18", 1);
+                    done = i + 1;
+                    csiState_ = 0;
+                    break;
+                }
                 if (c == 'S' || c == 'M') {
                     // The sequence may have started in an earlier chunk; nothing up to here
                     // changed the screen since then, so the snapshot is still exact. (Bytes up
@@ -754,6 +787,30 @@ int libvtermWidth(uint32_t cp) {
     vterm_state_get_cursorpos(vterm_obtain_state(probe), &p);
     *slot = p.col == 2 ? 2 : 1;
     return *slot;
+}
+
+bool libvtermZeroWidth(uint32_t cp) {
+    if (cp >= 0x20 && cp < 0x7f) return false;
+    static std::mutex m;
+    static std::unordered_map<uint32_t, bool> cache;
+    static VTerm* probe = nullptr;
+    std::lock_guard<std::mutex> lock(m);
+    auto it = cache.find(cp);
+    if (it != cache.end()) return it->second;
+    if (!probe) {
+        probe = vterm_new(1, 8);
+        vterm_set_utf8(probe, 1);
+        vterm_screen_reset(vterm_obtain_screen(probe), 1);
+    }
+    // At the home position a width-0 code point neither moves the cursor nor (being alone
+    // there) combines into a wider glyph.
+    std::string q = "\x1b[2;3H\x1b[H";
+    appendUtf8(q, cp > 0x10FFFF ? 0xFFFD : cp);
+    vterm_input_write(probe, q.data(), q.size());
+    VTermPos p;
+    vterm_state_get_cursorpos(vterm_obtain_state(probe), &p);
+    if (cache.size() > 4096) cache.clear();
+    return cache[cp] = p.col == 0;
 }
 
 // libvterm 0.3.3 keeps a wide character as the cell plus a marker in the next cell, and does not

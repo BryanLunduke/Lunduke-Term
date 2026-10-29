@@ -142,6 +142,29 @@ int main() {
         feed(s, "\x1b]99999999999999999999999;x\x07\x1b]00000000000000000002;ok\x07");
         CHECK(seen == "ok");
     }
+    // F7: REP (CSI Ps b) repeats the last printed glyph by its width; libvterm 0.3.3 loops forever
+    // when that width is 0 (nothing printed yet, or a lone combining mark). feed() drops REP then.
+    {
+        VtermSession s(3, 20);
+        feed(s, "\x1b[b");  // nothing printed yet (used to hang)
+        feed(s, "\x1b[H\xcc\x81\x1b[5b");  // a lone U+0301 (used to hang)
+        feed(s, "ok");
+        CHECK(s.rowText(0) == "ok");
+        // REP still works after a normal, wide or combined glyph, also split over chunks.
+        VtermSession t(3, 20);
+        feed(t, "x\x1b[3b");
+        feed(t, "\r\n\xe6\xbc\xa2\x1b[");
+        feed(t, "2b\r\ne\xcc\x81\x1b[1b");
+        CHECK(t.rowText(0) == "xxxx");
+        // libvterm counts REP in cells (xterm: characters): 2 more cells = one more 漢.
+        CHECK(t.rowText(1) == "\xe6\xbc\xa2\xe6\xbc\xa2");
+        CHECK(t.rowText(2) == "e\xcc\x81" "e\xcc\x81" || t.rowText(2) == "e\xcc\x81");  // dropped = conservative
+        // A REP whose start arrived in an earlier chunk is aborted cleanly.
+        VtermSession u(3, 20);
+        feed(u, "\x1b[H\xcc\x81\x1b[9");
+        feed(u, "9bz");
+        CHECK(u.rowText(0) == "z");
+    }
     if (failures == 0) std::printf("fuzz_regress_test: OK\n");
     return failures ? 1 : 0;
 }

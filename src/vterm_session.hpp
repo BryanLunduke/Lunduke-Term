@@ -45,6 +45,9 @@ void truncateUtf8(std::string& s, size_t max);
 
 // Cell width (1 or 2) libvterm gives a code point; see vterm_session.cpp.
 int libvtermWidth(uint32_t cp);
+// True when libvterm 0.3.3 prints the code point with width 0 (a combining mark or other
+// zero-width character on its own). Probed and cached like libvtermWidth.
+bool libvtermZeroWidth(uint32_t cp);
 
 class VtermSession : public LineSource {
 public:
@@ -196,6 +199,12 @@ private:
     int csiDigits_ = 0;
     bool csiArgs_ = false;   // a digit or separator was seen (leader bytes are over)
     bool csiInter_ = false;  // an intermediate byte was seen
+    // Last code point printed as text (0: none yet / unknown) and the UTF-8 decoder for it.
+    // libvterm 0.3.3 REP (CSI Ps b) loops forever when the last printed glyph had width 0 (a
+    // lone combining mark, or nothing printed yet), so feed() drops REP then (fuzz finding F7).
+    uint32_t lastCp_ = 0;
+    uint32_t u8acc_ = 0;
+    int u8need_ = 0;
     void restoreCharsets();
     std::string penSgr() const;
     // Continuation flags of the screen rows, taken just before an operation that may push
