@@ -133,6 +133,11 @@ public:
         damaged_ = false;
         return d;
     }
+    // For the fuzzer's differential check (tools/fuzz): feed()'s escape-guard state (see
+    // csiState_) and the VTerm whose parser it mirrors.
+    int guardState() const { return csiState_; }
+    int guardIntermediates() const { return csiState_ == 3 ? escInters_ : 0; }
+    VTerm* vtermForCheck() const { return vt_; }
     const std::string& title() const { return title_; }
     std::function<void()> onTitle;
     std::function<void()> onBell;

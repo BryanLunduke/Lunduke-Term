@@ -6,11 +6,23 @@
 // child), or reads everything back the way the view does (fillGrid, cellText/cellChars, rowText,
 // selection text, search). Built with clang -fsanitize=fuzzer,address,undefined against
 // libvterm 0.3.3 compiled from source with the same flags (tools/fuzz/build.sh).
+//
+// Differential check (review of M4): feed() keeps its own copy of libvterm's escape-parser state
+// to stop the inputs that crash or hang libvterm (F1, F7, F12, F13). If the two disagree, a
+// sequence the guard thinks is over (or is plain text) is still open in libvterm, and the guard's
+// checks can be walked around. After every feed (and, for half of the feed ops, after every
+// single byte) the harness compares feed()'s state with libvterm's own parser struct (read
+// through vterm_internal.h, which is why this works only in this build) and aborts on a
+// mismatch. See docs/FUZZING.md for what it does and does not cover.
 #include "search.hpp"
 #include "selection.hpp"
 #include "vterm_session.hpp"
 
 #include <fuzzer/FuzzedDataProvider.h>
+
+extern "C" {
+#include "vterm_internal.h"  // libvterm 0.3.3 source tree (tools/fuzz/build.sh: -I$VT/src)
+}
 
 #include <cstdint>
 #include <cstdio>
@@ -26,6 +38,43 @@ static void traceStr(const char* what, const std::string& s) {
     std::fprintf(stderr, "%s \"", what);
     for (unsigned char c : s) std::fprintf(stderr, c >= 0x20 && c < 0x7f && c != '"' && c != '\\' ? "%c" : "\\x%02x", c);
     std::fprintf(stderr, "\"\n");
+}
+
+// The class of libvterm's parser state in feed()'s numbering (csiState_; 1 and 3 differ in
+// whether intermediates were collected).
+static int parserClass(const VTerm* vt, int* inters) {
+    const auto& p = vt->parser;
+    using PS = decltype(p.state);  // enum nested in the C struct
+    const bool str = p.state >= PS::OSC_COMMAND;
+    *inters = 0;
+    if (p.in_esc && str) return 5;
+    if (p.in_esc) {
+        *inters = p.intermedlen;
+        return p.intermedlen ? 3 : 1;
+    }
+    switch (p.state) {
+    case PS::NORMAL: return 0;
+    case PS::CSI_LEADER:
+    case PS::CSI_ARGS:
+    case PS::CSI_INTERMED: return 2;
+    case PS::DCS_COMMAND: return 6;
+    case PS::OSC_COMMAND: return 7;
+    default: return 4;  // OSC, DCS, APC, PM, SOS strings
+    }
+}
+
+static void checkGuard(const VtermSession& s, const char* where) {
+    int inters = 0;
+    const int lv = parserClass(s.vtermForCheck(), &inters);
+    const int g = s.guardState();
+    // libvterm stops counting intermediates at INTERMED_MAX - 1.
+    const int gi = std::min(s.guardIntermediates(), INTERMED_MAX - 1);
+    if (lv == g && (g != 3 || gi == inters)) return;
+    std::fprintf(stderr, "guard/libvterm parser mismatch after %s: guard state %d (intermediates %d), libvterm %d "
+                 "(state %d, in_esc %d, intermedlen %d)\n", where, g, gi, lv,
+                 static_cast<int>(s.vtermForCheck()->parser.state), static_cast<int>(s.vtermForCheck()->parser.in_esc),
+                 s.vtermForCheck()->parser.intermedlen);
+    std::abort();
 }
 
 static void readBack(const VtermSession& s, FuzzedDataProvider& fdp) {
@@ -63,9 +112,18 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     while (fdp.remaining_bytes() > 0 && ops++ < 400) {
         switch (fdp.ConsumeIntegralInRange<int>(0, 15)) {
         default: {  // most ops: terminal output
+            const bool bytewise = fdp.ConsumeBool();
             const std::string chunk = fdp.ConsumeRandomLengthString(512);
-            traceStr("feed", chunk);
-            s.feed(chunk);
+            traceStr(bytewise ? "feed bytewise" : "feed", chunk);
+            if (bytewise) {
+                for (char c : chunk) {
+                    s.feed(&c, 1);
+                    checkGuard(s, "a byte");
+                }
+            } else {
+                s.feed(chunk);
+                checkGuard(s, "a chunk");
+            }
             break;
         }
         case 9: {
@@ -113,6 +171,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         }
         (void)s.takeOutput();
         (void)s.takeDamage();
+        checkGuard(s, "an op");
     }
     readBack(s, fdp);
     return 0;

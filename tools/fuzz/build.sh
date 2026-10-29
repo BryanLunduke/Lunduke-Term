@@ -18,7 +18,7 @@ PC=$(pkg-config --cflags pangocairo fontconfig glib-2.0)
 for f in vterm_session selection search profiles effects font_resolve; do
   $CLANG clang++ -std=c++17 $SAN -I"$VT/include" -I"$SRC/src" $PC -c "$SRC/src/$f.cpp" -o "$OUT/obj/$f.o"
 done
-$CLANG clang++ -std=c++17 $SAN -I"$VT/include" -I"$SRC/src" $PC -c "$SRC/tools/fuzz/vterm_fuzz.cpp" -o "$OUT/obj/vterm_fuzz.o"
+$CLANG clang++ -std=c++17 $SAN -I"$VT/include" -I"$VT/src" -I"$SRC/src" $PC -c "$SRC/tools/fuzz/vterm_fuzz.cpp" -o "$OUT/obj/vterm_fuzz.o"
 $CLANG clang++ -fsanitize=fuzzer,address,undefined "$OUT"/obj/*.o -o "$OUT/vterm_fuzz" \
   $(pkg-config --libs pangocairo fontconfig glib-2.0) -lutil
 echo "$OUT/vterm_fuzz"
