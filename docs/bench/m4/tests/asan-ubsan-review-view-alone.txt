@@ -1,0 +1,17 @@
+# ASan+UBSan build-san, meson test view only, --timeout-multiplier 4, code c0323c9, 2026-10-29 01:23 EDT, after two serial-suite failures at view_test.cpp:673
+ninja: Entering directory `/workspace/lunduke-term-m4/build-san'
+ninja: no work to do.
+1/1 view OK              94.11s
+
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+Unexpected Pass:    0   
+Skipped:            0   
+Timeout:            0   
+
+Full log written to /workspace/lunduke-term-m4/build-san/meson-logs/testlog.txt
+exit 0
+--- from testlog.txt:
+governor auto: demoted at 7.5 s, back to reduced, tick 100 ms
+governor cpu: demoted at 7.1 s, back to reduced, tick 118 ms
