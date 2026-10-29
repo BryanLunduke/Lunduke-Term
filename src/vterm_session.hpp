@@ -43,6 +43,9 @@ void closeFrom3(int maxFd);
 // Truncates to at most max bytes without splitting a UTF-8 sequence.
 void truncateUtf8(std::string& s, size_t max);
 
+// Cell width (1 or 2) libvterm gives a code point; see vterm_session.cpp.
+int libvtermWidth(uint32_t cp);
+
 class VtermSession : public LineSource {
 public:
     VtermSession(int rows, int cols);
@@ -138,6 +141,7 @@ private:
     };
     Color8 mapColor(VTermColor c, bool foreground) const;
     void toCell(const VTermScreenCell& vc, Cell& cell) const;
+    void normalizeCell(int col, VTermScreenCell& c) const;
     bool getCell(long line, int col, VTermScreenCell& out) const;
     void scanModes(const char* bytes, size_t len);
     static int cbDamage(VTermRect, void* user);

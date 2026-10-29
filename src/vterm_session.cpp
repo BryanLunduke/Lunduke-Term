@@ -8,6 +8,8 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <mutex>
+#include <unordered_map>
 #include <fcntl.h>
 #include <pwd.h>
 #include <sys/ioctl.h>
@@ -728,18 +730,74 @@ static VTermScreenCell blankCell() {
     return c;
 }
 
+// The width libvterm 0.3.3 itself gives a code point (its own table, not exported): measured
+// once per code point on a private 1x8 terminal and remembered. Code points below U+1100 are
+// all narrow there.
+int libvtermWidth(uint32_t cp) {
+    if (cp < 0x1100) return 1;
+    static std::mutex m;
+    static std::vector<int8_t> bmp(0x10000, 0);
+    static std::unordered_map<uint32_t, int8_t> astral;
+    static VTerm* probe = nullptr;
+    std::lock_guard<std::mutex> lock(m);
+    int8_t* slot = cp < 0x10000 ? &bmp[cp] : &astral[cp];
+    if (*slot) return *slot;
+    if (!probe) {
+        probe = vterm_new(1, 8);
+        vterm_set_utf8(probe, 1);
+        vterm_screen_reset(vterm_obtain_screen(probe), 1);
+    }
+    std::string q = "\x1b[H";
+    appendUtf8(q, cp > 0x10FFFF ? 0xFFFD : cp);
+    vterm_input_write(probe, q.data(), q.size());
+    VTermPos p;
+    vterm_state_get_cursorpos(vterm_obtain_state(probe), &p);
+    *slot = p.col == 2 ? 2 : 1;
+    return *slot;
+}
+
+// libvterm 0.3.3 keeps a wide character as the cell plus a marker in the next cell, and does not
+// keep the two consistent when only one half is overwritten or erased (xterm erases the whole
+// character then): a narrow character printed over the left half came back as a 2-cell "x"
+// hiding the right half, a wide character whose right half was overwritten or erased came back
+// 1 cell wide (drawn over its neighbour), ICH/DCH inside it left a 2-cell blank, and a reflow-free
+// resize can leave a wide character in the last column. This makes such cells what a VT would
+// show: a narrow character / blank 1 cell wide, a half-covered wide character a blank (keeping
+// its colours). It also replaces code points that are not Unicode scalar values (libvterm
+// decodes F4 90 80 80 to U+110000) with U+FFFD, so no invalid UTF-8 reaches Pango or the
+// clipboard.
+void VtermSession::normalizeCell(int col, VTermScreenCell& c) const {
+    for (int i = 0; i < VTERM_MAX_CHARS_PER_CELL && c.chars[i] && c.chars[i] != 0xFFFFFFFFu; ++i)
+        if (c.chars[i] > 0x10FFFF || (c.chars[i] >= 0xD800 && c.chars[i] <= 0xDFFF)) c.chars[i] = 0xFFFD;
+    const uint32_t base = c.chars[0];
+    if (base == 0 || base == 0xFFFFFFFFu) {
+        if (c.width > 1) c.width = 1;
+        return;
+    }
+    const int w = libvtermWidth(base);
+    if (c.width == 2 && (w != 2 || col == cols_ - 1)) {
+        if (w == 2) c.chars[0] = 0;  // a wide character with no room for its right half
+        c.width = 1;
+    } else if (c.width == 1 && w == 2) {
+        c.chars[0] = 0;  // right half overwritten / erased
+    }
+}
+
 bool VtermSession::getCell(long line, int col, VTermScreenCell& out) const {
     if (col < 0 || col >= cols_) return false;
     if (line >= pushed_) {
         long r = line - pushed_;
         if (r >= rows_) return false;
-        return vterm_screen_get_cell(screen_, VTermPos{static_cast<int>(r), col}, &out) != 0;
+        if (!vterm_screen_get_cell(screen_, VTermPos{static_cast<int>(r), col}, &out)) return false;
+        normalizeCell(col, out);
+        return true;
     }
     long idx = static_cast<long>(sb_.size()) - (pushed_ - line);
     if (idx < 0) return false;
     const SbLine& l = sb_[static_cast<size_t>(idx)];
     if (col < static_cast<int>(l.cells.size())) out = l.cells[static_cast<size_t>(col)];
     else out = blankCell();
+    normalizeCell(col, out);
     return true;
 }
 
@@ -906,17 +964,28 @@ void VtermSession::focus(bool in) {
 }
 
 std::string VtermSession::rowText(int row) const {
-    // vterm_screen_get_text() returns the length the text needs, which can be more than the
-    // buffer it was given (wide rows of combining characters: up to 6 code points of 4 bytes
-    // per cell); the old fixed 4 KiB buffer was then read past its end. Ask again with room.
-    char buf[4096];
-    VTermRect rect{row, row + 1, 0, cols_};
-    size_t n = vterm_screen_get_text(screen_, buf, sizeof buf, rect);
-    if (n <= sizeof buf) return std::string(buf, n);
-    std::string big(n, '\0');
-    n = vterm_screen_get_text(screen_, &big[0], big.size(), rect);
-    big.resize(std::min(n, big.size()));
-    return big;
+    // Built from the normalised cells (getCell()), so it says what the screen shows; the same
+    // rules as vterm_screen_get_text(): blanks become spaces, trailing blanks are dropped, the
+    // right half of a wide character is skipped. (The old version used a fixed 4 KiB buffer with
+    // vterm_screen_get_text(), which returns the length it needed and was read past its end on
+    // long rows of combining characters: fuzz_regress_test F4.)
+    std::string out;
+    size_t pending = 0;
+    const long line = pushed_ + row;
+    for (int c = 0; c < cols_; ++c) {
+        uint32_t cp[VTERM_MAX_CHARS_PER_CELL];
+        int w = 1;
+        const int n = cellChars(line, c, cp, VTERM_MAX_CHARS_PER_CELL, &w);
+        if (w == 0) continue;
+        if (n == 0) {
+            ++pending;
+            continue;
+        }
+        out.append(pending, ' ');
+        pending = 0;
+        for (int k = 0; k < n; ++k) appendUtf8(out, cp[k]);
+    }
+    return out;
 }
 
 int VtermSession::cbDamage(VTermRect, void* user) {

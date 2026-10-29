@@ -113,6 +113,9 @@ test('fixes', executable('fixes_test', 'tests/fixes_test.cpp',
 test('fuzz-regress', executable('fuzz_regress_test', 'tests/fuzz_regress_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
   timeout : 60, env : test_env)
+test('unicode', executable('unicode_test', 'tests/unicode_test.cpp',
+  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
+  timeout : 60, env : test_env)
 test('search', executable('search_test', 'tests/search_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
   timeout : 60, env : test_env)
