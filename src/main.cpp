@@ -3,7 +3,7 @@
 //   lunduke-terminal [--profile ID] [--effects|--no-effects] [--renderer auto|gl|cpu]
 //                    [--threads N] [--effects-fps N] [--max-fps N] [--no-pause-unfocused]
 //                    [--effects-quality auto|full|reduced|static] [--cpu-budget PERCENT]
-//                    [--font FAMILY] [--font-px N] [--size WxH] [--quit-after MS] [--stats]
+//                    [--font FAMILY] [--font-px N] [--size WxH] [--quit-after MS] [--stats] [--stats-every S]
 //                    [--scrollback N] [--login] [--cwd DIR] [--on-exit close|hold|hold-on-error]
 //                    [--hold] [--bell LIST] [--cursor-shape block|underline|bar]
 //                    [--cursor-blink|--no-cursor-blink]
@@ -25,6 +25,7 @@
 #include <gtkmm.h>
 
 #include <cstdio>
+#include <malloc.h>
 #include <cstdlib>
 #include <cstring>
 #include <sys/wait.h>
@@ -91,6 +92,7 @@ int main(int argc, char** argv) {
     lterm::ViewOptions opts;
     loadSettings(opts);
     int w = 1280, h = 800, quitAfter = 0;
+    int statsEvery = 0;  // --stats-every: seconds between memory lines (M4 item 4)
     std::string title = "Lunduke Terminal";  // -T/--title (x-terminal-emulator interface)
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
@@ -113,6 +115,7 @@ int main(int argc, char** argv) {
         else if (a == "--size" && i + 1 < argc) std::sscanf(argv[++i], "%dx%d", &w, &h);
         else if (a == "--quit-after" && i + 1 < argc) quitAfter = std::atoi(argv[++i]);
         else if (a == "--stats") opts.stats = true;
+        else if (a == "--stats-every" && i + 1 < argc) statsEvery = std::atoi(argv[++i]);
         else if ((a == "-T" || a == "--title") && i + 1 < argc) title = argv[++i];
         else if (a == "--scrollback" && i + 1 < argc) opts.scrollbackLines = std::strtoll(argv[++i], nullptr, 10);
         else if (a == "--login") opts.loginShell = true;
@@ -163,5 +166,34 @@ int main(int argc, char** argv) {
     win.show();
     if (!win.newTab(true)) return 1;
     if (quitAfter > 0) Glib::signal_timeout().connect_once([&] { win.hide(); }, quitAfter);
+    if (statsEvery > 0) {
+        // M4 item 4: memory accounting every N s on stdout (heap from glibc, the rest from the views).
+        const gint64 t0 = g_get_monotonic_time();
+        Glib::signal_timeout().connect_seconds([&win, t0] {
+            const struct mallinfo2 mi = mallinfo2();
+            lterm::ViewMemory sum;
+            for (int i = 0; i < win.tabCount(); ++i)
+                if (lterm::TerminalView* v = win.view(i)) {
+                    const lterm::ViewMemory m = v->memory();
+                    sum.scrollbackLines += m.scrollbackLines;
+                    sum.scrollbackBytes += m.scrollbackBytes;
+                    sum.glyphs += m.glyphs;
+                    sum.glyphBytes += m.glyphBytes;
+                    sum.textures += m.textures;
+                    sum.textureBytes += m.textureBytes;
+                    sum.surfaceBytes += m.surfaceBytes;
+                    sum.statSamples += m.statSamples;
+                }
+            std::printf("stats-mem t=%.0f tabs=%d heap-arena=%zu heap-mmap=%zu heap-mmap-n=%zu heap-inuse=%zu "
+                        "heap-free=%zu heap-releasable=%zu sb-lines=%zu sb-bytes=%zu glyphs=%zu glyph-bytes=%zu "
+                        "textures=%d texture-bytes=%zu surface-bytes=%zu stat-samples=%zu\n",
+                        (g_get_monotonic_time() - t0) / 1e6, win.tabCount(), mi.arena, mi.hblkhd, mi.hblks,
+                        mi.uordblks + mi.hblkhd, mi.fordblks, mi.keepcost, sum.scrollbackLines, sum.scrollbackBytes,
+                        sum.glyphs, sum.glyphBytes, sum.textures, sum.textureBytes, sum.surfaceBytes,
+                        sum.statSamples);
+            std::fflush(stdout);
+            return true;
+        }, static_cast<unsigned>(statsEvery));
+    }
     return app->run(win);
 }

@@ -43,6 +43,12 @@ void closeFrom3(int maxFd);
 // Truncates to at most max bytes without splitting a UTF-8 sequence.
 void truncateUtf8(std::string& s, size_t max);
 
+// Cell width (1 or 2) libvterm gives a code point; see vterm_session.cpp.
+int libvtermWidth(uint32_t cp);
+// True when libvterm 0.3.3 prints the code point with width 0 (a combining mark or other
+// zero-width character on its own). Probed and cached like libvtermWidth.
+bool libvtermZeroWidth(uint32_t cp);
+
 class VtermSession : public LineSource {
 public:
     VtermSession(int rows, int cols);
@@ -69,6 +75,8 @@ public:
 
     void resize(int rows, int cols);  // vterm_set_size (+ reflow) + TIOCSWINSZ
     int rows() const { return rows_; }
+    // Resizes done without reflow to dodge libvterm's abort() (see reflowWouldAbort()).
+    int reflowFallbacks() const { return reflowFallbacks_; }
     int cols() const override { return cols_; }
 
     // Input.
@@ -101,6 +109,7 @@ public:
     void setScrollbackLimit(size_t lines);  // clamped to kMaxScrollbackLines
     size_t scrollbackLimit() const { return sbLimit_; }
     size_t scrollbackSize() const { return sb_.size(); }
+    size_t scrollbackBytes() const;  // M4 item 4: cell storage of the history (capacity, not size)
     long topLine() const { return pushed_; }
     long firstLine() const override { return pushed_ - static_cast<long>(sb_.size()); }
     long endLine() const override { return pushed_ + rows_; }
@@ -124,6 +133,12 @@ public:
         damaged_ = false;
         return d;
     }
+    // For the fuzzer's differential check (tools/fuzz): feed()'s escape-guard state (see
+    // csiState_) and the VTerm whose parser it mirrors.
+    int guardState() const { return csiState_; }
+    int guardIntermediates() const { return csiState_ == 3 ? escInters_ : 0; }
+    bool guardHoldsEsc() const { return stringEscHeld_; }
+    VTerm* vtermForCheck() const { return vt_; }
     const std::string& title() const { return title_; }
     std::function<void()> onTitle;
     std::function<void()> onBell;
@@ -135,6 +150,7 @@ private:
     };
     Color8 mapColor(VTermColor c, bool foreground) const;
     void toCell(const VTermScreenCell& vc, Cell& cell) const;
+    void normalizeCell(int col, VTermScreenCell& c) const;
     bool getCell(long line, int col, VTermScreenCell& out) const;
     void scanModes(const char* bytes, size_t len);
     static int cbDamage(VTermRect, void* user);
@@ -148,8 +164,10 @@ private:
     static int cbSbClear(void* user);
     static void cbOutput(const char* s, size_t len, void* user);
     void feedRaw(const char* bytes, size_t len);
+    void holdStringEsc(const char* bytes, size_t i, size_t& done);
     void snapshotWraps();  // see wrapSnap_
     void clearTopContinuation();  // libvterm 0.3.3 reflow reads row -1 otherwise (see resize())
+    bool reflowWouldAbort(int newRows, int newCols) const;  // libvterm 0.3.3 abort(), see resize()
 
     VTerm* vt_ = nullptr;
     VTermScreen* screen_ = nullptr;
@@ -165,7 +183,8 @@ private:
     bool altScreen_ = false, reverse_ = false;
     bool x10_ = false;
     int scanState_ = 0;
-    int csiState_ = 0;    // feed(): 0 ground, 1 after ESC, 2 inside CSI
+    int csiState_ = 0;    // feed(): 0 ground, 1 after ESC, 2 inside CSI, 3 ESC + intermediates, 4 control string,
+                          // 5 ESC in a string, 6 DCS command, 7 OSC number (mirrors libvterm's parser)
     long csiStart_ = -1;  // index of the ESC of the open CSI in the current chunk
     // libvterm's DECSC/DECRC (ESC 7/8, CSI ?1048/?1049) do not save the character set state
     // (G0/G1 designations, SO/SI), which a VT100 does; feed() tracks it and restores it.
@@ -174,9 +193,40 @@ private:
         bool shifted = false;  // SO: G1 invoked into GL
     };
     Charsets cs_, savedCs_;
-    int escTarget_ = 0;       // feed() state 3: 0 = G0, 1 = G1 being designated
+    int escTarget_ = -1;      // feed() state 3: 0 = G0, 1 = G1 being designated (ESC ( / ESC )), else -1
+    int escInters_ = 0;       // feed() state 3: intermediate bytes so far
+    // feed() state 5: the ESC is not given to libvterm yet (F15, see holdStringEsc()). It is,
+    // right before the next byte that ends the escape; C0 controls before that go on without it.
+    bool stringEscHeld_ = false;
     std::string csiParams_;   // parameters of the open CSI (bounded)
+    // libvterm 0.3.3 stores CSI arguments in a fixed long[16] without a bounds check: a 17th
+    // argument overwrites the parser's callbacks pointer (crash, or worse, from any program's
+    // output). feed() counts the separators and drops the parameter bytes after the 15th.
+    int csiSeps_ = 0;
+    int reflowFallbacks_ = 0;
+    // Its argument accumulator (long * 10 + digit) also overflows (undefined behaviour), and a
+    // value >= 2^31 collides with its CSI_ARG_FLAG_MORE bit: feed() keeps at most 9 significant
+    // digits per argument (the rest are dropped, so the value stays huge and gets clamped).
+    int csiDigits_ = 0;
+    bool csiArgs_ = false;   // a digit or separator was seen (leader bytes are over)
+    bool csiInter_ = false;  // an intermediate byte was seen
+    // Last code point printed as text (0: none yet / unknown) and the UTF-8 decoder for it.
+    // libvterm 0.3.3 REP (CSI Ps b) loops forever when the last printed glyph had width 0 (a
+    // lone combining mark, or nothing printed yet), so feed() drops REP then (fuzz finding F7).
+    uint32_t lastCp_ = 0;
+    uint32_t u8acc_ = 0;
+    int u8need_ = 0;
     void restoreCharsets();
+    // libvterm 0.3.3 does not clamp the saved cursor (DECSC, ?1048h, ?1049h) on resize, so a
+    // DECRC after shrinking puts the cursor outside the screen and the next character reads
+    // past lineinfo[] (fuzz finding F9). Called after every cursor restore.
+    void clampCursorAfterRestore();
+    // Moves the cursor to (row, col), also in origin mode (see clampCursorAfterRestore).
+    void placeCursor(int row, int col);
+    // A DECSTBM / DECSLRM with parameters was seen. libvterm 0.3.3 only clamps the bottom/right
+    // margin on resize, so shrinking below the region's top/left leaves top > bottom and the next
+    // LF memmove()s a negative size (fuzz finding F10); resize() resets the margins then.
+    bool regionSet_ = false;
     std::string penSgr() const;
     // Continuation flags of the screen rows, taken just before an operation that may push
     // several lines to the scrollback at once (CSI S, CSI M, resize). libvterm shifts its line

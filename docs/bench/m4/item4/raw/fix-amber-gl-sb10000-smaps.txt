@@ -1,0 +1,44 @@
+# t=0 s
+anon<1MiB 2808
+anon>=1MiB 52896
+file:libLLVM 56768
+file:libgallium 11296
+file:other 10176
+file:other-libs 35848
+heap(main-arena) 49256
+other-special 8
+shm/memfd 2560
+stack 80
+# t=36 s
+anon<1MiB 3016
+anon>=1MiB 11912
+file:libLLVM 56768
+file:libgallium 11296
+file:other 10476
+file:other-libs 36312
+heap(main-arena) 192704
+other-special 8
+shm/memfd 10244
+stack 88
+# t=65 s
+anon<1MiB 3016
+anon>=1MiB 11912
+file:libLLVM 56768
+file:libgallium 11296
+file:other 10476
+file:other-libs 36312
+heap(main-arena) 171500
+other-special 8
+shm/memfd 12804
+stack 88
+# t=603 s
+anon<1MiB 3016
+anon>=1MiB 9860
+file:libLLVM 56768
+file:libgallium 11296
+file:other 10476
+file:other-libs 36312
+heap(main-arena) 191844
+other-special 8
+shm/memfd 12804
+stack 88

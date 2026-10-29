@@ -123,7 +123,10 @@ cairo_surface_t* GridPainter::glyph(const Cell& cell) {
     if (it != cache_.end()) return it->second;
     if (cache_.size() >= 8192) clearCache();  // crude bound; real terminals rarely get here
     const int w = cellW_ * key.width + 2 * padX_;
-    cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_A8, w, cellH_);
+    // Rendered in ARGB32 first: a colour glyph (Noto Color Emoji and other colour fonts) is kept
+    // as a colour image and painted as-is; anything else becomes an A8 mask tinted with the cell
+    // colour. (Before M4 item 5 everything was A8, so emoji came out as fg-coloured silhouettes.)
+    cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, cellH_);
     cairo_t* cr = cairo_create(s);
     PangoLayout* layout = glyphLayout_;
     pango_layout_set_font_description(layout, cell.bold ? bold_ : font_);
@@ -142,6 +145,33 @@ cairo_surface_t* GridPainter::glyph(const Cell& cell) {
     pango_cairo_show_layout(cr, layout);
     cairo_destroy(cr);
     cairo_surface_flush(s);
+    const int st = cairo_image_surface_get_stride(s);
+    const uint8_t* d = cairo_image_surface_get_data(s);
+    bool colour = false;
+    for (int y = 0; y < cellH_ && !colour; ++y) {
+        const uint32_t* row = reinterpret_cast<const uint32_t*>(d + static_cast<size_t>(y) * st);
+        for (int x = 0; x < w; ++x) {
+            const uint32_t p = row[x], a = p >> 24, r = (p >> 16) & 0xff, g = (p >> 8) & 0xff, b = p & 0xff;
+            // White drawn through a mask is premultiplied grey: r == g == b == a.
+            if (r != a || g != a || b != a) {
+                colour = true;
+                break;
+            }
+        }
+    }
+    if (!colour) {
+        cairo_surface_t* m = cairo_image_surface_create(CAIRO_FORMAT_A8, w, cellH_);
+        cairo_surface_flush(m);
+        uint8_t* md = cairo_image_surface_get_data(m);
+        const int ms = cairo_image_surface_get_stride(m);
+        for (int y = 0; y < cellH_; ++y) {
+            const uint32_t* row = reinterpret_cast<const uint32_t*>(d + static_cast<size_t>(y) * st);
+            for (int x = 0; x < w; ++x) md[static_cast<size_t>(y) * ms + x] = row[x] >> 24;
+        }
+        cairo_surface_mark_dirty(m);
+        cairo_surface_destroy(s);
+        s = m;
+    }
     cache_.emplace(std::move(key), s);
     return s;
 }
@@ -179,8 +209,13 @@ void GridPainter::paintRows(cairo_t* cr, const Grid& g, int ox, int oy, Color8 c
             }
             if (!(cell.width == 0 || cell.text.empty() || (cell.text == " " && !cell.underline))) {
                 cairo_surface_t* m = glyph(cell);
-                setColor(cr, solid ? cell.bg : cell.fg);
-                cairo_mask_surface(cr, m, ox + c * cellW_ - padX_, y);
+                if (cairo_image_surface_get_format(m) == CAIRO_FORMAT_ARGB32) {  // colour glyph
+                    cairo_set_source_surface(cr, m, ox + c * cellW_ - padX_, y);
+                    cairo_paint(cr);
+                } else {
+                    setColor(cr, solid ? cell.bg : cell.fg);
+                    cairo_mask_surface(cr, m, ox + c * cellW_ - padX_, y);
+                }
             }
             if (isCursor && !solid) {
                 const int w = cellW_ * (cell.width == 2 ? 2 : 1);
@@ -235,6 +270,15 @@ void rgbaToSurface(const uint8_t* rgba, int w, int h, cairo_surface_t* s) {
             row[x] = 0xff000000u | (uint32_t(i[x * 4]) << 16) | (uint32_t(i[x * 4 + 1]) << 8) | i[x * 4 + 2];
     }
     cairo_surface_mark_dirty(s);
+}
+
+size_t GridPainter::cachedGlyphBytes() const {
+    size_t b = 0;
+    for (const auto& kv : cache_)
+        if (kv.second)
+            b += static_cast<size_t>(cairo_image_surface_get_stride(kv.second)) *
+                 static_cast<size_t>(cairo_image_surface_get_height(kv.second));
+    return b;
 }
 
 }  // namespace lterm

@@ -1,0 +1,4 @@
+stats: quality=reduced software=1 tick-interval 120.8 ms
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=9 full-repaints=1 rows-painted=50 ticks=14 median paint 0.38 ms, median effects-source 10.62 ms, median tick 8.07 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 139.1 ms
+zombies: 0

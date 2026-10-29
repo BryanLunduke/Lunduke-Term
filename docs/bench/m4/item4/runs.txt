@@ -1,0 +1,23 @@
+M4 item 4 soak runs (soak4.sh: 1024x640, amber unless noted, LIBGL_ALWAYS_SOFTWARE=1, llvmpipe on Xvfb :44/:45;
+each loop opens 3 tabs, types into them, closes 3, resizes 4 times; RSS from smaps_rollup).
+Binary: 123d13b (no trim) for base/sb0/mmapthr128k/cpu/plain; 95fd762 (malloc_trim after tab close) for trim/fix-*.
+label                    duration  args/env
+base-amber-gl-sb10000    600 s     --profile amber (scrollback 10000 default)
+sb0                      120 s     --profile amber --scrollback 0
+mmapthr128k              120 s     MALLOC_MMAP_THRESHOLD_=131072 --profile amber
+cpu                      120 s     --profile amber --renderer cpu
+plain                    120 s     --profile plain
+trim-amber-gl            120 s     --profile amber
+fix-amber-gl-sb10000     600 s     --profile amber
+fix-sb0                  120 s     --profile amber --scrollback 0
+fix-arenamax1            120 s     MALLOC_ARENA_MAX=1 --profile amber
+Summary (kB; mean/max over samples at t>=30 s):
+base-amber-gl-sb10000    rss_t0=221932 mean=500920 max=502232 last=498604
+sb0                      rss_t0=205336 mean=470683 max=472292 last=469736
+mmapthr128k              rss_t0=221300 mean=448069 max=448968 last=446412
+cpu                      rss_t0=166888 mean=210309 max=211064 last=211064
+plain                    rss_t0=138800 mean=154935 max=157132 last=154572
+trim-amber-gl            rss_t0=221864 mean=329270 max=339956 last=339956
+fix-amber-gl-sb10000     rss_t0=221696 mean=333602 max=342512 last=332472
+fix-sb0                  rss_t0=206036 mean=298105 max=304704 last=296048
+fix-arenamax1            rss_t0=221564 mean=337732 max=340860 last=336432

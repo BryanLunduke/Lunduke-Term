@@ -1,0 +1,32 @@
+# ASan+UBSan build-san (meson test env: ASAN_OPTIONS=detect_leaks=1, LSAN suppressions tests/lsan.supp), --timeout-multiplier 4 --num-processes 2, code c0323c9, run 1, 2026-10-29 01:16 EDT, no fuzzer running
+ninja: Entering directory `/workspace/lunduke-term-m4/build-san'
+ninja: no work to do.
+ 1/15 desktop-file OK               0.01s
+ 2/15 metainfo     OK               0.02s
+ 3/15 governor     OK               0.01s
+ 4/15 profiles     OK               0.01s
+ 5/15 painter      OK               0.33s
+ 6/15 fonts        OK               0.06s
+ 7/15 vterm        OK               0.02s
+ 8/15 effects      OK               1.86s
+ 9/15 session      OK               0.11s
+10/15 fixes        OK               0.45s
+11/15 fuzz-regress OK               0.03s
+12/15 unicode      OK               0.03s
+13/15 search       OK              23.38s
+14/15 gl-match     OK             101.23s
+15/15 view         OK              95.13s
+
+Ok:                 15  
+Expected Fail:      0   
+Fail:               0   
+Unexpected Pass:    0   
+Skipped:            0   
+Timeout:            0   
+
+Full log written to /workspace/lunduke-term-m4/build-san/meson-logs/testlog.txt
+exit 0
+--- from testlog.txt:
+tab close (ASan+UBSan build): 19 closes, worst 17.29 ms, total 115.14 ms; 19 still running right after, all reaped 2002 ms later (limit 75 ms)
+governor auto: demoted at 7.5 s, back to reduced, tick 100 ms
+governor cpu: demoted at 7.1 s, back to reduced, tick 183 ms

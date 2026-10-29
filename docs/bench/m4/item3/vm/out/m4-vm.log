@@ -1,0 +1,5 @@
+/t/m4-vm.sh: 22: cannot create /t/out/idle-plain-/default0.log: Directory nonexistent
+/t/m4-vm.sh: 24: cannot create /t/out/trace-plain-/default0.txt: Directory nonexistent
+/t/m4-vm.sh: 28: cannot create /t/out/trace-plain-/default0.txt: Directory nonexistent
+/t/m4-vm.sh: 28: cannot create /t/out/trace-plain-/default0.txt: Directory nonexistent
+grep: /t/out/idle-plain-/default0.log: No such file or directory

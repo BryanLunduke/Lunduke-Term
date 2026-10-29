@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Scrollback search (M2 stage 3): matches in history and on screen, case folding, soft-wrapped
 // lines, wide characters, next/previous with wrap-around, history that scrolled away.
+#include "sanitizer.hpp"
 #include "search.hpp"
 #include "vterm_session.hpp"
 
@@ -92,7 +93,7 @@ int main() {
         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
         std::printf("search 10000+24 lines x 80: %zu matches in %.1f ms\n", m.size(), ms);
         CHECK(m.size() >= 10000);
-        CHECK(ms < 2000.0);  // generous: ASan/UBSan debug builds run this too
+        CHECK(ms < (LTERM_ASAN ? 6000.0 : 2000.0));  // ASan+UBSan: 1.5-2.0 s measured in M4
     }
     // ---- M3 item 1(a): SearchIndex (cached, sliced) gives the same results as findAll ----
     auto sameAs = [](const LineSource& src, SearchIndex& idx, const std::string& q, bool cs) {
@@ -216,7 +217,9 @@ int main() {
         std::printf("100000 lines: build %d slices (worst %.2f ms), worst keystroke %.2f ms, %zu matches\n", slices,
                     worstSlice, worstKey, n);
         CHECK(n == 100);
-        CHECK(worstSlice < 60.0);
+        // A slice is 4 ms nominal; the bound is for a loaded box. ASan+UBSan is 3-10x slower
+        // (M3: 75.8 ms once), so it gets its own bound.
+        CHECK(worstSlice < (LTERM_ASAN ? 250.0 : 60.0));
         CHECK(worstKey < 200.0);
     }
     if (failures == 0) std::printf("search_test: OK\n");

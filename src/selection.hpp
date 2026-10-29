@@ -29,6 +29,10 @@ public:
     virtual int cellChars(long line, int col, uint32_t* out, int max, int* width) const;
 };
 
+// True for the empty last column of a soft-wrapped row whose wide character moved to the next
+// row (copy and search skip it).
+bool wideJumpGap(const LineSource& src, long line, int col, long end);
+
 struct SelPos {
     long line = 0;
     int col = 0;

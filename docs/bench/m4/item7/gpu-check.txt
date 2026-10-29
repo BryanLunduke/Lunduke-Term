@@ -1,0 +1,15 @@
+Wed Oct 28 21:18:04 CDT 2026
+$ ls -la /dev/dri
+ls: cannot access '/dev/dri': No such file or directory
+$ ls /dev/nvidia* /dev/kfd /sys/class/drm
+ls: cannot access '/dev/nvidia*': No such file or directory
+ls: cannot access '/dev/kfd': No such file or directory
+ls: cannot access '/sys/class/drm': No such file or directory
+$ which lspci
+lspci: not installed
+$ glxinfo -B (Xvfb :44)
+Extended renderer info (GLX_MESA_query_renderer):
+    Vendor: Mesa (0xffffffff)
+    Device: llvmpipe (LLVM 19.1.7, 256 bits) (0xffffffff)
+    Accelerated: no
+OpenGL renderer string: llvmpipe (LLVM 19.1.7, 256 bits)

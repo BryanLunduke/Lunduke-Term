@@ -1,0 +1,75 @@
+done.
+Begin: Mounting root file system ... Begin: Running /scripts/live-top ... done.
+Begin: Running /scripts/live-premount ... done.
+Begin: Running /scripts/live-realpremount ... done.
+Begin: Mounting "/run/live/medium/live/filesystem.squashfs" on "/run/live/rootfs/filesystem.squashfs" via "/dev/loop0" ... done.
+done.
+done.
+Begin: Running /scripts/live-bottom ... done.
+Begin: Running /scripts/init-bottom ... done.
+SELinux:  Could not open policy file <= /etc/selinux/default/policy/policy.35:  No such file or directory
+INIT: version 3.14 booting
+INIT: No inittab.d directory found
+Using makefile-style concurrent boot in runlevel S.
+live-config: debconf hostname user-setup
+ sudo locales tzdata
+Current default time zone: 'Etc/UTC'
+Local time is now:      Thu Oct 29 00:54:43 UTC 2026.
+Universal Time is now:  Thu Oct 29 00:54:43 UTC 2026.
+
+ lightdm keyboard-configuration sysv-rc policykit ssl-cert util-linux login lcos-installer-desktop lcos-xfce-skel lcos-live-login-hint lcos-live-no-screensaver.
+Starting hot-plug events dispatcher: udevd[0;21;31mudevd[840]: GOTO 'alsa_restore_std' has no matching label in: '/usr/lib/udev/rules.d/90-alsa-restore.rules'[0m
+[0;21;31mudevd[840]: GOTO 'alsa_restore_std' has no matching label in: '/usr/lib/udev/rules.d/90-alsa-restore.rules'[0m
+.
+Synthesizing the initial hotplug events (subsystems)...done.
+Synthesizing the initial hotplug events (devices)...done.
+Waiting for /dev to be fully populated...done.
+Setting up keyboard layout...done.
+Activating swap...done.
+Cleaning up temporary files... /tmp.
+Starting early crypto disks...done.
+Starting remaining crypto disks...done.
+Checking file systems...done.
+Loading kernel modules...done.
+Mounting local filesystems...done.
+Activating swapfile swap, if any...done.
+Cleaning up temporary files....
+Cleaning up temporary files....
+Starting Setting kernel variables: sysctlsysctl: setting key "net.core.default_qdisc": No such file or directory
+ is already running.
+Setting up ALSA...done.
+Starting standalone sysusers service: opensysusers
+Opensysusers: system users successfully created
+.
+.
+INIT: Entering runlevel: 2
+Using makefile-style concurrent boot in runlevel 2.
+Starting time daemon: chronyd.
+Setting up console font and keymap...done.
+Starting seatd: seatd.
+Starting system message bus: dbusdbus[1739]: Unknown group "power" in message bus configuration file
+.
+Error: vmware-checkvm must be run inside a virtual machine on a VMware hypervisor product.
+open-vm-tools: not starting as this is not a VMware VM
+Starting IIO Sensor Proxy: iio-sensor-proxy.
+Starting bluetooth:
+ bluetoothd.
+Starting Switcheroo Control: switcheroo-control.
+Starting session management daemon: elogind.
+Starting Light Display Manager: lightdm.
+Starting Avahi mDNS/DNS-SD Daemon: avahi-daemon.
+Starting IPP-over-USB: ipp-usb.
+Starting Thermal Daemon: thermaldReady to serve requests: Daemonizing.. 1
+.
+saned[1833]: saned (AF-indep+IPv6) from sane-backends 1.2.1-debian starting up
+
+saned[1844]: Now daemonized
+
+Starting SANE network scanner server: saned.
+MARK idle-start
+SHOT m4-vm-idle-plain-/default0
+SHOT m4-vm-idle-amber-gl-auto
+SHOT m4-vm-idle-amber-cpu-auto
+SHOT m4-vm-idle-amber-gl-auto-long
+MARK idle-done
+MARK DONE

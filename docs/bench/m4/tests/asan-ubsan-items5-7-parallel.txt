@@ -1,0 +1,32 @@
+# ASan+UBSan build-san (meson test env: ASAN_OPTIONS=detect_leaks=1, LSAN suppressions tests/lsan.supp), --timeout-multiplier 4, code at HEAD 318bfb7, Wed Oct 28 22:17:14 CDT 2026
+ninja: Entering directory `/workspace/lunduke-term-m4/build-san'
+ninja: no work to do.
+ 1/15 desktop-file OK               0.01s
+ 2/15 metainfo     OK               0.02s
+ 3/15 governor     OK               0.01s
+ 4/15 profiles     OK               0.01s
+ 5/15 painter      OK               0.37s
+ 6/15 fonts        OK               0.05s
+ 7/15 vterm        OK               0.02s
+ 8/15 effects      OK               1.97s
+ 9/15 session      OK               0.14s
+10/15 fixes        OK               0.45s
+11/15 fuzz-regress OK               0.03s
+12/15 unicode      OK               0.03s
+13/15 search       OK              20.82s
+14/15 gl-match     OK              93.14s
+15/15 view         FAIL            97.37s   exit status 1
+>>> MESON_TEST_ITERATION=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-m4/tests/lsan.supp:print_suppressions=0 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:fast_unwind_on_malloc=0 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 MALLOC_PERTURB_=33 /workspace/lunduke-term-m4/build-san/view_test
+
+
+Ok:                 14  
+Expected Fail:      0   
+Fail:               1   
+Unexpected Pass:    0   
+Skipped:            0   
+Timeout:            0   
+
+Full log written to /workspace/lunduke-term-m4/build-san/meson-logs/testlog.txt
+
+# failure detail (build-san/meson-logs/testlog.txt):
+FAIL ../tests/view_test.cpp:673: governor back to Normal within 6000 ms (timing; passes 2/2 alone and in the --num-processes 1 run, asan-ubsan-items5-7.txt)

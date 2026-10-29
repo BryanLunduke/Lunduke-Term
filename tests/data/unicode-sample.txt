@@ -1,0 +1,7 @@
+[1;36mLunduke Terminal — Unicode sample (M4 item 5)[0m
+CJK:      漢字 かな カナ 한글  全角ＡＢＣ
+Combining: é ä ñ ô ç | precomposed: é ä ñ
+Emoji:    😀 ❤️ ✌🏽 👨‍👩‍👧 🇫🇮 #️⃣ ⌚
+RTL (not reordered): שלום  العربية
+Box: ┌─┬─┐ │█▓▒░│  [31mred [32mgreen [7m漢字 inverse[0m
+Invalid UTF-8: [�] [�(] [����] [���]

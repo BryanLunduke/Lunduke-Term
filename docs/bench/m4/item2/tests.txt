@@ -1,0 +1,13 @@
+# M4 2, 2026-10-28 19:25:43 CDT, release build
+governor_test with the M4 code:
+slow-down then recover: interval 100 ms
+demote/probe/recover: 5 demotions
+costly probe: 5 demotions, last probe 1 frame(s), next in 80 s
+governor: all passed
+
+governor_test with the 'over-budget window resets the count' line disabled (M3 behaviour), restored afterwards:
+3 failure(s)  (the 'good,bad,good,bad,good' probe passed after its 5th window)
+
+view_test (release, Xvfb, llvmpipe):
+governor auto: costly probe aborted after 1 frame(s), retry in 3.0 s
+governor cpu: costly probe aborted after 1 frame(s), retry in 3.0 s

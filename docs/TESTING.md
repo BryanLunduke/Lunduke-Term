@@ -24,11 +24,13 @@ Sanitizer build (what the CI `sanitizers` job runs):
 ```sh
 meson setup build-san --buildtype=debug -Db_sanitize=address,undefined -Db_lundef=false
 meson compile -C build-san
-ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
-  xvfb-run -a meson test -C build-san --print-errorlogs --timeout-multiplier 4
+xvfb-run -a meson test -C build-san --print-errorlogs --timeout-multiplier 4
 ```
 
-Leak detection is off: GTK, fontconfig and Mesa keep caches until exit.
+meson sets `ASAN_OPTIONS=detect_leaks=1:abort_on_error=1`, `UBSAN_OPTIONS` and
+`LSAN_OPTIONS=suppressions=tests/lsan.supp` for every test (M4). Leak checking is on; the
+suppressions cover only third-party caches that live until exit (fontconfig, Mesa GLX/llvmpipe,
+one GDK X11 list). view_test also uses `fast_unwind_on_malloc=0`, so GDK frames are visible.
 
 ## CI
 

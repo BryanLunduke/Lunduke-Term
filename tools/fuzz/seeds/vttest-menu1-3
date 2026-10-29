@@ -1,0 +1,57 @@
+8;80HuV[19;80HV v
+[19;80HW		w[19;2HW
+[19;80H
+[18;1HX[18;80Hx[19;1HY[19;80Hy
+[18;80HyZ[19;80HZ z
+[?6l[r[22;1HPush <RETURN>[?3l[2J[1;1HTest of cursor-control characters inside ESC sequences.
+Below should be four identical lines:
+
+A B C D E F G H I
+A[2CB[2CC[2CD[2CE[2CF[2CG[2CH[2CI[2C
+A [2CB[4CC[6CD[8CE[10CF[12CG[14CH[16CI
+[20lA [1AB [1AC [1AD [1AE [1AF [1AG [1AH [1AI [1A
+
+Push <RETURN>[2J[1;1HTest of leading zeros in ESC sequences.
+Two lines below you should see the sentence "This is a correct sentence".[00000000004;000000001HT[00000000004;000000002Hh[00000000004;000000003Hi[00000000004;000000004Hs[00000000004;000000005H [00000000004;000000006Hi[00000000004;000000007Hs[00000000004;000000008H [00000000004;000000009Ha[00000000004;0000000010H [00000000004;0000000011Hc[00000000004;0000000012Ho[00000000004;0000000013Hr[00000000004;0000000014Hr[00000000004;0000000015He[00000000004;0000000016Hc[00000000004;0000000017Ht[00000000004;0000000018H [00000000004;0000000019Hs[00000000004;0000000020He[00000000004;0000000021Hn[00000000004;0000000022Ht[00000000004;0000000023He[00000000004;0000000024Hn[00000000004;0000000025Hc[00000000004;0000000026He[20;1HPush <RETURN>
+[2J[3;10HVT100 test program, version 2.7 (20241208)[4;10HScreen size 24x80 (80 max) Line speed 38400bd [5;10HChoose test type:
+[6;1H[0J
+          0. Exit
+          1. Test of cursor movements
+          2. Test of screen features
+          3. Test of character sets
+          4. Test of double-sized characters
+          5. Test of keyboard
+          6. Test of terminal reports
+          7. Test of VT52 mode
+          8. Test of VT102 features (Insert/Delete Char/Line)
+          9. Test of known bugs
+          10. Test of reset and self-test
+          11. Test non-VT100 (e.g., VT220, XTERM) terminals
+          12. Modify test-parameters
+
+          Enter choice number (0 - 12): 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+0
+[2J[?1l[?3l[?5l[?6l[?7h[?8h[r[0m[2J[12;30HThat's all, folks!
+
+
+
+0
+0

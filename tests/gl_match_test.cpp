@@ -4,11 +4,17 @@
 // Skips (77) when no EGL/GL 3.3 context is available.
 #include "cpu_effects.hpp"
 #include "gl_effects.hpp"
+#include "grid_painter.hpp"
 #include "profiles.hpp"
 #include "synthetic_frame.hpp"
+#include "vterm_session.hpp"
 
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <iterator>
+#include <string>
 #include <vector>
 
 using namespace lterm;
@@ -38,9 +44,27 @@ double compare(GlEffects& gl, const EffectParams& p, const std::vector<uint8_t>&
     const double mse = sq / (w * h * 3.0);
     return mse == 0 ? 99.0 : 10 * std::log10(255.0 * 255.0 / mse);
 }
+// M4 item 5: a frame of the Unicode sample (CJK, combining marks, emoji, RTL, invalid UTF-8) as
+// the view paints it: VtermSession -> Grid -> GridPainter::paintRows, at the given scale.
+std::vector<uint8_t> unicodeFrame(const std::string& text, int w, int h, int scale, int shift) {
+    GridPainter painter("DejaVu Sans Mono", 14, scale);
+    VtermSession s((h - 2 * kMargin * scale) / painter.cellHeight(), (w - 2 * kMargin * scale) / painter.cellWidth());
+    s.feed(text.data(), text.size());
+    for (int i = 0; i < shift; ++i) s.feed("x", 1);
+    Grid g;
+    s.fillGrid(g);
+    cairo_surface_t* surf = cairo_image_surface_create(CAIRO_FORMAT_RGB24, w, h);
+    cairo_t* cr = cairo_create(surf);
+    painter.paintRows(cr, g, kMargin * scale, kMargin * scale, Color8{200, 200, 200}, Color8{0, 0, 0}, nullptr, w);
+    cairo_destroy(cr);
+    std::vector<uint8_t> out;
+    surfaceToRgba(surf, out);
+    cairo_surface_destroy(surf);
+    return out;
+}
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
     auto a = renderSyntheticFrame(W, H, 0, "DejaVu Sans Mono", 14);
     auto b = renderSyntheticFrame(W, H, 3, "DejaVu Sans Mono", 14);
     int fails = 0, mx = 0;
@@ -115,6 +139,34 @@ int main() {
                 const double ps = compare(gq, p, a2, b2, &mx, scale * W, scale * H);
                 std::printf("%s %s scale %d: PSNR %.2f dB, max diff %d\n", v.name, effectsQualityName(q), scale, ps, mx);
                 if (ps < 40.0) ++fails;
+            }
+        }
+    }
+
+    // M4 item 5: wide (CJK, emoji), combining and RTL text through both back-ends. The text is
+    // rasterised once on the CPU (the glyph cache, colour emoji included) and the effects run on
+    // each back-end, so the wide glyphs cover the same 2 cells in both.
+    if (argc > 1) {
+        std::ifstream f(argv[1], std::ios::binary);
+        const std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+        if (text.empty()) {
+            std::printf("FAIL: cannot read %s\n", argv[1]);
+            ++fails;
+        }
+        for (int scale : {1, 2}) {
+            const auto ua = unicodeFrame(text, scale * W, scale * H, scale, 0);
+            const auto ub = unicodeFrame(text, scale * W, scale * H, scale, 3);
+            for (const char* prof : {"amber", "green-scanlines", "vintage"}) {
+                const Profile* pr = findProfile(prof);
+                if (!pr) continue;
+                for (EffectsQuality q : {EffectsQuality::Full, EffectsQuality::Static}) {
+                    const EffectParams p = scaleEffectParams(applyEffectsQuality(pr->fx, q), scale);
+                    GlEffects gq(p);
+                    const double ps = compare(gq, p, ua, ub, &mx, scale * W, scale * H);
+                    std::printf("unicode sample %s %s scale %d: PSNR %.2f dB, max diff %d\n", prof,
+                                effectsQualityName(q), scale, ps, mx);
+                    if (ps < 40.0) ++fails;
+                }
             }
         }
     }

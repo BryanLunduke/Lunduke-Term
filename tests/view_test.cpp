@@ -5,6 +5,7 @@
 //   (d) closing the view while a clipboard request is pending
 //   (g) the child is reaped after the view hangs up on it
 // M2 stage 3: tabs, scrollback search (view + search bar), the settings dialog.
+#include "sanitizer.hpp"
 #include "terminal_view.hpp"
 #include "terminal_window.hpp"
 
@@ -423,9 +424,11 @@ static void testSearchView() {
     }
     CHECK(v.searchStep(true) && v.searchIndex() == 1);   // wraps around to the newest
     CHECK(v.searchStep(false) && v.searchIndex() == 0);  // and back
-    CHECK(v.setSearch("me", true) == 0);
+    // The case switch rebuilds the index; wait for the search to finish (searchSync), or a
+    // slow (ASan) run sees a pending 0.
+    CHECK(searchSync(v, "me", true) == 0);
     CHECK(!v.searchStep(false));
-    CHECK(v.setSearch("ME", true) == 2);
+    CHECK(searchSync(v, "ME", true) == 2);
     CHECK(searchSync(v, "row 1", false) >= 100);  // row 1, row 10.., row 100..
     // Output while the search is open re-runs it (debounced).
     CHECK(v.setSearch("zebra", false) == 0);
@@ -478,9 +481,9 @@ static void testSearchBig() {
         CHECK(!v.searchPending());
         worstKey = std::max(worstKey, v.searchMaxMainMs());
     }
-    std::printf("view search, 100000 lines (ASan build): first keystroke %.2f ms (pending, %d turns), "
+    std::printf("view search, 100000 lines (%s): first keystroke %.2f ms (pending, %d turns), "
                 "worst later keystroke %.2f ms, 'n' %d / 'needle' %d matches\n",
-                first, turns, worstKey, n1, v.searchCount());
+                ltermBuildLabel(), first, turns, worstKey, n1, v.searchCount());
     CHECK(v.searchCount() == 100);
     CHECK(v.searchIndex() == 99);
     CHECK(v.searchStep(true) && v.searchIndex() == 98);  // Enter: older
@@ -655,9 +658,17 @@ static void testGovernor(const char* renderer) {
     CHECK(w.view->effectsQuality() == EffectsQuality::Static);
     CHECK(!w.view->animating());
     const double demotedAt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-    // Load drops: the probe after 1.5 s brings auto back, and it stays.
+    // M4 item 2: a probe whose first frame is far over budget (3900 ms, like GL in the TCG VM)
+    // fails after that one frame, and the back-off doubles (1.5 s -> 3 s).
+    w.view->setRenderCostForTest(3900);
+    CHECK(waitFor([&] { return w.view->governor().probeAborted() && w.view->qualityDemoted(); }, 6000));
+    CHECK(w.view->governor().probeFrames() == 1);
+    CHECK(w.view->governor().probeDelayMs() == 3000);
+    std::printf("governor %s: costly probe aborted after %d frame(s), retry in %.1f s\n", renderer,
+                w.view->governor().probeFrames(), w.view->governor().probeDelayMs() / 1000.0);
+    // Load drops: the next probe (3 s later) brings auto back, and it stays.
     w.view->setRenderCostForTest(0);
-    CHECK(waitFor([&] { return !w.view->qualityDemoted(); }, 4000));
+    CHECK(waitFor([&] { return !w.view->qualityDemoted(); }, 8000));
     CHECK(w.view->effectsQuality() == level);
     CHECK(waitFor([&] { return w.view->governor().state() == EffectsGovernor::State::Normal; }, 6000));
     CHECK(!w.view->qualityDemoted());
@@ -752,6 +763,7 @@ static void testTabClose() {
     {
         TerminalWindow w(o);
         w.set_default_size(480, 320);
+        w.trimDelayMs = 300;
         w.show();
         const int n = 20;
         std::vector<pid_t> pids;
@@ -774,6 +786,8 @@ static void testTabClose() {
         }
         CHECK(w.tabCount() == 1);
         CHECK(TerminalView::pendingReaps() == n - 1);
+        // M4 item 4: the burst of closes schedules one malloc_trim, after trimDelayMs.
+        CHECK(w.trims() == 0);
         // Right after the closes the children still run (they ignore SIGHUP)...
         int running = 0;
         for (int i = 1; i < n; ++i) running += procState(pids[i]) != 0;
@@ -784,9 +798,17 @@ static void testTabClose() {
         int left = 0;
         for (int i = 1; i < n; ++i) left += procState(pids[i]) != 0;
         CHECK(left == 0);
-        std::printf("tab close (ASan build): %d closes, worst %.2f ms, total %.2f ms; %d still running right after, "
-                    "all reaped %.0f ms later\n", n - 1, worst, total, running, goneMs);
-        CHECK(worst < 25.0);  // M2: >= 50 ms per tab whose child ignores SIGHUP
+        // M2 regression: >= 50 ms per tab whose child ignores SIGHUP. The release build keeps the
+        // 25 ms limit and catches it; ASan+UBSan with every core busy measured 27.7 and 30.5 ms
+        // (review), so build-san only checks 75 ms (a gross regression, e.g. a blocking wait).
+        const double closeLimit = ltermTimingLimitMs(25.0, 75.0);
+        std::printf("tab close (%s): %d closes, worst %.2f ms, total %.2f ms; %d still running right after, "
+                    "all reaped %.0f ms later (limit %.0f ms)\n", ltermBuildLabel(), n - 1, worst, total, running, goneMs, closeLimit);
+        CHECK(worst < closeLimit);
+        CHECK(waitFor([&] { return w.trims() >= 1; }, 3000));
+        pump(500);
+        CHECK(w.trims() == 1);  // debounced: one trim for the 19 closes
+        std::printf("tab close trim: %d trim(s), RSS dropped %ld kB (ASan has its own allocator: ~0 here)\n", w.trims(), w.lastTrimKb());
     }
 }
 

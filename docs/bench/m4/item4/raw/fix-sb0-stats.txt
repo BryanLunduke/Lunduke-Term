@@ -1,0 +1,4 @@
+stats: quality=reduced software=1 tick-interval 110.9 ms
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=21 full-repaints=1 rows-painted=62 ticks=13 median paint 0.08 ms, median effects-source 10.54 ms, median tick 2.71 ms, glyphs cached 70
+stats: quality=reduced software=1 tick-interval 111.9 ms
+zombies: 0

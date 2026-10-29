@@ -8,6 +8,8 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <mutex>
+#include <unordered_map>
 #include <fcntl.h>
 #include <pwd.h>
 #include <sys/ioctl.h>
@@ -107,8 +109,11 @@ void truncateUtf8(std::string& s, size_t max) {
     s.resize(n);
 }
 
-VtermSession::VtermSession(int rows, int cols) : rows_(rows), cols_(cols) {
-    vt_ = vterm_new(rows, cols);
+// At least 2 columns: libvterm 0.3.3 writes a wide character's second cell without checking it
+// exists, so a wide character on a 1-column screen is a NULL write (the system libvterm0
+// segfaults; fuzz finding F8).
+VtermSession::VtermSession(int rows, int cols) : rows_(std::max(1, rows)), cols_(std::max(2, cols)) {
+    vt_ = vterm_new(rows_, cols_);
     vterm_set_utf8(vt_, 1);
     vterm_output_set_callback(vt_, &VtermSession::cbOutput, this);
     screen_ = vterm_obtain_screen(vt_);
@@ -335,7 +340,7 @@ static void appendColorSgr(std::string& out, const VTermColor& c, bool fg) {
     out += buf;
 }
 
-// The current pen as one SGR sequence ("ESC [ m" for the default pen).
+// The current pen as SGR sequences ("ESC [ m" for the default pen). Applied after "ESC [ m".
 std::string VtermSession::penSgr() const {
     std::string p;
     VTermValue v;
@@ -355,20 +360,58 @@ std::string VtermSession::penSgr() const {
     }
     if (vterm_state_get_penattr(state_, VTERM_ATTR_FONT, &v) && v.number > 0 && v.number < 10)
         p += ";" + std::to_string(10 + v.number);
-    if (vterm_state_get_penattr(state_, VTERM_ATTR_FOREGROUND, &v)) appendColorSgr(p, v.color, true);
-    if (vterm_state_get_penattr(state_, VTERM_ATTR_BACKGROUND, &v)) appendColorSgr(p, v.color, false);
     if (vterm_state_get_penattr(state_, VTERM_ATTR_SMALL, &v) && v.boolean &&
         vterm_state_get_penattr(state_, VTERM_ATTR_BASELINE, &v))
         p += v.number == VTERM_BASELINE_RAISE ? ";73" : v.number == VTERM_BASELINE_LOWER ? ";74" : "";
-    if (p.empty()) return "\x1b[m";
-    p[0] = '[';
-    return "\x1b" + p + "m";
+    // Colours in a second sequence: everything in one could reach 20 arguments, and libvterm
+    // 0.3.3 writes past its args[16] (F1; feedRaw() bypasses the guard; fuzz finding F11).
+    // At most 10 arguments in each.
+    std::string c;
+    if (vterm_state_get_penattr(state_, VTERM_ATTR_FOREGROUND, &v)) appendColorSgr(c, v.color, true);
+    if (vterm_state_get_penattr(state_, VTERM_ATTR_BACKGROUND, &v)) appendColorSgr(c, v.color, false);
+    if (p.empty() && c.empty()) return "\x1b[m";
+    std::string out;
+    if (!p.empty()) out += "\x1b[" + p.substr(1) + "m";
+    if (!c.empty()) out += "\x1b[" + c.substr(1) + "m";
+    return out;
+}
+
+void VtermSession::clampCursorAfterRestore() {
+    VTermPos p;
+    vterm_state_get_cursorpos(state_, &p);
+    if (p.row < rows_ && p.col < cols_) return;
+    const int r = std::min(p.row, rows_ - 1), c = std::min(p.col, cols_ - 1);
+    // CUP is relative to the scroll region / margins in origin mode (DECOM), which libvterm does
+    // not expose: find the origin with CUP 1;1 first, then move relative to it (libvterm keeps
+    // the cursor inside the region in that mode, as a VT does).
+    placeCursor(r, c);
+}
+
+void VtermSession::placeCursor(int r, int c) {
+    feedRaw("\x1b[H", 3);
+    VTermPos o;
+    vterm_state_get_cursorpos(state_, &o);
+    const std::string cup =
+        "\x1b[" + std::to_string(std::max(0, r - o.row) + 1) + ";" + std::to_string(std::max(0, c - o.col) + 1) + "H";
+    feedRaw(cup.data(), cup.size());
 }
 
 void VtermSession::restoreCharsets() {
     cs_ = savedCs_;
     char seq[8] = {0x1b, '(', cs_.g0, 0x1b, ')', cs_.g1, static_cast<char>(cs_.shifted ? 0x0e : 0x0f), 0};
     feedRaw(seq, 7);
+}
+
+// F15: libvterm 0.3.3 must not end a vterm_input_write() inside a control string just after an
+// ESC and one or more C0 controls (or NUL / DEL) that follow it: its final string fragment is
+// then (bytes + len - string_start) - 1 = (size_t)-1 bytes long, and the OSC / DCS handlers read
+// far past the buffer (ASan; the title callback copied up to kMaxTitleBytes of garbage). Such
+// C0 bytes are executed the same way without the ESC, so feed() holds the ESC back and passes it
+// on only right before the byte that ends libvterm's escape (see stringEscHeld_).
+void VtermSession::holdStringEsc(const char* bytes, size_t i, size_t& done) {
+    feedRaw(bytes + done, i - done);
+    done = i + 1;
+    stringEscHeld_ = true;
 }
 
 void VtermSession::feed(const char* bytes, size_t len) {
@@ -382,33 +425,168 @@ void VtermSession::feed(const char* bytes, size_t len) {
                 csiStart_ = static_cast<long>(i);
             } else if (c == 0x0e) cs_.shifted = true;
             else if (c == 0x0f) cs_.shifted = false;
+            else {
+                // Track the last printed code point for REP (see lastCp_). Anything unusual
+                // (broken UTF-8) makes it 0 = unknown, which only makes REP be dropped.
+                const unsigned char u = static_cast<unsigned char>(c);
+                if (u >= 0x20 && u < 0x7f) {
+                    lastCp_ = u;
+                    u8need_ = 0;
+                } else if (u >= 0x80 && u < 0xc0) {
+                    if (u8need_ > 0) {
+                        u8acc_ = (u8acc_ << 6) | (u & 0x3f);
+                        if (--u8need_ == 0) lastCp_ = u8acc_;
+                    } else {
+                        lastCp_ = 0;
+                    }
+                } else if (u >= 0xc2 && u < 0xf5) {
+                    u8need_ = u < 0xe0 ? 1 : u < 0xf0 ? 2 : 3;
+                    u8acc_ = u & (u < 0xe0 ? 0x1f : u < 0xf0 ? 0x0f : 0x07);
+                    lastCp_ = 0;
+                } else if (u >= 0x80) {
+                    u8need_ = 0;
+                    lastCp_ = 0;
+                }
+            }
             break;  // (8-bit CSI 0x9B is not a control in UTF-8 mode, which we always use)
         case 1:
-            if (c == '[') {
+        case 5: {
+            // After ESC. State 5: the ESC came inside a control string. libvterm then ends the
+            // string, but the next byte is not "hoisted" into a C1 control: ESC [ there is not
+            // a CSI (and ESC \ is the string terminator).
+            const bool inString = csiState_ == 5;
+            const unsigned char u = static_cast<unsigned char>(c);
+            if (inString && c == 0x1b) {
+                holdStringEsc(bytes, i, done);  // ESC ESC: still one escape for libvterm
+                csiStart_ = static_cast<long>(i);
+                break;
+            }
+            if (inString && (c == 0x07 || c == 0x18 || c == 0x1a || (u >= 0x20 && u != 0x7f))) {
+                // This byte ends libvterm's "ESC in a string": now it can have the ESC (F15).
+                feedRaw(bytes + done, i - done);
+                done = i;
+                feedRaw("\x1b", 1);
+                stringEscHeld_ = false;
+            }
+            if (c == 0x1b) {
+                csiStart_ = static_cast<long>(i);
+            } else if (c == 0x18 || c == 0x1a) {
+                csiState_ = 0;
+            } else if (inString && c == 0x07) {
+                // BEL is not the string terminator after ESC: libvterm ends the string and stays
+                // in a plain escape, so ESC ] ... ESC BEL [ is a CSI (F16).
+                csiState_ = 1;
+            } else if (u < 0x20 || u == 0x7f) {
+                // C0 controls (and NUL/DEL) are executed / ignored without ending the escape
+            } else if (u >= 0x80) {
+                // libvterm ignores a byte >= 0x80 after ESC and stays in the escape (a string
+                // it was in is over, though), so ESC 0xC3 [ is still a CSI (F12).
+                csiState_ = 1;
+            } else if (inString && c == '\\') {
+                csiState_ = 0;
+            } else if (!inString && c == '[') {
                 csiState_ = 2;
                 csiParams_.clear();
-            } else if (c == 0x1b) csiStart_ = static_cast<long>(i);
-            else if (c == '(' || c == ')') {
-                escTarget_ = c == '(' ? 0 : 1;
+                csiSeps_ = csiDigits_ = 0;
+                csiArgs_ = csiInter_ = false;
+            } else if (u >= 0x20 && u <= 0x2f) {
+                // Intermediates (ESC SP F, ESC # 8, ESC ( B): libvterm collects them until the
+                // final byte 0x30-0x7e (F13). ESC ( / ESC ) with one final byte designate G0/G1.
+                escTarget_ = c == '(' ? 0 : c == ')' ? 1 : -1;
+                escInters_ = 1;
                 csiState_ = 3;
-            } else if (c == ']' || c == 'P' || c == '_' || c == '^' || c == 'X') {
-                csiState_ = 4;  // OSC / DCS / APC / PM / SOS string
+            } else if (!inString && c == ']') {
+                csiState_ = 7;  // OSC command number
+                csiDigits_ = 0;
+            } else if (!inString && c == 'P') {
+                csiState_ = 6;  // DCS: command bytes, not yet a string
+            } else if (!inString && (c == '_' || c == '^' || c == 'X')) {
+                csiState_ = 4;  // APC / PM / SOS string
             } else {
                 if (c == '7') savedCs_ = cs_;
                 else if (c == '8') {
                     feedRaw(bytes + done, i + 1 - done);
                     done = i + 1;
+                    clampCursorAfterRestore();
                     restoreCharsets();
                 } else if (c == 'c') cs_ = savedCs_ = Charsets{};  // RIS
                 csiState_ = 0;
             }
             break;
-        case 2:
+        }
+        case 6:  // DCS command (libvterm DCS_COMMAND is not a string state: ESC starts over)
+            if (c == 0x1b) {
+                csiState_ = 1;
+                csiStart_ = static_cast<long>(i);
+            } else if (c == 0x18 || c == 0x1a) {
+                csiState_ = 0;
+            } else if (c >= 0x40 && c <= 0x7e) {
+                csiState_ = 4;
+            }
+            break;
+        case 7:  // OSC command number: libvterm's int accumulator overflows too (keep 9 digits)
+            if (c >= '0' && c <= '9') {
+                if (csiDigits_ || c != '0') ++csiDigits_;
+                if (csiDigits_ > 9) {
+                    feedRaw(bytes + done, i - done);
+                    done = i + 1;
+                }
+                break;
+            }
+            if (c == 0x07 || c == 0x18 || c == 0x1a) csiState_ = 0;
+            else if (c == 0x1b) {
+                holdStringEsc(bytes, i, done);
+                csiState_ = 5;
+            }
+            // libvterm executes other C0 controls (and ignores NUL/DEL) without leaving its OSC
+            // command state, so digits after them still go into the number (F14).
+            else if (static_cast<unsigned char>(c) >= 0x20 && c != 0x7f) csiState_ = 4;
+            break;
+        case 2: {
+            const unsigned char u = static_cast<unsigned char>(c);
+            if (u >= 0x30 && u <= 0x3f) {
+                // Mirror libvterm's CSI states: a parameter byte after an intermediate, or a
+                // leader byte (< = > ?) after the arguments started, ends the CSI as invalid.
+                if (csiInter_ || (u >= 0x3c && csiArgs_)) {
+                    csiState_ = 0;
+                    break;
+                }
+                if (u < 0x3c) csiArgs_ = true;
+                if (c == ';' || c == ':') {
+                    ++csiSeps_;
+                    csiDigits_ = 0;
+                } else if (u <= '9' && (csiDigits_ || c != '0')) {
+                    ++csiDigits_;
+                }
+                if (csiSeps_ > 15 || csiDigits_ > 9) {  // see csiSeps_ / csiDigits_: drop this byte
+                    feedRaw(bytes + done, i - done);
+                    done = i + 1;
+                    break;
+                }
+            } else if (u >= 0x20 && u <= 0x2f) {
+                csiInter_ = true;
+            } else if (u >= 0x80) {
+                csiState_ = 0;  // not part of a CSI in UTF-8 mode: libvterm drops the sequence
+                break;
+            }
             if (c >= 0x40 && c <= 0x7e) {  // final byte
+                if ((c == 'r' || c == 's') && !csiParams_.empty()) regionSet_ = true;
+                if (c == 'b' && !csiInter_ && (csiParams_.empty() || csiParams_[0] < 0x3c) &&
+                    (lastCp_ == 0 || libvtermZeroWidth(lastCp_))) {
+                    // REP after a width-0 glyph: libvterm would loop forever (F7). CAN instead
+                    // of the final byte aborts the sequence (its start may be in an earlier chunk).
+                    feedRaw(bytes + done, i - done);
+                    feedRaw("\x18", 1);
+                    done = i + 1;
+                    csiState_ = 0;
+                    break;
+                }
                 if (c == 'S' || c == 'M') {
                     // The sequence may have started in an earlier chunk; nothing up to here
-                    // changed the screen since then, so the snapshot is still exact.
-                    const size_t start = csiStart_ >= 0 ? static_cast<size_t>(csiStart_) : done;
+                    // changed the screen since then, so the snapshot is still exact. (Bytes up
+                    // to `done` may already be fed when arguments were dropped.)
+                    const size_t start = csiStart_ >= 0 && static_cast<size_t>(csiStart_) >= done
+                                             ? static_cast<size_t>(csiStart_) : done;
                     feedRaw(bytes + done, start - done);
                     snapshotWraps();
                     feedRaw(bytes + start, i + 1 - start);
@@ -425,6 +603,7 @@ void VtermSession::feed(const char* bytes, size_t len) {
                     else {
                         feedRaw(bytes + done, i + 1 - done);
                         done = i + 1;
+                        clampCursorAfterRestore();
                         restoreCharsets();
                     }
                 }
@@ -434,28 +613,35 @@ void VtermSession::feed(const char* bytes, size_t len) {
                 csiStart_ = static_cast<long>(i);
             } else if (c == 0x18 || c == 0x1a) {
                 csiState_ = 0;  // CAN / SUB abort the sequence; other C0 controls do not end it
-            } else if (csiParams_.size() < 16) {
+            } else if (csiParams_.size() < 16 && u >= 0x20) {
                 csiParams_ += c;
             }
             break;
+        }
         case 4:  // inside a control string, until BEL or ST (ESC \\)
             if (c == 0x07 || c == 0x18 || c == 0x1a) csiState_ = 0;
-            else if (c == 0x1b) csiState_ = 5;
+            else if (c == 0x1b) {
+                holdStringEsc(bytes, i, done);
+                csiState_ = 5;
+            }
             break;
-        case 5:
-            csiState_ = c == '\\' ? 0 : (c == 0x1b ? 5 : 4);
-            break;
-        case 3:  // ESC ( / ESC ) : intermediates, then the final byte names the set
-            if (c >= 0x30 && c <= 0x7e) {
-                (escTarget_ ? cs_.g1 : cs_.g0) = c;
+        case 3: {  // ESC + intermediates, until the final byte (libvterm NORMAL + in_esc)
+            const unsigned char u = static_cast<unsigned char>(c);
+            if (u >= 0x30 && u <= 0x7e) {
+                // libvterm's SCS needs exactly "( F" / ") F"; nothing here is printed text.
+                if (escInters_ == 1 && escTarget_ >= 0) (escTarget_ ? cs_.g1 : cs_.g0) = c;
                 csiState_ = 0;
+            } else if (u >= 0x20 && u <= 0x2f) {
+                ++escInters_;
             } else if (c == 0x1b) {
                 csiState_ = 1;
                 csiStart_ = static_cast<long>(i);
-            } else if (c < 0x20 || c > 0x2f) {
+            } else if (c == 0x18 || c == 0x1a) {
                 csiState_ = 0;
             }
+            // C0 controls are executed, DEL and bytes >= 0x80 ignored: the escape stays open.
             break;
+        }
         }
     }
     feedRaw(bytes + done, len - done);
@@ -469,12 +655,73 @@ void VtermSession::clearTopContinuation() {
         const_cast<VTermLineInfo*>(li)->continuation = 0;
 }
 
+// libvterm 0.3.3 resize_buffer() reflows the active buffer bottom-up. When a logical line does
+// not fit any more (it would start above row 0) it stops there and keeps the cursor only if
+// `old_row_start <= cursor.row < old_row_end`; old_row_end is inclusive, so a cursor on the last
+// row of that line (the usual place: the shell prompt after a long wrapped command, or any
+// line that rewraps taller than the new height) is left at -1 and libvterm calls abort():
+// "screen_resize failed to update cursor position" (found by the fuzzer; a 5x3 terminal with
+// "abcdefg" resized to 1x3 kills the process). This walks the same rows with the same
+// arithmetic, reading the active buffer through the public API, and says whether that happens.
+bool VtermSession::reflowWouldAbort(int newRows, int newCols) const {
+    const int oldRows = rows_, oldCols = cols_;
+    VTermPos cur;
+    vterm_state_get_cursorpos(state_, &cur);
+    auto cont = [&](int r) {
+        const VTermLineInfo* li = vterm_state_get_lineinfo(state_, r);
+        return li && li->continuation;
+    };
+    auto popcount = [&](int r) {
+        VTermScreenCell cell;
+        int c = oldCols - 1;
+        while (c >= 0 && vterm_screen_get_cell(screen_, VTermPos{r, c}, &cell) && cell.chars[0] == 0) --c;
+        return c + 1;
+    };
+    int oldRow = oldRows - 1, newRow = newRows - 1, finalBlank = newRows;
+    bool found = false;
+    while (oldRow >= 0) {
+        const int end = oldRow;
+        while (oldRow >= 0 && cont(oldRow)) --oldRow;
+        const int start = oldRow;
+        if (start < 0) return false;  // clearTopContinuation() prevents this
+        long width = 0;
+        for (int r = start; r <= end; ++r) width += (r < oldRows - 1 && cont(r + 1)) ? oldCols : popcount(r);
+        if (finalBlank == newRow + 1 && width == 0) finalBlank = newRow;
+        const int height = width ? static_cast<int>((width + newCols - 1) / newCols) : 1;
+        int newStart = newRow - height + 1;
+        const int spare = newRows - finalBlank;
+        if (newStart < 0 && spare >= 0 && !found) {  // (cursor not placed yet: the test passes)
+            const int down = std::min(-newStart, spare);
+            newStart += down;
+            finalBlank += down;
+        }
+        if (newStart < 0) {
+            if (start <= cur.row && cur.row < end) found = true;  // libvterm's (buggy) test
+            break;
+        }
+        if (cur.row >= start && cur.row <= end) found = true;  // placed while copying the line
+        oldRow = start - 1;
+        newRow = newStart - 1;
+    }
+    if (cur.row <= oldRow) found = true;
+    return !found;
+}
+
 void VtermSession::resize(int rows, int cols) {
     if (rows < 1) rows = 1;
-    if (cols < 1) cols = 1;
+    if (cols < 2) cols = 2;  // see the constructor (F8)
     if (rows == rows_ && cols == cols_) return;
+    clearTopContinuation();
+    // See reflowWouldAbort(): in that case resize without reflow (lines are cut at the new
+    // width instead of rewrapped, this once) rather than let libvterm abort the process.
+    const bool noReflow = reflowWouldAbort(rows, cols);
+    if (noReflow) {
+        vterm_screen_enable_reflow(screen_, false);
+        ++reflowFallbacks_;
+    }
     snapshotWraps();  // shrinking pushes the top rows to the scrollback, several at once
     ++epoch_;         // reflow: search caches start over
+    const int oldRows = rows_, oldCols = cols_;
     rows_ = rows;
     cols_ = cols;
     // libvterm fills the cells a resize/reflow creates with the *current* pen, which in a
@@ -493,6 +740,24 @@ void VtermSession::resize(int rows, int cols) {
     // array is libvterm's mutable state; only the const accessor is public.
     clearTopContinuation();
     vterm_set_size(vt_, rows, cols);  // reflow + scrollback push/pop happen in here
+    if (noReflow) vterm_screen_enable_reflow(screen_, true);
+    if (regionSet_ && (rows < oldRows || cols < oldCols)) {
+        // F10: reset the margins (xterm resets them on every resize). A sequence still open
+        // here is cancelled first (CAN), so libvterm and the guard agree on the parser state;
+        // C0 controls inside it would otherwise already hit the broken region.
+        if (csiState_ != 0) {
+            feedRaw("\x18", 1);
+            csiState_ = 0;
+            stringEscHeld_ = false;
+            lastCp_ = 0;
+            u8need_ = 0;
+        }
+        VTermPos p;
+        vterm_state_get_cursorpos(state_, &p);
+        feedRaw("\x1b[r\x1b[s", 6);  // DECSTBM / DECSLRM defaults (libvterm: CSI s is always DECSLRM)
+        placeCursor(std::min(p.row, rows - 1), std::min(p.col, cols - 1));
+        regionSet_ = false;
+    }
     if (swapPen) feedRaw(pen.data(), pen.size());
     wrapSnapActive_ = false;
     vterm_screen_flush_damage(screen_);
@@ -597,18 +862,98 @@ static VTermScreenCell blankCell() {
     return c;
 }
 
+// The width libvterm 0.3.3 itself gives a code point (its own table, not exported): measured
+// once per code point on a private 1x8 terminal and remembered. Code points below U+1100 are
+// all narrow there.
+int libvtermWidth(uint32_t cp) {
+    if (cp < 0x1100) return 1;
+    static std::mutex m;
+    static std::vector<int8_t> bmp(0x10000, 0);
+    static std::unordered_map<uint32_t, int8_t> astral;
+    static VTerm* probe = nullptr;
+    std::lock_guard<std::mutex> lock(m);
+    int8_t* slot = cp < 0x10000 ? &bmp[cp] : &astral[cp];
+    if (*slot) return *slot;
+    if (!probe) {
+        probe = vterm_new(1, 8);
+        vterm_set_utf8(probe, 1);
+        vterm_screen_reset(vterm_obtain_screen(probe), 1);
+    }
+    std::string q = "\x1b[H";
+    appendUtf8(q, cp > 0x10FFFF ? 0xFFFD : cp);
+    vterm_input_write(probe, q.data(), q.size());
+    VTermPos p;
+    vterm_state_get_cursorpos(vterm_obtain_state(probe), &p);
+    *slot = p.col == 2 ? 2 : 1;
+    return *slot;
+}
+
+bool libvtermZeroWidth(uint32_t cp) {
+    if (cp >= 0x20 && cp < 0x7f) return false;
+    static std::mutex m;
+    static std::unordered_map<uint32_t, bool> cache;
+    static VTerm* probe = nullptr;
+    std::lock_guard<std::mutex> lock(m);
+    auto it = cache.find(cp);
+    if (it != cache.end()) return it->second;
+    if (!probe) {
+        probe = vterm_new(1, 8);
+        vterm_set_utf8(probe, 1);
+        vterm_screen_reset(vterm_obtain_screen(probe), 1);
+    }
+    // At the home position a width-0 code point neither moves the cursor nor (being alone
+    // there) combines into a wider glyph.
+    std::string q = "\x1b[2;3H\x1b[H";
+    appendUtf8(q, cp > 0x10FFFF ? 0xFFFD : cp);
+    vterm_input_write(probe, q.data(), q.size());
+    VTermPos p;
+    vterm_state_get_cursorpos(vterm_obtain_state(probe), &p);
+    if (cache.size() > 4096) cache.clear();
+    return cache[cp] = p.col == 0;
+}
+
+// libvterm 0.3.3 keeps a wide character as the cell plus a marker in the next cell, and does not
+// keep the two consistent when only one half is overwritten or erased (xterm erases the whole
+// character then): a narrow character printed over the left half came back as a 2-cell "x"
+// hiding the right half, a wide character whose right half was overwritten or erased came back
+// 1 cell wide (drawn over its neighbour), ICH/DCH inside it left a 2-cell blank, and a reflow-free
+// resize can leave a wide character in the last column. This makes such cells what a VT would
+// show: a narrow character / blank 1 cell wide, a half-covered wide character a blank (keeping
+// its colours). It also replaces code points that are not Unicode scalar values (libvterm
+// decodes F4 90 80 80 to U+110000) with U+FFFD, so no invalid UTF-8 reaches Pango or the
+// clipboard.
+void VtermSession::normalizeCell(int col, VTermScreenCell& c) const {
+    for (int i = 0; i < VTERM_MAX_CHARS_PER_CELL && c.chars[i] && c.chars[i] != 0xFFFFFFFFu; ++i)
+        if (c.chars[i] > 0x10FFFF || (c.chars[i] >= 0xD800 && c.chars[i] <= 0xDFFF)) c.chars[i] = 0xFFFD;
+    const uint32_t base = c.chars[0];
+    if (base == 0 || base == 0xFFFFFFFFu) {
+        if (c.width > 1) c.width = 1;
+        return;
+    }
+    const int w = libvtermWidth(base);
+    if (c.width == 2 && (w != 2 || col == cols_ - 1)) {
+        if (w == 2) c.chars[0] = 0;  // a wide character with no room for its right half
+        c.width = 1;
+    } else if (c.width == 1 && w == 2) {
+        c.chars[0] = 0;  // right half overwritten / erased
+    }
+}
+
 bool VtermSession::getCell(long line, int col, VTermScreenCell& out) const {
     if (col < 0 || col >= cols_) return false;
     if (line >= pushed_) {
         long r = line - pushed_;
         if (r >= rows_) return false;
-        return vterm_screen_get_cell(screen_, VTermPos{static_cast<int>(r), col}, &out) != 0;
+        if (!vterm_screen_get_cell(screen_, VTermPos{static_cast<int>(r), col}, &out)) return false;
+        normalizeCell(col, out);
+        return true;
     }
     long idx = static_cast<long>(sb_.size()) - (pushed_ - line);
     if (idx < 0) return false;
     const SbLine& l = sb_[static_cast<size_t>(idx)];
     if (col < static_cast<int>(l.cells.size())) out = l.cells[static_cast<size_t>(col)];
     else out = blankCell();
+    normalizeCell(col, out);
     return true;
 }
 
@@ -622,8 +967,16 @@ void VtermSession::fillGrid(Grid& g, int scrollOffset) const {
             VTermScreenCell vc;
             if (!getCell(line, c, vc)) vc = blank;
             Cell& cell = g.at(r, c);
+            if (c > 0 && g.at(r, c - 1).width == 2) {
+                // The right half of a wide character takes its colours and attributes from the
+                // left half: libvterm's marker cell keeps an older pen, so an inverse or coloured
+                // wide character had its right half in the default colours (M4 item 5).
+                cell = g.at(r, c - 1);
+                cell.text.clear();
+                cell.width = 0;
+                continue;
+            }
             toCell(vc, cell);
-            if (c > 0 && g.at(r, c - 1).width == 2) cell.width = 0;
         }
     }
     g.cursorRow = cursor_.row + scrollOffset;
@@ -775,10 +1128,28 @@ void VtermSession::focus(bool in) {
 }
 
 std::string VtermSession::rowText(int row) const {
-    char buf[4096];
-    VTermRect rect{row, row + 1, 0, cols_};
-    size_t n = vterm_screen_get_text(screen_, buf, sizeof buf, rect);
-    return std::string(buf, n);
+    // Built from the normalised cells (getCell()), so it says what the screen shows; the same
+    // rules as vterm_screen_get_text(): blanks become spaces, trailing blanks are dropped, the
+    // right half of a wide character is skipped. (The old version used a fixed 4 KiB buffer with
+    // vterm_screen_get_text(), which returns the length it needed and was read past its end on
+    // long rows of combining characters: fuzz_regress_test F4.)
+    std::string out;
+    size_t pending = 0;
+    const long line = pushed_ + row;
+    for (int c = 0; c < cols_; ++c) {
+        uint32_t cp[VTERM_MAX_CHARS_PER_CELL];
+        int w = 1;
+        const int n = cellChars(line, c, cp, VTERM_MAX_CHARS_PER_CELL, &w);
+        if (w == 0) continue;
+        if (n == 0) {
+            ++pending;
+            continue;
+        }
+        out.append(pending, ' ');
+        pending = 0;
+        for (int k = 0; k < n; ++k) appendUtf8(out, cp[k]);
+    }
+    return out;
 }
 
 int VtermSession::cbDamage(VTermRect, void* user) {
@@ -817,6 +1188,10 @@ int VtermSession::cbSetTermProp(VTermProp prop, VTermValue* val, void* user) {
         // A resize while the alternate screen is up reflows the primary too, so it must not
         // be left with a continuation in row 0 either (see resize()).
         if (val->boolean && !s->altScreen_) s->clearTopContinuation();
+        // Leaving: still the alternate screen's line info. It is reflowed on resize too, while
+        // hidden, and read row -1 the same way (F17, ASan use-after-free / over-read in
+        // resize_buffer); its content does not matter any more (entering erases it).
+        if (!val->boolean && s->altScreen_) s->clearTopContinuation();
         s->altScreen_ = val->boolean;
         s->damaged_ = true;
         break;
@@ -868,6 +1243,12 @@ void VtermSession::cbOutput(const char* bytes, size_t len, void* user) {
     auto* s = static_cast<VtermSession*>(user);
     if (s->capture_) s->capture_->append(bytes, len);
     else s->sendBytes(bytes, len);
+}
+
+size_t VtermSession::scrollbackBytes() const {
+    size_t b = 0;
+    for (const SbLine& l : sb_) b += sizeof(SbLine) + l.cells.capacity() * sizeof(VTermScreenCell);
+    return b;
 }
 
 }  // namespace lterm

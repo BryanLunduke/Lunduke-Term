@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Lunduke Terminal M3 item 2 TCG VM, virtio-vga 2D (TCG only, never KVM). Live ISO read-only, -snapshot.
 D=/workspace/lterm-tcg; ISO=/workspace/lcos-iso/lcos-live-100-01.iso
 rm -f /tmp/q-lterm-m3.sock

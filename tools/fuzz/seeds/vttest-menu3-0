@@ -1,0 +1,81 @@
+%@[0c[>c[?1l[?3l[?4l[?5l[?6l[?7h[?8l[?40h[?45l[r[0m%G[2J[3;10HVT100 test program, version 2.7 (20241208)[4;10HScreen size 24x80 (80 max) Line speed 38400bd [5;10HChoose test type:
+[6;1H[0J
+          0. Exit
+          1. Test of cursor movements
+          2. Test of screen features
+          3. Test of character sets
+          4. Test of double-sized characters
+          5. Test of keyboard
+          6. Test of terminal reports
+          7. Test of VT52 mode
+          8. Test of VT102 features (Insert/Delete Char/Line)
+          9. Test of known bugs
+          10. Test of reset and self-test
+          11. Test non-VT100 (e.g., VT220, XTERM) terminals
+          12. Modify test-parameters
+
+          Enter choice number (0 - 12): 3
+[2J[?42l(B)A*A+A[2J[3;10HMenu 3: Character-Set Tests[5;10HChoose test type:
+[6;1H[0J
+          0. Exit
+          1. Reset (G0 ASCII, G1 Latin-1, no NRC mode)
+          2. Enable highlighting of non-ISO-8859-1 mapping
+          3. Enable National Replacement Character (NRC) mode
+          4. Specify G0 (now US ASCII)
+          5. Specify G1 (now ISO Latin-1)
+          6. Specify G2 (now ISO Latin-1)
+          7. Specify G3 (now ISO Latin-1)
+          8. Test VT100 Character Sets
+          9. Test Shift In/Shift Out (SI/SO)
+          10. Test VT220 Locking Shifts
+          11. Test VT220 Single Shifts
+          12* Test Soft Character Sets
+          13. Test Keyboard Layout with G0 Selection
+
+          Enter choice number (0 - 13): 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+0
+[2J[1J[?42l(B[2J[3;10HVT100 test program, version 2.7 (20241208)[4;10HScreen size 24x80 (80 max) Line speed 38400bd [5;10HChoose test type:
+[6;1H[0J
+          0. Exit
+          1. Test of cursor movements
+          2. Test of screen features
+          3. Test of character sets
+          4. Test of double-sized characters
+          5. Test of keyboard
+          6. Test of terminal reports
+          7. Test of VT52 mode
+          8. Test of VT102 features (Insert/Delete Char/Line)
+          9. Test of known bugs
+          10. Test of reset and self-test
+          11. Test non-VT100 (e.g., VT220, XTERM) terminals
+          12. Modify test-parameters
+
+          Enter choice number (0 - 12): 0
+[2J[?1l[?3l[?5l[?6l[?7h[?8h[r[0m[2J[12;30HThat's all, folks!
+
+
+
