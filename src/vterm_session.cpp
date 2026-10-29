@@ -500,10 +500,70 @@ void VtermSession::clearTopContinuation() {
         const_cast<VTermLineInfo*>(li)->continuation = 0;
 }
 
+// libvterm 0.3.3 resize_buffer() reflows the active buffer bottom-up. When a logical line does
+// not fit any more (it would start above row 0) it stops there and keeps the cursor only if
+// `old_row_start <= cursor.row < old_row_end`; old_row_end is inclusive, so a cursor on the last
+// row of that line (the usual place: the shell prompt after a long wrapped command, or any
+// line that rewraps taller than the new height) is left at -1 and libvterm calls abort():
+// "screen_resize failed to update cursor position" (found by the fuzzer; a 5x3 terminal with
+// "abcdefg" resized to 1x3 kills the process). This walks the same rows with the same
+// arithmetic, reading the active buffer through the public API, and says whether that happens.
+bool VtermSession::reflowWouldAbort(int newRows, int newCols) const {
+    const int oldRows = rows_, oldCols = cols_;
+    VTermPos cur;
+    vterm_state_get_cursorpos(state_, &cur);
+    auto cont = [&](int r) {
+        const VTermLineInfo* li = vterm_state_get_lineinfo(state_, r);
+        return li && li->continuation;
+    };
+    auto popcount = [&](int r) {
+        VTermScreenCell cell;
+        int c = oldCols - 1;
+        while (c >= 0 && vterm_screen_get_cell(screen_, VTermPos{r, c}, &cell) && cell.chars[0] == 0) --c;
+        return c + 1;
+    };
+    int oldRow = oldRows - 1, newRow = newRows - 1, finalBlank = newRows;
+    bool found = false;
+    while (oldRow >= 0) {
+        const int end = oldRow;
+        while (oldRow >= 0 && cont(oldRow)) --oldRow;
+        const int start = oldRow;
+        if (start < 0) return false;  // clearTopContinuation() prevents this
+        long width = 0;
+        for (int r = start; r <= end; ++r) width += (r < oldRows - 1 && cont(r + 1)) ? oldCols : popcount(r);
+        if (finalBlank == newRow + 1 && width == 0) finalBlank = newRow;
+        const int height = width ? static_cast<int>((width + newCols - 1) / newCols) : 1;
+        int newStart = newRow - height + 1;
+        const int spare = newRows - finalBlank;
+        if (newStart < 0 && spare >= 0 && !found) {  // (cursor not placed yet: the test passes)
+            const int down = std::min(-newStart, spare);
+            newStart += down;
+            finalBlank += down;
+        }
+        if (newStart < 0) {
+            if (start <= cur.row && cur.row < end) found = true;  // libvterm's (buggy) test
+            break;
+        }
+        if (cur.row >= start && cur.row <= end) found = true;  // placed while copying the line
+        oldRow = start - 1;
+        newRow = newStart - 1;
+    }
+    if (cur.row <= oldRow) found = true;
+    return !found;
+}
+
 void VtermSession::resize(int rows, int cols) {
     if (rows < 1) rows = 1;
     if (cols < 1) cols = 1;
     if (rows == rows_ && cols == cols_) return;
+    clearTopContinuation();
+    // See reflowWouldAbort(): in that case resize without reflow (lines are cut at the new
+    // width instead of rewrapped, this once) rather than let libvterm abort the process.
+    const bool noReflow = reflowWouldAbort(rows, cols);
+    if (noReflow) {
+        vterm_screen_enable_reflow(screen_, false);
+        ++reflowFallbacks_;
+    }
     snapshotWraps();  // shrinking pushes the top rows to the scrollback, several at once
     ++epoch_;         // reflow: search caches start over
     rows_ = rows;
@@ -524,6 +584,7 @@ void VtermSession::resize(int rows, int cols) {
     // array is libvterm's mutable state; only the const accessor is public.
     clearTopContinuation();
     vterm_set_size(vt_, rows, cols);  // reflow + scrollback push/pop happen in here
+    if (noReflow) vterm_screen_enable_reflow(screen_, true);
     if (swapPen) feedRaw(pen.data(), pen.size());
     wrapSnapActive_ = false;
     vterm_screen_flush_damage(screen_);

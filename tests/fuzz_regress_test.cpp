@@ -69,6 +69,36 @@ int main() {
         s.fillGrid(g);
         CHECK(g.at(4, 0).text == "w");
     }
+    // F3: libvterm 0.3.3 abort()s ("screen_resize failed to update cursor position") when the
+    // cursor's wrapped line no longer fits after a resize and the cursor is on its last row.
+    {
+        struct Case { int r, c; const char* text; int nr, nc; };
+        const Case cases[] = {{5, 3, "abcdefg", 1, 3}, {5, 3, "abcdefg", 2, 1}, {14, 1, "ab", 1, 1},
+                              {3, 1, "ab", 1, 1},      {5, 2, "abcd", 1, 2},    {24, 80, "", 1, 1}};
+        for (const Case& k : cases) {
+            VtermSession s(k.r, k.c);
+            feed(s, k.text);
+            s.resize(k.nr, k.nc);  // used to abort() the process
+            CHECK(s.rows() == k.nr && s.cols() == k.nc);
+            feed(s, "\r\x1b[KZ");
+            CHECK(s.rowText(s.rows() - 1).find('Z') != std::string::npos || s.rowText(0).find('Z') != std::string::npos);
+            s.resize(k.r, k.c);
+            CHECK(s.rows() == k.r);
+        }
+        // A long wrapped prompt line on the alternate screen, shrunk to one row.
+        VtermSession a(6, 10);
+        feed(a, "\x1b[?1049h");
+        feed(a, std::string(35, 'q'));
+        a.resize(1, 10);
+        a.resize(6, 10);
+        feed(a, "\x1b[?1049l");
+        CHECK(a.reflowFallbacks() >= 1);
+        // The usual case still reflows (no fallback): a wrapped line that fits.
+        VtermSession n(5, 10);
+        feed(n, "0123456789abcde\r\n$ ");
+        n.resize(5, 20);
+        CHECK(n.reflowFallbacks() == 0 && n.rowText(0) == "0123456789abcde");
+    }
     if (failures == 0) std::printf("fuzz_regress_test: OK\n");
     return failures ? 1 : 0;
 }

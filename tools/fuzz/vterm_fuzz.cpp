@@ -13,10 +13,20 @@
 #include <fuzzer/FuzzedDataProvider.h>
 
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <string>
 
 using namespace lterm;
+
+// LTERM_FUZZ_TRACE=1: print the ops of an input (to turn a crash into a regression test).
+static const bool kTrace = std::getenv("LTERM_FUZZ_TRACE") != nullptr;
+static void traceStr(const char* what, const std::string& s) {
+    if (!kTrace) return;
+    std::fprintf(stderr, "%s \"", what);
+    for (unsigned char c : s) std::fprintf(stderr, c >= 0x20 && c < 0x7f && c != '"' && c != '\\' ? "%c" : "\\x%02x", c);
+    std::fprintf(stderr, "\"\n");
+}
 
 static void readBack(const VtermSession& s, FuzzedDataProvider& fdp) {
     Grid g;
@@ -44,7 +54,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     const int rows = fdp.ConsumeIntegralInRange<int>(1, 60);
     const int cols = fdp.ConsumeIntegralInRange<int>(1, 250);
     VtermSession s(rows, cols);
-    s.setScrollbackLimit(fdp.ConsumeIntegralInRange<size_t>(0, 200));
+    const size_t sb = fdp.ConsumeIntegralInRange<size_t>(0, 200);
+    s.setScrollbackLimit(sb);
+    if (kTrace) std::fprintf(stderr, "session %dx%d scrollback %zu\n", rows, cols, sb);
     s.onTitle = [&s] { (void)s.title().size(); };
     SearchIndex idx;
     int ops = 0;
@@ -52,15 +64,22 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         switch (fdp.ConsumeIntegralInRange<int>(0, 15)) {
         default: {  // most ops: terminal output
             const std::string chunk = fdp.ConsumeRandomLengthString(512);
+            traceStr("feed", chunk);
             s.feed(chunk);
             break;
         }
-        case 9:
-            s.resize(fdp.ConsumeIntegralInRange<int>(0, 70), fdp.ConsumeIntegralInRange<int>(0, 260));
+        case 9: {
+            const int r = fdp.ConsumeIntegralInRange<int>(0, 70), c = fdp.ConsumeIntegralInRange<int>(0, 260);
+            if (kTrace) std::fprintf(stderr, "resize %d %d\n", r, c);
+            s.resize(r, c);
             break;
-        case 10:
-            s.paste(fdp.ConsumeRandomLengthString(256));
+        }
+        case 10: {
+            const std::string p = fdp.ConsumeRandomLengthString(256);
+            traceStr("paste", p);
+            s.paste(p);
             break;
+        }
         case 11:
             s.sendKey(static_cast<VTermKey>(fdp.ConsumeIntegralInRange<int>(0, VTERM_KEY_MAX - 1)),
                       static_cast<VTermModifier>(fdp.ConsumeIntegralInRange<int>(0, 7)));
@@ -76,6 +95,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
             break;
         }
         case 13:
+            if (kTrace) std::fprintf(stderr, "readback\n");
             readBack(s, fdp);
             break;
         case 14: {
@@ -87,6 +107,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
             break;
         }
         case 15:
+            if (kTrace) std::fprintf(stderr, "scrollback limit\n");
             s.setScrollbackLimit(fdp.ConsumeIntegralInRange<size_t>(0, 50));
             break;
         }

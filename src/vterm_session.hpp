@@ -69,6 +69,8 @@ public:
 
     void resize(int rows, int cols);  // vterm_set_size (+ reflow) + TIOCSWINSZ
     int rows() const { return rows_; }
+    // Resizes done without reflow to dodge libvterm's abort() (see reflowWouldAbort()).
+    int reflowFallbacks() const { return reflowFallbacks_; }
     int cols() const override { return cols_; }
 
     // Input.
@@ -151,6 +153,7 @@ private:
     void feedRaw(const char* bytes, size_t len);
     void snapshotWraps();  // see wrapSnap_
     void clearTopContinuation();  // libvterm 0.3.3 reflow reads row -1 otherwise (see resize())
+    bool reflowWouldAbort(int newRows, int newCols) const;  // libvterm 0.3.3 abort(), see resize()
 
     VTerm* vt_ = nullptr;
     VTermScreen* screen_ = nullptr;
@@ -181,6 +184,7 @@ private:
     // argument overwrites the parser's callbacks pointer (crash, or worse, from any program's
     // output). feed() counts the separators and drops the parameter bytes after the 15th.
     int csiSeps_ = 0;
+    int reflowFallbacks_ = 0;
     // Its argument accumulator (long * 10 + digit) also overflows (undefined behaviour), and a
     // value >= 2^31 collides with its CSI_ARG_FLAG_MORE bit: feed() keeps at most 9 significant
     // digits per argument (the rest are dropped, so the value stays huge and gets clamped).
