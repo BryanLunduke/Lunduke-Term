@@ -276,13 +276,50 @@ See `docs/FUZZING.md` for the harness, tools, seeds, how to run it and the per-r
   | F9 | DECRC after a shrink reads past `lineinfo[]` | Cursor clamped after a restore |
   | F10 | Scroll region below the new bottom after a shrink; LF memmoves a negative size; segfaults the system lib | Margins reset on shrink |
   | F11 | Our own pen-restore SGR had 20 args (F1 via the unguarded path) | Split into two SGRs |
+  | F12 | (PR #5 review) A byte ≥ 0x80 after ESC reset the guard while libvterm stays in the escape: F1 segfault / F7 hang again | Guard stays after ESC |
+  | F13 | (review) `ESC SP F` / `ESC # 8` ended at the second byte and counted as printed: F7 hang via a following REP | Intermediates collected like libvterm |
+  | F14 | (differential check) C0 inside the OSC command number skipped the 9-digit cap: int overflow | Guard stays in the OSC-number state |
+  | F15 | (differential check) libvterm bug: a read ending in a string after ESC + C0 gives a `(size_t)-1` fragment: over-read | ESC held back until the byte that ends it |
+  | F16 | (found with F15) ESC BEL in a string is not ST for libvterm, so `ESC [` after it is a CSI: F1 segfault again | Guard goes to after-ESC |
+  | F17 | (fuzz run l on the review head) Wrapped+scrolled line on the alternate screen leaves row 0 a continuation; a resize after `?1049l` reflows the hidden buffer and reads freed memory (ASan UAF, libvterm `resize_buffer`) | Row-0 continuation cleared on leaving the alternate screen too |
 
-- Fuzzing time and execs: 179 988 execs over 11 runs (REAL). On the final code: 114 982 execs
-  and 26.5 min of wall time (REAL), about 17.9 min of it actual fuzzing (DERIVED), with no
-  reproducible finding. Each of those three runs was stopped by a libFuzzer timeout that re-runs in
-  milliseconds (a box stall, not a bug), so none of them ended in a clean "Done". There is a table
-  per run in `docs/FUZZING.md`.
+- Fuzzing time and execs: 361 062 execs over 15 runs (REAL). On the final head c0323c9 (runs n
+  and o, differential check on): 131 508 execs in 1 202 s ≈ 20 min of wall time (REAL), both runs
+  ended in libFuzzer's clean "Done" with no crash, timeout or slow unit. Runs i–k (before the
+  review) each ended in a libFuzzer timeout that re-ran in milliseconds (a box stall). Per-run
+  table in `docs/FUZZING.md`.
 - Nothing was reported upstream or to Debian.
+
+### PR #5 review fixes (after 8ddda4c)
+
+- F12, F13: see above and `docs/FUZZING.md`. REAL probe evidence (`docs/bench/m4/tests/review-probe.txt`):
+  with the guard at 8ddda4c the review probe's cases 1 and 2 exit 139 (segfault, whole and
+  byte by byte) and cases 5–7 exit 124 (hang); with the fixes all cases exit 0.
+- Differential check (review item 6): the fuzzer now compares the guard's state with libvterm's
+  parser struct after every operation and, for byte-at-a-time feeds, after every byte (design and
+  limits in `docs/FUZZING.md`). Its first pass over the existing corpus found F14, and the next
+  found F15; F16 turned up while fixing F15. The fuzz runs on the review head (l, m) then found
+  F17 twice; runs n and o on the final head were clean.
+- Every new regression test was run without its fix and failed (F12: exit 139; F13: exit 142,
+  `alarm()` instead of a hang; F14 and F15: exit 1; F16: exit 139; REAL). F17 is not visible with the system libvterm0, so its
+  meson test (`fuzz_regress_test`) passes either way; the evidence is the fuzz build: the seed
+  `regress-F17-alt-reflow` gives an ASan heap-use-after-free without the fix and runs clean with it
+  (REAL).
+- view_test tab-close timing: the limit is 25 ms in release builds and 75 ms in sanitizer builds
+  (`ltermTimingLimitMs()` in `tests/sanitizer.hpp`). Under ASan with all cores busy it measured
+  30.5 ms (review) and 27.67 ms (mine). Release still catches the M2 ≥ 50 ms regression; the
+  sanitizer build only catches gross ones.
+- Copy and search over a soft wrap where a wide character did not fit in the last column and
+  moved to the next row: the empty last column was copied as a space (`abcd 漢`), and `findAll`
+  / `SearchIndex` could not find `d漢`. `wideJumpGap()` skips that cell; a real space typed in the
+  last column is kept. Test in `unicode_test` (its three checks fail without the fix, REAL).
+- Tests on c0323c9 (`docs/bench/m4/tests/*-review*.txt`, REAL): release 15/15 OK. ASan+UBSan with
+  leak checking: two serial runs (`--num-processes 1`) each 14/15, `view` failing at
+  view_test.cpp:673 (the cpu-renderer governor pass did not get back to Normal within 6 s after the
+  probe); the first of them ran next to a fuzzer, the second with nothing of mine running. The two
+  2-way parallel runs were 15/15, and `view` alone passed. So that check is timing-flaky under
+  ASan on this shared box; it was not changed. Tab close under ASan: worst 16.78–19.15 ms against
+  the 75 ms sanitizer limit (release limit 25 ms).
 
 ## Item 7: real GPU
 
