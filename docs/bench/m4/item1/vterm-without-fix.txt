@@ -1,0 +1,19 @@
+# M4 1(c): vterm_test with clearTopContinuation() temporarily disabled (body replaced by 'return;'), release build, 2026-10-28 19:03:36 CDT. Restored afterwards; src/ unchanged in the commit. Non-ASCII shown with cat -v.
+FAIL ../tests/vterm_test.cpp:161: exact
+alt=0 rows:
+1234567890
+          ab
+cdefghij
+X
+Y
+
+FAIL ../tests/vterm_test.cpp:156: bad == 0
+FAIL ../tests/vterm_test.cpp:161: exact
+alt=1 rows:
+1234567890
+   ^A M-eM-^WM-^B  M-|M-^XM-^]M-8M-9M-8M-eM-^WM-^B ab
+cdefghij
+X
+Y
+
+exit 1

@@ -154,9 +154,13 @@ int main() {
             all += w.rowText(r) + "\n";
         }
         CHECK(bad == 0);
-        CHECK(all.find("abcdefghij") != std::string::npos || all.find("ab\ncdefghij") != std::string::npos);
+        // The top row must come back intact: exactly "abcdefghij" on one row (it does not re-join
+        // with the line that scrolled away). Without clearTopContinuation() both halves fail here.
+        bool exact = false;
+        for (int r = 0; r < rg.rows; ++r) exact = exact || w.rowText(r) == "abcdefghij";
+        CHECK(exact);
         CHECK(all.find("X") != std::string::npos && all.find("Y") != std::string::npos);
-        if (bad || all.find("abcdefghij") == std::string::npos) std::fprintf(stderr, "alt=%d rows:\n%s", alt, all.c_str());
+        if (bad || !exact) std::fprintf(stderr, "alt=%d rows:\n%s", alt, all.c_str());
     }
 
     if (failures == 0) std::printf("vterm_test: OK\n");
