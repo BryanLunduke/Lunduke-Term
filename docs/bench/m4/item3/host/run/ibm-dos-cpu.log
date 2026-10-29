@@ -1,0 +1,4 @@
+
+(lunduke-terminal:557391): dbind-WARNING **: 20:21:00.869: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+stats: backend="ibm-dos, effects: C++ fallback (4 threads), quality reduced" content-frames=2 full-repaints=1 rows-painted=42 ticks=251 median paint 2.22 ms, median effects-source 16.41 ms, median tick 8.64 ms, glyphs cached 41
+stats: quality=reduced software=1 tick-interval 189.7 ms
