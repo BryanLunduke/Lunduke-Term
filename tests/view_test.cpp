@@ -423,9 +423,11 @@ static void testSearchView() {
     }
     CHECK(v.searchStep(true) && v.searchIndex() == 1);   // wraps around to the newest
     CHECK(v.searchStep(false) && v.searchIndex() == 0);  // and back
-    CHECK(v.setSearch("me", true) == 0);
+    // The case switch rebuilds the index; wait for the search to finish (searchSync), or a
+    // slow (ASan) run sees a pending 0.
+    CHECK(searchSync(v, "me", true) == 0);
     CHECK(!v.searchStep(false));
-    CHECK(v.setSearch("ME", true) == 2);
+    CHECK(searchSync(v, "ME", true) == 2);
     CHECK(searchSync(v, "row 1", false) >= 100);  // row 1, row 10.., row 100..
     // Output while the search is open re-runs it (debounced).
     CHECK(v.setSearch("zebra", false) == 0);
