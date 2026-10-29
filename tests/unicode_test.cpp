@@ -210,6 +210,18 @@ int main() {
         CHECK(idx.find(s, ji).size() == 1 && idx.find(s, ji)[0] == findAll(s, ji, true)[0]);
         CHECK(idx.find(s, "e\xcc\x81").size() == 1);
     }
+    // The right half of an inverse / coloured wide character has the left half's colours (it
+    // was drawn in the default colours: libvterm's marker cell keeps an older pen).
+    {
+        VtermSession s(2, 10);
+        feed(s, "\x1b[7m" + kan + "\x1b[0m\x1b[41;33m" + ji + "\x1b[0m");
+        Grid g;
+        s.fillGrid(g);
+        CHECK(g.at(0, 1).width == 0 && g.at(0, 1).text.empty());
+        CHECK(g.at(0, 1).bg == g.at(0, 0).bg && g.at(0, 1).fg == g.at(0, 0).fg);
+        CHECK(g.at(0, 3).bg == g.at(0, 2).bg && g.at(0, 3).fg == g.at(0, 2).fg);
+        CHECK(g.at(0, 0).bg != g.at(0, 4).bg && g.at(0, 2).bg != g.at(0, 4).bg);
+    }
     if (failures == 0) std::printf("unicode_test: OK\n");
     return failures ? 1 : 0;
 }

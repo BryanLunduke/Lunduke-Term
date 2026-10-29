@@ -868,8 +868,16 @@ void VtermSession::fillGrid(Grid& g, int scrollOffset) const {
             VTermScreenCell vc;
             if (!getCell(line, c, vc)) vc = blank;
             Cell& cell = g.at(r, c);
+            if (c > 0 && g.at(r, c - 1).width == 2) {
+                // The right half of a wide character takes its colours and attributes from the
+                // left half: libvterm's marker cell keeps an older pen, so an inverse or coloured
+                // wide character had its right half in the default colours (M4 item 5).
+                cell = g.at(r, c - 1);
+                cell.text.clear();
+                cell.width = 0;
+                continue;
+            }
             toCell(vc, cell);
-            if (c > 0 && g.at(r, c - 1).width == 2) cell.width = 0;
         }
     }
     g.cursorRow = cursor_.row + scrollOffset;
