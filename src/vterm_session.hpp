@@ -137,6 +137,7 @@ public:
     // csiState_) and the VTerm whose parser it mirrors.
     int guardState() const { return csiState_; }
     int guardIntermediates() const { return csiState_ == 3 ? escInters_ : 0; }
+    bool guardHoldsEsc() const { return stringEscHeld_; }
     VTerm* vtermForCheck() const { return vt_; }
     const std::string& title() const { return title_; }
     std::function<void()> onTitle;
@@ -163,6 +164,7 @@ private:
     static int cbSbClear(void* user);
     static void cbOutput(const char* s, size_t len, void* user);
     void feedRaw(const char* bytes, size_t len);
+    void holdStringEsc(const char* bytes, size_t i, size_t& done);
     void snapshotWraps();  // see wrapSnap_
     void clearTopContinuation();  // libvterm 0.3.3 reflow reads row -1 otherwise (see resize())
     bool reflowWouldAbort(int newRows, int newCols) const;  // libvterm 0.3.3 abort(), see resize()
@@ -193,6 +195,9 @@ private:
     Charsets cs_, savedCs_;
     int escTarget_ = -1;      // feed() state 3: 0 = G0, 1 = G1 being designated (ESC ( / ESC )), else -1
     int escInters_ = 0;       // feed() state 3: intermediate bytes so far
+    // feed() state 5: the ESC is not given to libvterm yet (F15, see holdStringEsc()). It is,
+    // right before the next byte that ends the escape; C0 controls before that go on without it.
+    bool stringEscHeld_ = false;
     std::string csiParams_;   // parameters of the open CSI (bounded)
     // libvterm 0.3.3 stores CSI arguments in a fixed long[16] without a bounds check: a 17th
     // argument overwrites the parser's callbacks pointer (crash, or worse, from any program's

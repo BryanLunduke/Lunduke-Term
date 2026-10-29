@@ -344,6 +344,50 @@ int main() {
         feed(u, std::string("\x1b]\x01\x7f") + std::string(1, '\0') + "2;T\x07");
         CHECK(u.title() == "T");
     }
+    // F15 (found by the differential check, as an ASan overread in the fuzz build): a read that
+    // ends inside a control string right after ESC + a C0 control left libvterm with a string
+    // fragment of (size_t)-1 bytes; the title callback copied kMaxTitleBytes from past the
+    // buffer, and the ESC itself went into the title.
+    {
+        VtermSession s(4, 20);
+        feed(s, "\x1b]2;ab\x1b\x01");
+        CHECK(s.guardState() == 5 && s.guardHoldsEsc());
+        feed(s, "\\");  // ESC \ (with the C0 in between) is still the terminator
+        CHECK(s.title() == "ab");
+        VtermSession t(4, 20);
+        for (char c : std::string("\x1b]2;ab\x1b\x01\x1b\x0a\\")) feed(t, std::string(1, c));
+        CHECK(t.title() == "ab");
+        VtermSession u(4, 20);
+        feed(u, "\x1bP$q\x1b\x0a");  // DCS (DECRQSS) the same way
+        feed(u, "\x01");
+        feed(u, "\x18" "A");
+        CHECK(u.rowText(1) == "A");  // the LF was executed inside the string
+    }
+    // F16 (found while fixing F15): BEL after ESC in a string is not the terminator for libvterm;
+    // it ends the string but stays in the escape, so ESC [ follows as a real CSI. The guard took
+    // it for "ESC in a string" (no CSI) and let F1 (args) and F7 (REP) through.
+    {
+        const char* cases[] = {
+            "\x1b]2;x\x1b\x07[1;2;3;4;5;6;7;8;9;10;11;12;13;14;15;16;17;18;19;20;21;22;23;24;25;26;27;28;29;30;"
+            "31;32;33;34;35;36;37;38;39;40mA",
+            "\x1bPq\x1b\x07[1;2;3;4;5;6;7;8;9;10;11;12;13;14;15;16;17;18;19;20;21;22;23;24;25;26;27;28;29;30;"
+            "31;32;33;34;35;36;37;38;39;40mA",
+        };
+        for (const char* q : cases) {
+            VtermSession s(4, 40);
+            feed(s, q);
+            CHECK(s.rowText(0) == "A");
+            VtermSession t(4, 40);
+            for (const char* p = q; *p; ++p) feed(t, std::string(1, *p));
+            CHECK(t.rowText(0) == "A");
+        }
+        VtermSession v(4, 40);
+        feed(v, "\x1b]x\x1b\x07[bZ");  // REP with nothing printed (F7)
+        CHECK(v.rowText(0) == "Z");
+        VtermSession w(4, 40);
+        feed(w, "\x1b]2;T\x07");  // a plain BEL still ends the string
+        CHECK(w.title() == "T" && w.guardState() == 0);
+    }
     if (failures == 0) std::printf("fuzz_regress_test: OK\n");
     return failures ? 1 : 0;
 }

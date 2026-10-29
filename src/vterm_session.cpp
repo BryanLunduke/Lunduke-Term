@@ -402,6 +402,18 @@ void VtermSession::restoreCharsets() {
     feedRaw(seq, 7);
 }
 
+// F15: libvterm 0.3.3 must not end a vterm_input_write() inside a control string just after an
+// ESC and one or more C0 controls (or NUL / DEL) that follow it: its final string fragment is
+// then (bytes + len - string_start) - 1 = (size_t)-1 bytes long, and the OSC / DCS handlers read
+// far past the buffer (ASan; the title callback copied up to kMaxTitleBytes of garbage). Such
+// C0 bytes are executed the same way without the ESC, so feed() holds the ESC back and passes it
+// on only right before the byte that ends libvterm's escape (see stringEscHeld_).
+void VtermSession::holdStringEsc(const char* bytes, size_t i, size_t& done) {
+    feedRaw(bytes + done, i - done);
+    done = i + 1;
+    stringEscHeld_ = true;
+}
+
 void VtermSession::feed(const char* bytes, size_t len) {
     size_t done = 0;
     for (size_t i = 0; i < len; ++i) {
@@ -444,10 +456,26 @@ void VtermSession::feed(const char* bytes, size_t len) {
             // a CSI (and ESC \ is the string terminator).
             const bool inString = csiState_ == 5;
             const unsigned char u = static_cast<unsigned char>(c);
+            if (inString && c == 0x1b) {
+                holdStringEsc(bytes, i, done);  // ESC ESC: still one escape for libvterm
+                csiStart_ = static_cast<long>(i);
+                break;
+            }
+            if (inString && (c == 0x07 || c == 0x18 || c == 0x1a || (u >= 0x20 && u != 0x7f))) {
+                // This byte ends libvterm's "ESC in a string": now it can have the ESC (F15).
+                feedRaw(bytes + done, i - done);
+                done = i;
+                feedRaw("\x1b", 1);
+                stringEscHeld_ = false;
+            }
             if (c == 0x1b) {
                 csiStart_ = static_cast<long>(i);
             } else if (c == 0x18 || c == 0x1a) {
                 csiState_ = 0;
+            } else if (inString && c == 0x07) {
+                // BEL is not the string terminator after ESC: libvterm ends the string and stays
+                // in a plain escape, so ESC ] ... ESC BEL [ is a CSI (F16).
+                csiState_ = 1;
             } else if (u < 0x20 || u == 0x7f) {
                 // C0 controls (and NUL/DEL) are executed / ignored without ending the escape
             } else if (u >= 0x80) {
@@ -506,7 +534,10 @@ void VtermSession::feed(const char* bytes, size_t len) {
                 break;
             }
             if (c == 0x07 || c == 0x18 || c == 0x1a) csiState_ = 0;
-            else if (c == 0x1b) csiState_ = 5;
+            else if (c == 0x1b) {
+                holdStringEsc(bytes, i, done);
+                csiState_ = 5;
+            }
             // libvterm executes other C0 controls (and ignores NUL/DEL) without leaving its OSC
             // command state, so digits after them still go into the number (F14).
             else if (static_cast<unsigned char>(c) >= 0x20 && c != 0x7f) csiState_ = 4;
@@ -589,7 +620,10 @@ void VtermSession::feed(const char* bytes, size_t len) {
         }
         case 4:  // inside a control string, until BEL or ST (ESC \\)
             if (c == 0x07 || c == 0x18 || c == 0x1a) csiState_ = 0;
-            else if (c == 0x1b) csiState_ = 5;
+            else if (c == 0x1b) {
+                holdStringEsc(bytes, i, done);
+                csiState_ = 5;
+            }
             break;
         case 3: {  // ESC + intermediates, until the final byte (libvterm NORMAL + in_esc)
             const unsigned char u = static_cast<unsigned char>(c);
@@ -714,6 +748,7 @@ void VtermSession::resize(int rows, int cols) {
         if (csiState_ != 0) {
             feedRaw("\x18", 1);
             csiState_ = 0;
+            stringEscHeld_ = false;
             lastCp_ = 0;
             u8need_ = 0;
         }

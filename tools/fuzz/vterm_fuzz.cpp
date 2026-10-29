@@ -70,6 +70,8 @@ static void checkGuard(const VtermSession& s, const char* where) {
     // libvterm stops counting intermediates at INTERMED_MAX - 1.
     const int gi = std::min(s.guardIntermediates(), INTERMED_MAX - 1);
     if (lv == g && (g != 3 || gi == inters)) return;
+    // F15: in state 5 feed() keeps the ESC back, so libvterm is still in the plain string.
+    if (g == 5 && s.guardHoldsEsc() && (lv == 4 || lv == 7)) return;
     std::fprintf(stderr, "guard/libvterm parser mismatch after %s: guard state %d (intermediates %d), libvterm %d "
                  "(state %d, in_esc %d, intermedlen %d)\n", where, g, gi, lv,
                  static_cast<int>(s.vtermForCheck()->parser.state), static_cast<int>(s.vtermForCheck()->parser.in_esc),
