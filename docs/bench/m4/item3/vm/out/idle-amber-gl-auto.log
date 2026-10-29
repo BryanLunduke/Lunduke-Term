@@ -1,0 +1,41 @@
+[571.45] 
+[571.47] (lunduke-terminal:4499): Gtk-WARNING **: 01:03:32.253: Theme parsing error: gtk-widgets.css:153:27: The style property GtkButton:image-spacing is deprecated and shouldn't be used anymore. It will be removed in a future version
+[571.48] 
+[571.49] (lunduke-terminal:4499): Gtk-WARNING **: 01:03:32.254: Theme parsing error: gtk-widgets.css:154:26: The style property GtkButton:inner-border is deprecated and shouldn't be used anymore. It will be removed in a future version
+[571.50] 
+[571.51] (lunduke-terminal:4499): Gtk-WARNING **: 01:03:32.259: Theme parsing error: gtk-widgets.css:578:27: The style property GtkButton:image-spacing is deprecated and shouldn't be used anymore. It will be removed in a future version
+[571.52] 
+[571.53] (lunduke-terminal:4499): Gtk-WARNING **: 01:03:32.260: Theme parsing error: gtk-widgets.css:579:28: The style property GtkWidget:interior-focus is deprecated and shouldn't be used anymore. It will be removed in a future version
+[571.53] 
+[571.54] (lunduke-terminal:4499): Gtk-WARNING **: 01:03:32.260: Theme parsing error: gtk-widgets.css:580:28: The style property GtkButton:default-border is deprecated and shouldn't be used anymore. It will be removed in a future version
+[571.55] 
+[571.56] (lunduke-terminal:4499): Gtk-WARNING **: 01:03:32.260: Theme parsing error: gtk-widgets.css:581:26: The style property GtkButton:inner-border is deprecated and shouldn't be used anymore. It will be removed in a future version
+[571.57] 
+[571.58] (lunduke-terminal:4499): Gtk-WARNING **: 01:03:32.269: Theme parsing error: gtk-widgets.css:1214:18: Not using units is deprecated. Assuming 'px'.
+[571.59] 
+[571.59] (lunduke-terminal:4499): Gtk-WARNING **: 01:03:32.273: Theme parsing error: gtk-widgets.css:1338:25: The style property GtkRange:slider-width is deprecated and shouldn't be used anymore. It will be removed in a future version
+[571.60] 
+[571.61] (lunduke-terminal:4499): Gtk-WARNING **: 01:03:32.273: Theme parsing error: gtk-widgets.css:1339:25: The style property GtkRange:stepper-size is deprecated and shouldn't be used anymore. It will be removed in a future version
+[571.62] 
+[571.63] (lunduke-terminal:4499): Gtk-WARNING **: 01:03:32.274: Theme parsing error: gtk-widgets.css:1340:34: The style property GtkScrollbar:min-slider-length is deprecated and shouldn't be used anymore. It will be removed in a future version
+[571.64] 
+[571.65] (lunduke-terminal:4499): Gtk-WARNING **: 01:03:32.274: Theme parsing error: gtk-widgets.css:1341:28: The style property GtkRange:stepper-spacing is deprecated and shouldn't be used anymore. It will be removed in a future version
+[571.66] 
+[571.67] (lunduke-terminal:4499): Gtk-WARNING **: 01:03:32.274: Theme parsing error: gtk-widgets.css:1342:34: The style property GtkRange:trough-under-steppers is deprecated and shouldn't be used anymore. It will be removed in a future version
+[573.17] lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+[584.38] lunduke-terminal: animation needs 407% of a core at 1 fps (4074 ms per frame); effects-quality auto -> static, retry in 10.0 s
+[584.39] lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+[594.42] lunduke-terminal: effects-quality auto: probing the animation again
+[594.43] lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+[597.39] lunduke-terminal: animation needs 405% of a core at 1 fps (4049 ms per frame); effects-quality auto -> static, retry in 20.0 s
+[597.40] lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+[617.61] lunduke-terminal: effects-quality auto: probing the animation again
+[617.63] lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+[620.71] lunduke-terminal: animation needs 415% of a core at 1 fps (4149 ms per frame); effects-quality auto -> static, retry in 40.0 s
+[620.71] lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+[660.87] lunduke-terminal: effects-quality auto: probing the animation again
+[660.89] lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+[664.15] lunduke-terminal: animation needs 436% of a core at 1 fps (4356 ms per frame); effects-quality auto -> static, retry in 80.0 s
+[664.16] lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+[688.37] stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)" content-frames=5 full-repaints=4 rows-painted=101 ticks=2 median paint 5.39 ms, median effects-source 1674.90 ms, median tick 998.65 ms, glyphs cached 18
+[688.38] stats: quality=static software=1 tick-interval 50.0 ms

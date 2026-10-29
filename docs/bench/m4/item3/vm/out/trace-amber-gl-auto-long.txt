@@ -1,0 +1,19 @@
+pid 11457 start-uptime 811.32
+t+10 s cpu-ms-in-10s 13810 rss-kb 265628
+t+20 s cpu-ms-in-10s 40 rss-kb 265628
+t+30 s cpu-ms-in-10s 20 rss-kb 265628
+t+40 s cpu-ms-in-10s 30 rss-kb 265628
+t+50 s cpu-ms-in-10s 16480 rss-kb 273720
+t+60 s cpu-ms-in-10s 20 rss-kb 273720
+t+70 s cpu-ms-in-10s 30 rss-kb 273720
+t+80 s cpu-ms-in-10s 30 rss-kb 273720
+t+90 s cpu-ms-in-10s 20 rss-kb 273720
+t+100 s cpu-ms-in-10s 40 rss-kb 273720
+t+110 s cpu-ms-in-10s 20 rss-kb 273720
+t+120 s cpu-ms-in-10s 40 rss-kb 273720
+t+130 s cpu-ms-in-10s 15220 rss-kb 274004
+t+140 s cpu-ms-in-10s 30 rss-kb 274004
+t+150 s cpu-ms-in-10s 30 rss-kb 274004
+t+160 s cpu-ms-in-10s 30 rss-kb 274004
+t+170 s cpu-ms-in-10s 30 rss-kb 274004
+t+180 s cpu-ms-in-10s 20 rss-kb 274004
