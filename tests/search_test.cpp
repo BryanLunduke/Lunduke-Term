@@ -93,7 +93,7 @@ int main() {
         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
         std::printf("search 10000+24 lines x 80: %zu matches in %.1f ms\n", m.size(), ms);
         CHECK(m.size() >= 10000);
-        CHECK(ms < 2000.0);  // generous: ASan/UBSan debug builds run this too
+        CHECK(ms < (LTERM_ASAN ? 6000.0 : 2000.0));  // ASan+UBSan: 1.5-2.0 s measured in M4
     }
     // ---- M3 item 1(a): SearchIndex (cached, sliced) gives the same results as findAll ----
     auto sameAs = [](const LineSource& src, SearchIndex& idx, const std::string& q, bool cs) {
