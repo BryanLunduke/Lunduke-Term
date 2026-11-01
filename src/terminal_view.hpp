@@ -53,6 +53,7 @@ struct ViewStats {
     long contentFrames = 0, ticks = 0, rowsPainted = 0, fullRepaints = 0;
     std::vector<double> paintMs, effectsSourceMs, tickMs;
     double finalTickIntervalMs = 0;  // governor state on exit
+    long probesDeferred = 0;         // M5: due probe polls skipped while hidden/unfocused
 };
 
 // M4 item 4: what one view holds in memory (for --stats-every), all in bytes unless counts.
@@ -193,6 +194,7 @@ private:
     bool onTick();
     double nowMs() const;
     bool animationWanted() const;
+    bool probeWanted() const;
     void updateQuality();          // resolve effects-quality for the current renderer
     double baseTickIntervalMs() const;
     bool governTick();             // software rendering: keep the idle animation within cpuBudget

@@ -462,8 +462,14 @@ bool TerminalView::onGlRender(const Glib::RefPtr<Gdk::GLContext>&) {
     // effects tick showed it; with nothing animating, the window stayed black).
     GLint fbo = 0;
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &fbo);
-    if (!glPipe_ || glParamsStale_) {
-        if (glPipe_) glPipe_->release();
+    if (glPipe_ && glParamsStale_) {
+        // M5 item 1c: a quality switch (a governor probe and its re-demotion, a profile or scale
+        // change) only changes uniforms and sized objects; keep the compiled programs.
+        glPipe_->setParams(fx_);
+        glParamsStale_ = false;
+        effectsSourceStale_ = true;
+    }
+    if (!glPipe_) {
         glPipe_.reset(new GlPipeline(fx_));
         glParamsStale_ = false;
         effectsSourceStale_ = true;
@@ -855,9 +861,19 @@ bool TerminalView::governTick() {
     return false;
 }
 
+bool TerminalView::probeWanted() const {
+    // M5 item 1c: a probe renders animated frames; nobody sees them while the window is hidden
+    // or (with pause-when-unfocused) unfocused, and the animation would pause there anyway.
+    return effectsOn_ && mode_ != Mode::Plain && visible_ && (active_ || !opts_.pauseWhenUnfocused);
+}
+
 bool TerminalView::onProbeTimer() {
     if (!qualityDemoted_) return false;
     if (!gov_.probeDue(nowMs())) return true;
+    if (!probeWanted()) {
+        ++stats_.probesDeferred;
+        return true;  // due; starts once the window is visible/focused again (polled every 250 ms)
+    }
     // Try the auto level again; the governor demotes once more (with a longer wait) if it
     // is still too expensive.
     qualityDemoted_ = false;

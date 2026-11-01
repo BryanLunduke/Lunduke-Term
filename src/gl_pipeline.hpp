@@ -26,6 +26,12 @@ public:
     std::string renderer() const;
 
     void resize(int width, int height);  // frees the previous size's textures and FBOs
+    // M5 item 1c: new effect parameters (a quality switch, e.g. a governor probe) without
+    // recompiling: the shader programs and the noise texture stay; the size-dependent
+    // textures/FBOs are freed and come back on the next resize() (burn-in/bezel depend on them).
+    void setParams(const EffectParams& params);
+    // Programs compiled by every GlPipeline in this process so far (tests: a probe must not recompile).
+    static long programsCompiled();
     int width() const { return w_; }
     int height() const { return h_; }
     // Uploads rows [rowBegin, rowEnd) (rowEnd < 0: all) of an 8-bit source image and runs the

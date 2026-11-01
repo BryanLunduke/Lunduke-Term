@@ -1,0 +1,15 @@
+# 2026-11-01 11:21 CST interleaved A/B, 3 rounds, lterm-m5-probe-bench auto 30 focused, llvmpipe on Xvfb :44 (host box, NOT a GPU)
+# old = 3bf5d97 (M4 src), new = 3bf5d97 + item 1c; cache=off sets MESA_SHADER_CACHE_DISABLE=true
+round 1 cache=on old: run 30.0 s: 14 probe(s) started, 14 completed; process CPU 3193 ms total (10.6 % of a core) idle between probes: 80.25 ms CPU per s per probe (net of idle): median 55.1 ms, min 50.2, max 68.8, mean 56.1 (n=14) 
+round 1 cache=on new: run 30.0 s: 14 probe(s) started, 14 completed; process CPU 3011 ms total (10.0 % of a core) idle between probes: 76.87 ms CPU per s per probe (net of idle): median 49.1 ms, min 40.2, max 65.9, mean 50.3 (n=14) 
+round 1 cache=off old: run 30.0 s: 0 probe(s) started, 0 completed; process CPU 8106 ms total (27.0 % of a core) idle between probes: 270.19 ms CPU per s 
+round 1 cache=off new: run 30.0 s: 14 probe(s) started, 14 completed; process CPU 3022 ms total (10.1 % of a core) idle between probes: 76.32 ms CPU per s per probe (net of idle): median 51.6 ms, min 43.7, max 69.7, mean 52.3 (n=14) 
+round 2 cache=on old: run 30.0 s: 14 probe(s) started, 14 completed; process CPU 3151 ms total (10.5 % of a core) idle between probes: 79.39 ms CPU per s per probe (net of idle): median 55.1 ms, min 45.8, max 67.0, mean 54.9 (n=14) 
+round 2 cache=on new: run 30.0 s: 14 probe(s) started, 14 completed; process CPU 3093 ms total (10.3 % of a core) idle between probes: 79.36 ms CPU per s per probe (net of idle): median 47.2 ms, min 39.4, max 75.5, mean 50.9 (n=14) 
+round 2 cache=off old: run 30.0 s: 0 probe(s) started, 0 completed; process CPU 7995 ms total (26.6 % of a core) idle between probes: 266.48 ms CPU per s 
+round 2 cache=off new: run 30.0 s: 14 probe(s) started, 14 completed; process CPU 3066 ms total (10.2 % of a core) idle between probes: 78.19 ms CPU per s per probe (net of idle): median 49.1 ms, min 43.8, max 75.3, mean 51.5 (n=14) 
+round 3 cache=on old: run 30.0 s: 14 probe(s) started, 14 completed; process CPU 3208 ms total (10.7 % of a core) idle between probes: 80.87 ms CPU per s per probe (net of idle): median 53.9 ms, min 45.7, max 67.2, mean 55.8 (n=14) 
+round 3 cache=on new: run 30.0 s: 14 probe(s) started, 14 completed; process CPU 2957 ms total (9.9 % of a core) idle between probes: 74.72 ms CPU per s per probe (net of idle): median 49.7 ms, min 43.2, max 61.8, mean 51.1 (n=14) 
+round 3 cache=off old: run 30.0 s: 0 probe(s) started, 0 completed; process CPU 7635 ms total (25.5 % of a core) idle between probes: 254.50 ms CPU per s 
+round 3 cache=off new: run 30.0 s: 14 probe(s) started, 14 completed; process CPU 2941 ms total (9.8 % of a core) idle between probes: 74.33 ms CPU per s per probe (net of idle): median 49.1 ms, min 46.1, max 61.9, mean 50.8 (n=14) 
+done

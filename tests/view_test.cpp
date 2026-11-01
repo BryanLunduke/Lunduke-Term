@@ -5,6 +5,7 @@
 //   (d) closing the view while a clipboard request is pending
 //   (g) the child is reaped after the view hangs up on it
 // M2 stage 3: tabs, scrollback search (view + search bar), the settings dialog.
+#include "gl_pipeline.hpp"
 #include "sanitizer.hpp"
 #include "terminal_view.hpp"
 #include "terminal_window.hpp"
@@ -652,6 +653,9 @@ static void testGovernor(const char* renderer) {
     CHECK(!w.view->qualityDemoted());
     CHECK(w.view->effectsQuality() == level);
     CHECK(w.view->animating());
+    // M5 item 1c: from here on (demotion, two probes, recovery) no GL program is compiled again;
+    // a quality switch only swaps the pipeline's parameters (M4 rebuilt all 7 programs each time).
+    const long programs0 = GlPipeline::programsCompiled();
     // A renderer that needs 400 ms per frame: over budget even at 1 fps -> static.
     w.view->setRenderCostForTest(400);
     CHECK(waitFor([&] { return w.view->qualityDemoted(); }, ltermWaitMs(8000, 20000)));
@@ -688,9 +692,54 @@ static void testGovernor(const char* renderer) {
     waitFor([&] { return w.view->tickIntervalMs() <= w.view->governor().config().baseIntervalMs; }, 5000);
     std::printf("governor %s: demoted at %.1f s, back to %s, tick %.0f ms\n", renderer, demotedAt,
                 effectsQualityName(w.view->effectsQuality()), w.view->tickIntervalMs());
+    std::printf("governor %s: GL programs compiled during demotion + 2 probes: %ld\n", renderer,
+                GlPipeline::programsCompiled() - programs0);
+    CHECK(GlPipeline::programsCompiled() == programs0);
     // An explicit choice clears the state.
     w.view->setEffectsQuality(EffectsQuality::Full);
     CHECK(w.view->effectsQuality() == EffectsQuality::Full);
+}
+
+// M5 item 1c: a due probe waits while the window is hidden or (pause-when-unfocused) unfocused,
+// and runs once it is visible and focused again.
+static void testProbeDeferred(const char* renderer) {
+    ViewOptions o;
+    o.profile = "amber";
+    o.renderer = renderer;
+    o.pauseWhenUnfocused = true;
+    o.command = {"/bin/sh", "-c", "printf '$ '; sleep 60"};
+    Win w(o);
+    w.view->governor().configure([&] {
+        GovernorConfig c = w.view->governor().config();
+        c.firstProbeMs = 1000;
+        c.maxProbeMs = 1000;
+        return c;
+    }());
+    CHECK(w.view->start());
+    pump(300);
+    CHECK(w.view->softwareRendering());
+    w.view->setRenderCostForTest(3900);
+    CHECK(waitFor([&] { return w.view->qualityDemoted(); }, ltermWaitMs(8000, 20000)));
+    pump(300);
+    const auto checkDeferred = [&](const char* why) {
+        const long d0 = w.view->stats().probesDeferred;
+        pump(2500);  // 2.5x the probe delay
+        std::printf("probe deferral %s (%s): %ld due poll(s) deferred, state %d\n", renderer, why,
+                    w.view->stats().probesDeferred - d0, static_cast<int>(w.view->governor().state()));
+        CHECK(w.view->stats().probesDeferred > d0);
+        CHECK(w.view->qualityDemoted());
+        CHECK(w.view->governor().state() == EffectsGovernor::State::Demoted);
+        CHECK(!w.view->animating());
+    };
+    w.view->setWindowActive(false);
+    checkDeferred("unfocused");
+    w.view->setWindowActive(true);
+    w.view->setWindowVisible(false);
+    checkDeferred("hidden");
+    // Visible and focused again: the due probe starts (and, at no cost, brings auto back).
+    w.view->setRenderCostForTest(0);
+    w.view->setWindowVisible(true);
+    CHECK(waitFor([&] { return !w.view->qualityDemoted(); }, ltermWaitMs(3000, 8000)));
 }
 
 // M3 item 1e: a settings.ini that is not a valid key file no longer blocks Save: the dialog
@@ -906,6 +955,8 @@ int main(int argc, char** argv) {
     testTabIds();
     testGovernor("auto");
     testGovernor("cpu");
+    testProbeDeferred("auto");
+    testProbeDeferred("cpu");
     if (failures) {
         std::fprintf(stderr, "%d failure(s)\n", failures);
         return 1;

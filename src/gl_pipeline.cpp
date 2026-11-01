@@ -28,6 +28,22 @@ GlPipeline::GlPipeline(const EffectParams& params)
 
 GlPipeline::~GlPipeline() = default;
 
+namespace {
+long gProgramsCompiled = 0;
+}
+
+long GlPipeline::programsCompiled() { return gProgramsCompiled; }
+
+void GlPipeline::setParams(const EffectParams& params) {
+    p_ = params;
+    d_ = derive(params);
+    weights_ = bloomWeights(params.bloomRadiusHalfRes);
+    weights_.resize(65, 0.0f);
+    freeSized();
+    w_ = h_ = 0;  // the next resize() allocates for the new parameters (burn-in size, bezel)
+    haveBurn_ = false;
+}
+
 void GlPipeline::release() {
     freeSized();
     if (texNoise_) deleteTex(&texNoise_);
@@ -71,6 +87,7 @@ unsigned GlPipeline::compile(const char* fsBody) {
         return 0;
     }
     GLuint p = glCreateProgram();
+    ++gProgramsCompiled;
     glAttachShader(p, vs);
     glAttachShader(p, fs);
     glLinkProgram(p);
