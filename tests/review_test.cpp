@@ -2,6 +2,8 @@
 // M5 review fixes (docs/M5-NOTES.md, numbering from the 2026-11-01 code review). Needs an X
 // display; skipped without one.
 //   1  an output flood does not freeze the main loop, and Ctrl+C reaches the child
+//   5  cursor blink stops after the blink timeout, restarts on a key
+//   7  a hidden tab does not paint; showing it paints once
 //   8  output compares only the on-screen part of a selection with its snapshot
 //   14 frame-time samples only with --stats
 //   12 the retro look (amber) is the default profile; plain stays selectable
@@ -192,6 +194,61 @@ static void testSelectionCompare() {
     std::printf("selection of %ld lines: %ld lines compared over the ticks (screen %d rows)\n", selLines, compared, rows);
 }
 
+// ---- item 5: cursor blink timeout ----
+static void testBlinkTimeout() {
+    ViewOptions o;
+    o.profile = "amber";
+    o.cursorBlink = true;
+    o.cursorBlinkTimeoutMs = 1500;
+    o.pauseWhenUnfocused = false;
+    o.command = {"/bin/sh", "-c", "printf '$ '; exec sleep 30"};
+    Win w(o);
+    TerminalView& v = *w.view;
+    CHECK(v.start());
+    w.view->setWindowActive(true);
+    pump(1000);
+    CHECK(v.stats().blinkToggles > 0);
+    CHECK(waitFor([&] {
+        const long t0 = v.stats().blinkToggles;
+        pump(1200);  // > 2 blink periods
+        return v.stats().blinkToggles == t0;
+    }, ltermWaitMs(6000, 15000)));
+    const long frames = v.stats().contentFrames;
+    pump(1500);
+    CHECK(v.stats().contentFrames == frames);  // stopped, cursor solid: no frames at all
+    const long t1 = v.stats().blinkToggles;
+    GdkEventKey e = keyEv(GDK_KEY_a, 0);  // a key restarts it
+    v.testKey(&e);
+    CHECK(waitFor([&] { return v.stats().blinkToggles > t1; }, ltermWaitMs(1500, 4000)));
+    std::printf("blink: stopped after the timeout, restarted by a key\n");
+}
+
+// ---- item 7: hidden tabs do not paint ----
+static void testHiddenTab() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-c", "i=0; while :; do echo busy line $i; i=$((i+1)); sleep 0.02; done"};
+    TerminalWindow w(o);
+    w.settingsFile = "/dev/null";
+    w.set_default_size(480, 320);
+    w.show();
+    TerminalView* busy = w.newTab(true);
+    TerminalView* idle = w.newTab();
+    CHECK(busy && idle);
+    if (!busy || !idle) return;
+    w.setCurrent(1);
+    pump(500);
+    CHECK(!busy->windowVisible());
+    const long f0 = busy->stats().contentFrames, h0 = busy->stats().framesHidden;
+    pump(1000);
+    CHECK(busy->stats().contentFrames == f0);  // M4: ~30 frames per second while hidden
+    CHECK(busy->stats().framesHidden > h0);
+    w.setCurrent(0);
+    CHECK(waitFor([&] { return busy->stats().contentFrames > f0; }, ltermWaitMs(1000, 4000)));
+    CHECK(screenText(busy->shownGrid()).find("busy line") != std::string::npos);
+    std::printf("hidden tab: %ld frame requests skipped in 1 s, 0 painted\n", busy->stats().framesHidden - h0);
+}
+
 // ---- item 14: no frame statistics unless --stats ----
 static void testStatsOff(bool stats) {
     ViewOptions o;
@@ -248,6 +305,8 @@ int main(int argc, char** argv) {
     testFlood("amber");
     testFloodEnds();
     testDefaultProfile();
+    testBlinkTimeout();
+    testHiddenTab();
     testSelectionCompare();
     testStatsOff(false);
     testStatsOff(true);

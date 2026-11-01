@@ -249,6 +249,7 @@ std::string TerminalView::backendName() const {
 bool TerminalView::start() {
     if (!session_->spawn(SpawnOptions{opts_.command, opts_.loginShell, opts_.cwd})) return false;
     connectPtyWatch();
+    blinkSinceMs_ = nowMs();
     // GLib reaps the child (SIGCHLD) and reports the wait status on the main loop.
     childWatch_ = g_child_watch_add(
         session_->childPid(),
@@ -316,10 +317,23 @@ void TerminalView::onBell() {
 void TerminalView::updateBlink() {
     int b = session_->cursorBlink();
     const bool blink = b < 0 ? opts_.cursorBlink : b != 0;
-    const bool want = blink && active_ && visible_ && !holding_ && scrollOffset_ == 0;
+    const bool want = blink && active_ && visible_ && !holding_ && scrollOffset_ == 0 && !blinkExpired_;
     if (want && !blink_.connected()) {
         blink_ = Glib::signal_timeout().connect(
             [this] {
+                // Review item 5: each toggle is a content frame, and with effects the whole
+                // effects pass. Stop with the cursor shown after the timeout.
+                const int timeout = blinkTimeoutMs();
+                if (timeout >= 0 && nowMs() - blinkSinceMs_ >= timeout) {
+                    blinkExpired_ = true;
+                    if (blinkOff_) {
+                        blinkOff_ = false;
+                        contentDirty_ = true;
+                        requestFrame();
+                    }
+                    return false;
+                }
+                ++stats_.blinkToggles;
                 blinkOff_ = !blinkOff_;
                 contentDirty_ = true;
                 requestFrame();
@@ -334,6 +348,20 @@ void TerminalView::updateBlink() {
         contentDirty_ = true;
         requestFrame();
     }
+}
+
+int TerminalView::blinkTimeoutMs() const {
+    if (opts_.cursorBlinkTimeoutMs >= 0) return opts_.cursorBlinkTimeoutMs;
+    int s = 10;
+    if (auto settings = Gtk::Settings::get_default()) s = settings->property_gtk_cursor_blink_timeout().get_value();
+    if (s <= 0 || s >= 1000000) return -1;  // G_MAXINT: blink forever
+    return s * 1000;
+}
+
+void TerminalView::noteBlinkActivity() {
+    blinkSinceMs_ = nowMs();
+    blinkExpired_ = false;
+    updateBlink();
 }
 
 void TerminalView::applyProfile() {
@@ -728,6 +756,12 @@ bool TerminalView::updateContent() {
 
 void TerminalView::requestFrame() {
     if (frameTimer_.connected()) return;
+    // Review item 7: a hidden tab (or minimised window) only parses; contentDirty_ stays set and
+    // setWindowVisible(true) paints the changed rows once.
+    if (!visible_) {
+        if (contentDirty_) ++stats_.framesHidden;
+        return;
+    }
     // Effects re-run bloom/burn-in/static passes for every content frame: cap those at 30 fps.
     const int fps = std::max(1, mode_ == Mode::Plain ? opts_.maxFps : std::min(opts_.maxFps, 30));
     const double delay = std::max(0.0, lastFrameMs_ + 1000.0 / fps - nowMs());
@@ -740,6 +774,7 @@ void TerminalView::requestFrame() {
 }
 
 void TerminalView::onFrameTimer() {
+    if (!visible_) return;  // hidden since the request: paint on show (contentDirty_ stays set)
     if (mode_ == Mode::Plain) lastFrameMs_ = nowMs();
     const bool changed = updateContent();
     if (mode_ == Mode::Cpu && (changed || effectsSourceStale_)) area_.queue_draw();
@@ -906,7 +941,8 @@ void TerminalView::setWindowActive(bool active) {
     contentDirty_ = true;                   // hollow <-> solid cursor (one row)
     requestFrame();
     updateAnimation();
-    updateBlink();
+    if (active) noteBlinkActivity();  // focus-in restarts the blink timeout
+    else updateBlink();
 }
 
 void TerminalView::setWindowVisible(bool visible) {
@@ -972,7 +1008,7 @@ bool TerminalView::readSlice(bool* more) {
                 },
                 250);
         requestFrame();
-        updateBlink();  // DECSCUSR / ?12 may have changed blinking
+        noteBlinkActivity();  // output restarts the blink timeout; DECSCUSR / ?12 may change it
         // Output overwrote the selected text (clear, an editor redraw): drop the selection. A
         // selection that merely scrolled keeps its text and stays (it is anchored to lines).
         if (sel_.active() && !selecting_ && sel_.end().line >= session_->topLine() && selectionOverwritten())
@@ -1005,6 +1041,7 @@ void TerminalView::ensureWriteWatch() {
 
 void TerminalView::sendKeyInput() {
     snapToBottom();
+    noteBlinkActivity();
     if (blinkOff_) {  // typing shows the cursor immediately
         blinkOff_ = false;
         contentDirty_ = true;

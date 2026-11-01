@@ -1,0 +1,5 @@
+# 2026-11-01 12:03 CST code 38acc4e (before items 5/7), lterm-m5-idle-bench tabs plain shown 20, Xvfb :44 1024x640, llvmpipe (NOT a GPU), terminal process CPU only, REAL
+tabs plain shown: plain, no effects, window visible 1, active 1
+   0-10 s:     670 ms CPU =   6.7 % of one core, 476 content frames
+  10-20 s:     690 ms CPU =   6.9 % of one core, 476 content frames
+  total 1360 ms CPU over 20 s = 6.8 %

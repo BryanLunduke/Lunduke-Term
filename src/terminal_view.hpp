@@ -43,6 +43,9 @@ struct ViewOptions {
     bool bellVisual = true, bellUrgent = true, bellAudible = false;
     std::string cursorShape = "block";  // block | underline | bar (DECSCUSR overrides)
     bool cursorBlink = false;           // DECSCUSR / ?12 override
+    // Review item 5: blinking stops (cursor solid) this long after the last key, output or
+    // focus-in, like GTK entries; -1: the desktop's gtk-cursor-blink-timeout (default 10 s).
+    int cursorBlinkTimeoutMs = -1;
     std::string wordChars = Selection::defaultWordChars();
     // M2 item 5: bezel / RGB shift overrides of the profile (see profiles.hpp).
     TubeOverrides tube;
@@ -51,8 +54,10 @@ struct ViewOptions {
 // Frame statistics (ms), kept for --stats and the benchmarks in docs/.
 struct ViewStats {
     long contentFrames = 0, ticks = 0, rowsPainted = 0, fullRepaints = 0;
-    long ptySlicesCut = 0;
-    long selLinesCompared = 0;  // selected lines re-read to see whether output overwrote them  // PTY reads stopped at the time budget (output flood)
+    long ptySlicesCut = 0;      // PTY reads stopped at the time budget (output flood)
+    long selLinesCompared = 0;  // selected lines re-read to see whether output overwrote them
+    long framesHidden = 0;      // frame requests skipped because the tab/window was hidden
+    long blinkToggles = 0;      // cursor blink phases shown
     std::vector<double> paintMs, effectsSourceMs, tickMs;
     double finalTickIntervalMs = 0;  // governor state on exit
     long probesDeferred = 0;         // M5: due probe polls skipped while hidden/unfocused
@@ -280,6 +285,10 @@ private:
     bool bellFlash_ = false;
     bool inverseShown_ = false;  // margins currently painted for reverse video
     bool blinkOff_ = false;
+    bool blinkExpired_ = false;  // blinked for the timeout without activity: solid until then
+    double blinkSinceMs_ = 0;    // last key, output or focus-in
+    int blinkTimeoutMs() const;
+    void noteBlinkActivity();    // restarts the blink timeout
     bool lastAlt_ = false;
     ViewStats stats_;
     // Search state

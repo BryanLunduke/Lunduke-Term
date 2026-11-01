@@ -91,6 +91,9 @@ executable('lterm-m3-close-bench', 'tools/m3_close_bench.cpp', 'src/terminal_vie
 executable('lterm-m5-probe-bench', 'tools/m5_probe_bench.cpp', 'src/terminal_view.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
+executable('lterm-m5-idle-bench', 'tools/m5_idle_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp',
+  include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
+  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
 executable('lterm-m5-flood-bench', 'tools/m5_flood_bench.cpp', 'src/terminal_view.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])

@@ -1,0 +1,7 @@
+# 2026-11-01 12:02 CST code 38acc4e (before items 5/7), lterm-m5-idle-bench blink amber gl auto 30, Xvfb :44 1024x640, llvmpipe (NOT a GPU), terminal process CPU only, REAL
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+blink amber gl auto: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering), window visible 1, active 1
+   0-10 s:    3019 ms CPU =  30.2 % of one core, 19 content frames
+  10-20 s:    3070 ms CPU =  30.7 % of one core, 19 content frames
+  20-30 s:    2833 ms CPU =  28.3 % of one core, 19 content frames
+  total 8923 ms CPU over 30 s = 29.7 %
