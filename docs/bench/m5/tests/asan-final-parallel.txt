@@ -1,0 +1,31 @@
+# head 43bda7c, build-san (-Db_sanitize=address,undefined, leak checking on: meson's ASAN_OPTIONS detect_leaks=1 + tests/lsan.supp), meson test --num-processes 2 --timeout-multiplier 4, LD_LIBRARY_PATH=lterm-tools (metainfo), Xvfb :44, llvmpipe (NOT a GPU), REAL
+# load: none of mine (other agents' load unknown)
+## run 1 start 2026-11-01 16:14:37 CST
+   loadavg at start: 2.00 1.54 1.21, nproc 8
+ 1/16 desktop-file OK               0.01s
+ 2/16 metainfo     OK               0.01s
+ 3/16 governor     OK               0.01s
+ 4/16 profiles     OK               0.01s
+ 5/16 painter      OK               0.31s
+ 6/16 fonts        OK               0.06s
+ 7/16 vterm        OK               0.02s
+ 8/16 effects      OK               1.65s
+ 9/16 session      OK               0.11s
+10/16 fixes        OK               0.45s
+11/16 fuzz-regress OK               0.04s
+12/16 unicode      OK               0.02s
+13/16 search       OK              20.89s
+14/16 gl-match     OK              92.00s
+15/16 view         OK             118.38s
+16/16 review       OK              70.30s
+Ok:                 16  
+Fail:               0   
+Timeout:            0   
+governor auto (ASan+UBSan build): probe reached Normal 3024 ms after auto came back (wait limit 30000 ms)
+governor cpu (ASan+UBSan build): probe reached Normal 6210 ms after auto came back (wait limit 30000 ms)
+probe deferral auto (unfocused): 8 due poll(s) deferred, state 1
+probe deferral auto (hidden): 10 due poll(s) deferred, state 1
+probe deferral cpu (unfocused): 8 due poll(s) deferred, state 1
+probe deferral cpu (hidden): 10 due poll(s) deferred, state 1
+## end 2026-11-01 16:19:19 CST
+SANDONE
