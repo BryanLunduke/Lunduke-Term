@@ -685,10 +685,12 @@ static void testGovernor(const char* renderer) {
     CHECK(waitFor([&] { return !w.view->qualityDemoted(); }, ltermWaitMs(8000, 20000)));
     CHECK(w.view->effectsQuality() == level);
     // M5 item 1a: the probe needs 3 consecutive in-budget 1 s windows; under ASan+UBSan on a busy
-    // box one window over budget restarts the count, so build-san waits up to 15 s (failed 2/5
-    // serial runs with 6 s in M4).
+    // box one window over budget restarts the count, so build-san waits longer (failed 2/5
+    // serial runs with 6 s in M4). 15 s was still tight: one serial run reached Normal after
+    // 17.7 s (waitFor counts 20 ms pump steps, and slow main-loop iterations overrun them), so
+    // build-san waits up to 30 s (M5 PR #6).
     const auto n0 = std::chrono::steady_clock::now();
-    const int normalWait = ltermWaitMs(6000, 15000);
+    const int normalWait = ltermWaitMs(6000, 30000);
     CHECK(waitFor([&] { return w.view->governor().state() == EffectsGovernor::State::Normal; }, normalWait));
     std::printf("governor %s (%s): probe reached Normal %.0f ms after auto came back (wait limit %d ms)\n",
                 renderer, ltermBuildLabel(),
@@ -734,6 +736,10 @@ static void testProbeDeferred(const char* renderer) {
     const auto checkDeferred = [&](const char* why) {
         const long d0 = w.view->stats().probesDeferred;
         pump(2500);  // 2.5x the probe delay
+        // M5 PR #6: under ASan+UBSan on a busy box the 1 s probe poll can miss those 2.5 s (failed
+        // once in 8 serial runs with 0 polls deferred), so build-san waits up to 7.5 s more for
+        // the first deferred poll. The release build checks right after the 2.5 s, as before.
+        waitFor([&] { return w.view->stats().probesDeferred > d0; }, ltermWaitMs(0, 7500));
         std::printf("probe deferral %s (%s): %ld due poll(s) deferred, state %d\n", renderer, why,
                     w.view->stats().probesDeferred - d0, static_cast<int>(w.view->governor().state()));
         CHECK(w.view->stats().probesDeferred > d0);
