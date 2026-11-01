@@ -161,6 +161,12 @@ See `bench/m5/tests/`:
 | **PR #6 re-run** (pixel-40col + scaled waits, code 9de3b75): release `build/`, `--num-processes 2` (`release-pr6.txt`) | 1 | **16/16 OK** |
 | PR #6: ASan+UBSan+leaks, serial (`asan-pr6-serial.txt`) | 2 | **2/2 runs 16/16 OK** (Normal after 3.0-6.2 s; 7-10 polls deferred per case) |
 | PR #6: ASan+UBSan+leaks, `--num-processes 2` (`asan-pr6-parallel.txt`) | 1 | **1/1 run 16/16 OK** |
+| **PR #6 review, final code 83db14a** (heads 1996979-43bda7c; later commits docs only): release `view` x10 in a row (`view-10runs-83db14a.txt`) | 10 | **10/10 green**; every run demoted twice (6.7-7.9 s and 7.0-7.3 s); tab close worst 9.5-17.2 ms, 2nd worst 6.0-7.3 ms (no run needed the relaxed N8 limit) |
+| Earlier attempt on c3e3164 (`view-10runs-c3e3164-attempt1.txt`) | 10 | 9/10; run 5 failed only view_test:882 (tab close 27.31 ms > 25); B1 phases green in all 10 |
+| Final: release, all tests, `--num-processes 2` (`release-final-83db14a.txt`) | 1 | **16/16 OK** (view 100.0 s, review 38.6 s) |
+| Final: ASan+UBSan+leaks, serial (`asan-final-serial.txt`) | 2 | **2/2 runs 16/16 OK** |
+| Final: ASan+UBSan+leaks, `--num-processes 2` (`asan-final-parallel.txt`) | 1 | **1/1 run 16/16 OK**; no leak or UBSan reports in the 3 runs |
+| Fuzzer | — | not re-run: `src/vterm_session.cpp` unchanged since 5938825 |
 
 So, before PR #6: 7 of 8 sanitizer runs passed completely, which is 126 of 128 test results (DERIVED).
 Leak checking: meson's `ASAN_OPTIONS` (detect_leaks=1) plus `tests/lsan.supp`; no leak reports in any run (PR #6 runs included).
