@@ -1,0 +1,104 @@
+# meson test -C build view x10 IN A ROW, release build (view_test ASan-linked), code 83db14a (= final code; later commits are docs only), Xvfb :44, llvmpipe (NOT a GPU), sequential, Nov 1 2026, times CST. REAL.
+# Result: 10/10 green, 0 FAIL lines.
+run 1 15:46:54 exit 0 demoted at 7.0 s demoted at 7.3 s  0 FAIL-lines
+run 2 15:48:32 exit 0 demoted at 6.8 s demoted at 7.0 s  0 FAIL-lines
+run 3 15:50:12 exit 0 demoted at 7.9 s demoted at 7.3 s  0 FAIL-lines
+run 4 15:51:50 exit 0 demoted at 7.9 s demoted at 7.3 s  0 FAIL-lines
+run 5 15:53:28 exit 0 demoted at 6.7 s demoted at 7.3 s  0 FAIL-lines
+run 6 15:55:07 exit 0 demoted at 7.7 s demoted at 7.3 s  0 FAIL-lines
+run 7 15:56:47 exit 0 demoted at 7.9 s demoted at 7.3 s  0 FAIL-lines
+run 8 15:58:26 exit 0 demoted at 7.9 s demoted at 7.0 s  0 FAIL-lines
+run 9 16:00:05 exit 0 demoted at 7.5 s demoted at 7.3 s  0 FAIL-lines
+run 10 16:01:43 exit 0 demoted at 7.5 s demoted at 7.1 s  0 FAIL-lines
+DONE
+
+## run 1
+tab close (release build, ASan in this test only): 19 closes, worst 14.61 ms, total 98.79 ms; 19 still running right after, all reaped 2019 ms later (limit 25 ms for the 2nd worst 6.29 ms)
+governor auto (release build, ASan in this test only): probe reached Normal 3028 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.0 s, back to reduced, tick 100 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3020 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.3 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 2
+tab close (release build, ASan in this test only): 19 closes, worst 17.23 ms, total 102.90 ms; 19 still running right after, all reaped 2011 ms later (limit 25 ms for the 2nd worst 6.22 ms)
+governor auto (release build, ASan in this test only): probe reached Normal 3028 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 6.8 s, back to reduced, tick 100 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3033 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.0 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 3
+tab close (release build, ASan in this test only): 19 closes, worst 10.22 ms, total 97.75 ms; 19 still running right after, all reaped 2014 ms later (limit 25 ms for the 2nd worst 6.56 ms)
+governor auto (release build, ASan in this test only): probe reached Normal 3030 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.9 s, back to reduced, tick 100 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3029 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.3 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 4
+tab close (release build, ASan in this test only): 19 closes, worst 10.01 ms, total 99.92 ms; 19 still running right after, all reaped 2011 ms later (limit 25 ms for the 2nd worst 7.27 ms)
+governor auto (release build, ASan in this test only): probe reached Normal 3028 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.9 s, back to reduced, tick 100 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3017 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.3 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 5
+tab close (release build, ASan in this test only): 19 closes, worst 10.66 ms, total 96.37 ms; 19 still running right after, all reaped 2011 ms later (limit 25 ms for the 2nd worst 6.45 ms)
+governor auto (release build, ASan in this test only): probe reached Normal 3040 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 6.7 s, back to reduced, tick 100 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3032 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.3 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 6
+tab close (release build, ASan in this test only): 19 closes, worst 9.51 ms, total 92.71 ms; 19 still running right after, all reaped 2013 ms later (limit 25 ms for the 2nd worst 6.01 ms)
+governor auto (release build, ASan in this test only): probe reached Normal 3037 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.7 s, back to reduced, tick 100 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3041 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.3 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 7
+tab close (release build, ASan in this test only): 19 closes, worst 9.48 ms, total 92.63 ms; 19 still running right after, all reaped 2011 ms later (limit 25 ms for the 2nd worst 6.05 ms)
+governor auto (release build, ASan in this test only): probe reached Normal 3027 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.9 s, back to reduced, tick 100 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3042 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.3 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 8
+tab close (release build, ASan in this test only): 19 closes, worst 10.72 ms, total 96.62 ms; 19 still running right after, all reaped 2008 ms later (limit 25 ms for the 2nd worst 6.48 ms)
+governor auto (release build, ASan in this test only): probe reached Normal 3035 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.9 s, back to reduced, tick 100 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3036 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.0 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 9
+tab close (release build, ASan in this test only): 19 closes, worst 14.08 ms, total 98.58 ms; 19 still running right after, all reaped 2018 ms later (limit 25 ms for the 2nd worst 6.14 ms)
+governor auto (release build, ASan in this test only): probe reached Normal 3037 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.5 s, back to reduced, tick 100 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3038 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.3 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 10
+tab close (release build, ASan in this test only): 19 closes, worst 11.58 ms, total 96.90 ms; 19 still running right after, all reaped 2013 ms later (limit 25 ms for the 2nd worst 6.42 ms)
+governor auto (release build, ASan in this test only): probe reached Normal 3028 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.5 s, back to reduced, tick 100 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3038 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.1 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
