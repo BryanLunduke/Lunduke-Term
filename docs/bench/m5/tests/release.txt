@@ -1,0 +1,23 @@
+# 2026-11-01 13:17 CST head afbbe05 (code identical to c23120a; afbbe05 is docs only), build/ (release: -O3, assertions on; view_test always links -fsanitize=address), meson test --num-processes 2, LD_LIBRARY_PATH=lterm-tools (metainfo), Xvfb :44, llvmpipe (NOT a GPU), REAL
+ 1/16 desktop-file OK               0.01s
+ 2/16 metainfo     OK               0.01s
+ 3/16 governor     OK               0.00s
+ 4/16 profiles     OK               0.00s
+ 5/16 painter      OK               0.09s
+ 6/16 fonts        OK               0.03s
+ 7/16 vterm        OK               0.00s
+ 8/16 effects      OK               0.23s
+ 9/16 session      OK               0.07s
+10/16 fixes        OK               0.38s
+11/16 fuzz-regress OK               0.01s
+12/16 unicode      OK               0.00s
+13/16 search       OK               0.83s
+14/16 gl-match     OK              12.29s
+15/16 view         OK             102.80s
+16/16 review       OK              26.46s
+Ok:                 16  
+Fail:               0   
+Skipped:            0   
+Timeout:            0   
+governor auto (release build, ASan in this test only): probe reached Normal 3035 ms after auto came back (wait limit 6000 ms)
+governor cpu (release build, ASan in this test only): probe reached Normal 3035 ms after auto came back (wait limit 6000 ms)

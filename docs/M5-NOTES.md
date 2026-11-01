@@ -119,7 +119,23 @@ See `bench/m5/tests/`:
 - `asan-parallel.txt`
 - the fuzz run (FUZZING.md, run p)
 
-RESULTS_PLACEHOLDER
+| Suite | Runs | Result |
+|---|---|---|
+| release `build/`, `--num-processes 2`, head afbbe05 | 1 | **16/16 OK** (view 102.8 s, review 26.5 s) |
+| ASan+UBSan+leaks, serial, fuzzer/other load running | 3 | **3/3 runs 16/16 OK** |
+| ASan+UBSan+leaks, serial, no load of mine | 3 | **2/3 runs 16/16 OK**; run 1: 14/16 (view, review failed) |
+| ASan+UBSan+leaks, `--num-processes 2` | 2 | **2/2 runs 16/16 OK** |
+| Fuzzer run p (caaa69a, ASan+UBSan) | 661 s | 79 461 execs, 0 crashes; F1-F16 seeds replay clean |
+
+So: 7 of 8 sanitizer runs passed completely, which is 126 of 128 test results (DERIVED).
+Leak checking: meson's `ASAN_OPTIONS` (detect_leaks=1) plus `tests/lsan.supp`; no leak reports in any run.
+Serial-load run 1 used review_test from 8505761 (before 6b5b2d2 relinked it); the other runs are on the final test code.
+
+**The failed run, honestly:** serial no-load run 1 (12:46 CST, head 375f3d1) failed
+`view_test.cpp:739` (`probesDeferred > d0`; 0 probes deferred in the hidden C++-path case) and
+`review_test.cpp:227` (blink-restart wait). The run took 11.4 min against ~4.8 min for the others,
+and review took 452 s against ~48 s, so I suspect the box or process stalled. That is NOT proven.
+Neither failure came back in the 7 later runs.
 
 ## Limits and caveats
 
@@ -141,6 +157,11 @@ RESULTS_PLACEHOLDER
   `-e cmd`, the command is the child itself, so closing does not ask.
 - **Item 4** is a stopgap. Scrollback storage is unchanged, and the shown size is an upper bound.
 - **Item 1** caps reads, not rendering. One amber effects frame on llvmpipe can still take ~100 ms.
+- **Test timing under ASan.** Two waits are still tight. (a) testProbeDeferred pumps a fixed
+  2.5 s, so it does not use a sanitizer-scaled wait (that was the run-1 failure). (b) In serial
+  no-load run 3, "probe reached Normal" took 17 694 ms against the 15 s limit. The test still
+  passed: waitFor checks the condition after its last main-loop iteration, and that iteration ran
+  past the limit. Making both sanitizer-scaled (e.g. 20 s) is a small follow-up, not done here.
 - **Process note.** During earlier work I ran `pkill -u <me> -x yes` once to stop a flood
   benchmark. It is scoped to my user, but in principle it could have hit another agent's `yes`
   under the same uid. Since then I kill by PID only.
