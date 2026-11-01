@@ -64,6 +64,7 @@ Suggests: fonts-hermit,
 | fonts-atarismall (`"Atari800"`) | permissive, non-SPDX (one legal read advised, FONTS.md) | `pixel-8bit` (M5) |
 | fonts-atarist (`Atari`) | BSD-3-Clause | `pixel-hires-mono` (M5) |
 | fonts-amiga (`Amiga`) | OFL-1.1 | `pixel-16bit` (M5) |
+| fonts-sixtyfour (`C-64`) | OFL-1.1 | `pixel-40col` (M5, editor decision) |
 
 - fonts-terminus, fonts-hermit and fonts-proggy are built from Debian's `cool-retro-term`
   source, which is repacked as `+ds2` without the non-free Kreative and Style64 fonts.

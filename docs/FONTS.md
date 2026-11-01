@@ -108,33 +108,36 @@ copyright/licence strings) were read. Quotes below are from those files (REAL).
 | fonts-atarist 0+git20230822+ds-2 | `Copyright: 2015 ntwk` / `2017 Andrew Goncharov` (Cyrillic) `License: BSD-3-clause` | `Atari` style `ST`, copyright string empty | **yes** | **new `pixel-hires-mono`** (`Atari` 32 px = 2x 8x16) |
 | fonts-atarismall 2.3-3 | `Copyright: 1999 Thomas A. Fine` / `2015-2016 ntwk` / `2007,2023 Alex Myczko` `License: atari800-license`: "License to copy, modify, and distribute for both commercial and non-commercial use is herby granted, provided this notice is preserved." | `"Atari800"` (quotes are part of the name), "Copyright 1999, 2015 Atari800 authors" | **yes (permissive), non-SPDX licence: one legal read recommended** before LCOS depends on it | **new `pixel-8bit`** (`"Atari800"` 32 px = 4x 8 px) |
 | fonts-amiga 1.0-3 | `Files: *` `Copyright: 2019 The Homecomputer Fonts Project Authors` / `2019 Jens Kutilek` `License: OFL-1.1` | `Amiga`, copyright string empty | **yes** (a redrawing; trademark note) | **new `pixel-16bit`** (`Amiga` 32 px) |
-| fonts-sixtyfour 1.0-3 | same as fonts-amiga: `Files: *` `Copyright: 2019 The Homecomputer Fonts Project Authors` / `2019 Jens Kutilek` `License: OFL-1.1` | `C-64`, copyright string empty | **licence: yes** (OFL-1.1 redrawing, not the Kreative/Style64 fonts). **Profile: not added, flagged for the editor** (see below) | none |
+| fonts-sixtyfour 1.0-3 | same as fonts-amiga: `Files: *` `Copyright: 2019 The Homecomputer Fonts Project Authors` / `2019 Jens Kutilek` `License: OFL-1.1`, no Reserved Font Name (**re-verified** from a fresh download, [`bench/m5/sixtyfour-reverify.txt`](bench/m5/sixtyfour-reverify.txt)) | family `C-64`, monospace; no copyright/licence strings in the name table (like fonts-amiga) | **yes** (OFL-1.1 redrawing, not the Kreative/Style64 fonts) | **new `pixel-40col`** (editor decision; family `C-64` 32 px = 4x 8 px) |
 | fonts-hermit 1.2.0+ds2-4 | stanza `app/qml/fonts/modern-hermit/*` `Copyright: 2013 Pablo Caro` … "with Reserved Font Name Hermit." `License: OFL-1.1` | `Hermit`, OFL 1.1 | **yes** | **new `modern`** (`Hermit` 20 px) |
 | fonts-proggy 1.2.0+ds2-4 | stanza `modern-proggy-tiny/*` `Copyright: 2004, 2005 Tristan Grimmer` `License: MIT` | `ProggyTinyTT`, "by Tristan Grimmer" | **yes** | `modern`'s 2nd choice (`ProggyTinyTT` 32 px = 2x 16 px) |
 | Apple II PrintChar21/PRNumber3, PetMe (Kreative), C64 Pro Mono (Style64), AtariClassic | not in Debian (`Files-Excluded` of cool-retro-term's copyright) | — | **no** (non-free, see below) | none, and `profiles_test` forbids them |
 
-**What the new profiles are.** Four mono tubes on amber's values (amber's phosphor palette) with
+**What the new profiles are.** Five mono tubes on amber's values (amber's phosphor palette) with
 their own phosphor colour, each naming one Debian family first at a whole multiple of its design
 size and then the Terminus chain (`Terminus (TTF)`, `Terminus`, `DejaVu Sans Mono`, `Monospace`).
 Nothing is shipped. Without the font the profile falls back to DejaVu Sans Mono 22 px
 (`tests/fonts_test.cpp`, and [`bench/font-fallback.txt`](bench/font-fallback.txt) "M5" section).
 
 **Naming (editor, please check).** The ids and labels are neutral (`pixel-8bit`,
-`pixel-hires-mono`, `pixel-16bit`, `modern`); `profiles_test` checks that no id or label contains
-Atari or Amiga and no id contains Commodore, C64, Apple or PET. The M1 proposal used `amiga` / `atari-800` /
+`pixel-hires-mono`, `pixel-16bit`, `pixel-40col`, `modern`); `profiles_test` checks that no id or label contains
+Atari, Amiga, Commodore or C64/C-64 and no id contains Apple or PET. The M1 proposal used `amiga` / `atari-800` /
 `atari-st`; I did not use those because Atari and Amiga are trademarks like Commodore. Only the
 font *family* names (the packages' own) carry the marks. The existing `ibm-dos`/`ibm-3278` ids
 are unchanged (out of scope).
 
-**fonts-sixtyfour: flagged, not decided.** The licence qualifies (OFL-1.1, an original
-redrawing; it is not the Style64/Kreative ROM-copy fonts). A neutral profile (e.g. id
-`pixel-40col`, label "Pixel 40-column", family `C-64` 32 px, light-blue phosphor) would therefore
-be licence-clean, but `profiles_test` currently forbids the family string `c-64` (M2's rule
-"no C64 fonts"), and the visual is unmistakably the C64 screen. Adding it needs the editor's yes
-and a change to that test.
+**fonts-sixtyfour: added on the editor's decision (M5 PR #6).** The licence was re-verified
+from a fresh download before adding it (`Files: *` OFL-1.1, no Reserved Font Name; evidence in
+[`bench/m5/sixtyfour-reverify.txt`](bench/m5/sixtyfour-reverify.txt)). It is an original redrawing,
+not the Style64/Kreative ROM-copy fonts. Profile id `pixel-40col`, label "Pixel 40-column",
+light-blue phosphor, family `C-64` 32 px (8x8 design grid on a 1 em advance, so 4x: 40 columns
+at 1280 px). The Debian family name is the only place the mark appears. `profiles_test` allows
+that one exact family, and only in `pixel-40col`. Any other family containing `c64` or `c-64`
+stays forbidden, and so do C64 Pro / C64 Pro Mono (Style64), PetMe (Kreative), Apple II
+PrintChar21/PRNumber3 and AtariClassic.
 
 Screenshots (fonts from the unpacked `.deb`s via `FONTCONFIG_FILE`, Xvfb, llvmpipe):
-`/workspace/lcos-app-reviews/terminal-m5/f-{pixel-8bit,pixel-hires-mono,pixel-16bit,modern}.png`.
+`/workspace/lcos-app-reviews/terminal-m5/f-{pixel-8bit,pixel-hires-mono,pixel-16bit,pixel-40col,modern}.png`.
 
 **LCOS 1.0 ISO** (lcos-live-100-01 package list).
 - Already shipped: fonts-pc, fonts-pc-extra, fonts-3270, fonts-amiga, fonts-atarismall,

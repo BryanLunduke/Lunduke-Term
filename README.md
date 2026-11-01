@@ -40,9 +40,9 @@ libFuzzer harness (`tools/fuzz/`, [`docs/FUZZING.md`](docs/FUZZING.md)) whose fi
 of libvterm are fixed with regression tests (`tests/fuzz_regress_test.cpp`). No GPU on the build
 box: every GL number so far is llvmpipe; real-GPU numbers are not measured.
 
-M5 (see [`docs/M5-NOTES.md`](docs/M5-NOTES.md)): amber is the default profile; four
+M5 (see [`docs/M5-NOTES.md`](docs/M5-NOTES.md)): amber is the default profile; five
 retro-font profiles on licence-clean Debian fonts (`pixel-8bit`, `pixel-hires-mono`,
-`pixel-16bit`, `modern`); fixes from the code review: an output flood no longer freezes the
+`pixel-16bit`, `pixel-40col`, `modern`); fixes from the code review: an output flood no longer freezes the
 window (Ctrl+C gets through), input methods (dead keys, Compose, ibus/fcitx), hidden tabs neither
 paint nor keep their effects buffers, the cursor stops blinking after the blink timeout, closing
 a tab or window that runs a program asks first, and the scrollback maximum is 100,000 lines

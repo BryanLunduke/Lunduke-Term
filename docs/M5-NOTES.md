@@ -13,7 +13,7 @@ Times are CST.
 | 1a governor wait flaky under ASan | `tests/view_test.cpp`: the wait for the probe to bring the governor back to Normal is 15 s under ASan/UBSan, 6 s in release (`ltermWaitMs()` in `tests/sanitizer.hpp`). Neighbouring wall-clock waits (demotion, probe abort, recovery, tick speed-up, child reaping, malloc_trim) are scaled the same way. The time to Normal is printed. | Serial ASan runs with and without load: `bench/m5/tests/asan-serial-*.txt` (pass counts below) |
 | 1b replay-only seeds | `docs/FUZZING.md` and `tools/fuzz/seeds/README.md` list each F12–F17 seed: its finding, what it replays, and whether the meson test can see the bug without the fix. No meson test reads seed files. In the fuzz build, F12-csi/osc, F14 and F16 fail without their fix and run clean with it. F12-rep, F13-* and F15 run clean either way, so they replay nothing (said so). F17 is evidenced only by the fuzz build. | `bench/m5/item1b/seed-replay.txt`, `seed-trace.txt` (REAL) |
 | 1c GL probe CPU cost | How I read the M4 note: the probe's cost was the 7 GL programs recompiled on every probe and re-demotion, plus probes running while nobody can see the window. Fix: `GlPipeline::setParams()` swaps uniforms and sized objects and keeps the programs; due probes wait while the window is hidden or (pause-when-unfocused) unfocused. | `bench/m5/item1c/` (REAL, llvmpipe, a 3.9 s frame cost injected like the TCG VM). Focused: 62.1 → 53.0 ms CPU per probe (median), 11.4 → 10.0 % of a core. Unfocused: 13.1 → 2.0 % (0 probes). Mesa shader cache off: 25.5–27.0 % → 9.8–10.2 %. Tests: view_test (no program compiled over demotion + 2 probes; deferral), gl_match (setParams matches the C++ path). |
-| 2 retro fonts | Four profiles with neutral names on licence-clean Debian fonts: `pixel-8bit` (`"Atari800"` 32 px), `pixel-hires-mono` (`Atari` ST 32 px), `pixel-16bit` (`Amiga` 32 px), `modern` (`Hermit` 20 px, then `ProggyTinyTT`). Each falls back to the Terminus chain and DejaVu Sans Mono. No font files shipped. | Table below; `docs/FONTS.md` "M5"; `bench/fonts-SHA256SUMS`; tests `fonts` (fallback) and `profiles` (no trademark names); screenshots `f-*.png` |
+| 2 retro fonts | Five profiles with neutral names on licence-clean Debian fonts: `pixel-8bit` (`"Atari800"` 32 px), `pixel-hires-mono` (`Atari` ST 32 px), `pixel-16bit` (`Amiga` 32 px), `pixel-40col` (`C-64` 32 px, added on the editor's decision in PR #6), `modern` (`Hermit` 20 px, then `ProggyTinyTT`). Each falls back to the Terminus chain and DejaVu Sans Mono. No font files shipped. | Table below; `docs/FONTS.md` "M5"; `bench/fonts-SHA256SUMS`; tests `fonts` (fallback) and `profiles` (no trademark names); screenshots `f-*.png` |
 | 3 docs/tests | This file, README, FONTS.md, FUZZING.md; test outputs in `bench/m5/tests/`. | below |
 
 ## Review items
@@ -49,15 +49,17 @@ The `.deb`s came from deb.debian.org (trixie) and were extracted, not installed.
 | fonts-atarist 0+git20230822+ds-2 | `Copyright: 2015 ntwk` / `2017 Andrew Goncharov` `License: BSD-3-clause` | yes | new `pixel-hires-mono` |
 | fonts-atarismall 2.3-3 | `Copyright: 1999 Thomas A. Fine` / `2015-2016 ntwk` / `2007,2023 Alex Myczko` `License: atari800-license` ("copy, modify, and distribute … provided this notice is preserved") | yes (permissive, **not SPDX-listed: one legal read recommended**) | new `pixel-8bit` |
 | fonts-amiga 1.0-3 | `Copyright: 2019 The Homecomputer Fonts Project Authors` / `2019 Jens Kutilek` `License: OFL-1.1` | yes (a redrawing; trademark note) | new `pixel-16bit` |
-| fonts-sixtyfour 1.0-3 | same stanza as fonts-amiga, `License: OFL-1.1` | licence: yes (an original redrawing, not the Style64/Kreative fonts) | **none: flagged for the editor** |
+| fonts-sixtyfour 1.0-3 | `Files: *` `Copyright: 2019 The Homecomputer Fonts Project Authors` / `2019 Jens Kutilek` `License: OFL-1.1`, no Reserved Font Name; re-verified from a fresh download (`bench/m5/sixtyfour-reverify.txt`) | yes (an original redrawing, not the Style64/Kreative fonts) | new `pixel-40col` (editor decision) |
 | fonts-hermit 1.2.0+ds2-4 | stanza `modern-hermit/*` `Copyright: 2013 Pablo Caro` `License: OFL-1.1` (RFN "Hermit") | yes | new `modern` |
 | fonts-proggy 1.2.0+ds2-4 | stanza `modern-proggy-tiny/*` `Copyright: 2004, 2005 Tristan Grimmer` `License: MIT` | yes | `modern`'s 2nd choice |
 | Apple II (PrintChar21/PRNumber3), PetMe (Kreative), C64 Pro Mono (Style64), AtariClassic | not in Debian (cool-retro-term's `Files-Excluded`) | **no** | none; `profiles_test` forbids them |
 
-**Editor decision needed: fonts-sixtyfour.** The licence is clean. A neutral profile would also
-be clean, for example id `pixel-40col`, label "Pixel 40-column", family `C-64` 32 px. But it is
-unmistakably the C64 screen, and `profiles_test` keeps M2's "no C64 fonts" rule. I did not add
-it. It needs your yes, and that test would have to change.
+**fonts-sixtyfour (editor decision, PR #6).** Ted relayed the editor's yes: include it if the
+licence is clean. I downloaded the .deb again over https. Its SHA-256 matches trixie's
+`Packages.xz` and `bench/fonts-SHA256SUMS`. I read the copyright file and the name table again:
+`Files: *`, OFL-1.1, no Reserved Font Name, family `C-64`. The new profile is `pixel-40col`
+("Pixel 40-column"). `profiles_test` allows exactly the family `C-64`, and only there. Screenshot:
+`f-pixel-40col.png`.
 
 The profile ids and labels avoid Atari, Amiga, Commodore, C64, Apple and PET (checked by a test).
 Only the font family names, which are the packages' own, carry those marks.

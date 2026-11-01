@@ -1,0 +1,56 @@
+# fonts-sixtyfour licence re-verification, 2026-11-01 13:26:45 CST, REAL
+# Downloaded again: https://deb.debian.org/debian/pool/main/f/fonts-homecomputer/fonts-sixtyfour_1.0-3_all.deb (curl, https)
+# Index: https://deb.debian.org/debian/dists/trixie/main/binary-all/Packages.xz (fetched the same minute; the InRelease signature was NOT checked with gpg)
+
+## sha256sum of the downloaded .deb
+8f6dc31f6fced35bc39bec12575e57dd484b022cd73944c6d49a06c1e0478ffd  fonts-sixtyfour_1.0-3_all.deb
+
+## trixie Packages.xz entry
+Version: 1.0-3
+Filename: pool/main/f/fonts-homecomputer/fonts-sixtyfour_1.0-3_all.deb
+SHA256: 8f6dc31f6fced35bc39bec12575e57dd484b022cd73944c6d49a06c1e0478ffd
+
+## equals docs/bench/fonts-SHA256SUMS:
+8f6dc31f6fced35bc39bec12575e57dd484b022cd73944c6d49a06c1e0478ffd  fonts-sixtyfour_1.0-3_all.deb
+
+## dpkg-deb -x contents
+x/usr/share/doc/fonts-sixtyfour/changelog.Debian.gz
+x/usr/share/doc/fonts-sixtyfour/copyright
+x/usr/share/fonts/truetype/sixtyfour/C-64-Regular.ttf
+
+## usr/share/doc/fonts-sixtyfour/copyright, lines 1-12 and 97-99 (cat -n; the OFL-1.1 text in lines 10-95 is the SIL OFL 1.1 text of 26 February 2007, read in full, no added terms)
+     1	Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+     2	Upstream-Name: fonts-homecomputer
+     3	Upstream-Contact: Jens Kutilek <www.kutilek.de>
+     4	Source: https://github.com/jenskutilek/homecomputer-fonts
+     5	
+     6	Files: *
+     7	Copyright: 2019 The Homecomputer Fonts Project Authors
+     8	           2019 Jens Kutilek <www.kutilek.de>
+     9	License: OFL-1.1
+    10	 -----------------------------------------------------------
+    11	 SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+    12	 -----------------------------------------------------------
+    97	Files: debian/*
+    98	Copyright: 2021-2024 Alex Myczko <tar@debian.org>
+    99	License: GPL-2+
+
+## Reserved Font Name: none ('grep -i reserved' finds only the OFL text's definitions)
+35: "Reserved Font Name" refers to any names specified as such after the
+
+## fc-scan --format '%{family}|%{style}|%{fullname}|%{postscriptname}|%{spacing}|%{fontversion}|%{foundry}'  (spacing 100 = monospace)
+C-64|Regular|C-64 Regular|C-64-Regular|100|131072|jens
+
+## name table (fontTools, platform 3; IDs 0 copyright, 13 licence, 14 licence URL are ABSENT)
+1 'C-64'
+2 'Regular'
+3 'C-64 Regular'
+4 'C-64 Regular'
+5 'Version 1.000'
+6 'C-64-Regular'
+16 'C-64'
+17 'Regular'
+fsType 0
+
+## TTF sha256 (identical to the earlier extract in /workspace/m5-fonts: cmp equal)
+e2d0c714e96221e14fa5630bd3a25d2665163ebd56f474e390829b953339102f  x/usr/share/fonts/truetype/sixtyfour/C-64-Regular.ttf
