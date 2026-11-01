@@ -28,11 +28,38 @@ Times are CST.
 | 7 hidden tabs | A hidden view only parses; its changed rows are painted once on show. | `testHiddenTab` (47 requests skipped in 1 s, 0 painted) | Plain, busy hidden tab: 5.2 % (475 frames painted) → 0.9 % (0). Amber static: 3.6 % (476) → 0.8 % (0) (REAL) |
 | 8 selection | The selected text is kept per line; output re-reads only the selected lines still on screen. | 1019-line selection: 80 lines compared over 5 reads | — |
 | 9 confirm close | Tab close button, Ctrl+Shift+W and the window's close ask in a dialog when a tab's PTY foreground process group is not the shell's (`tcgetpgrp`), naming the job. An idle shell and child-exit closes do not ask. | `testConfirmClose` (/bin/sh -i running sleep 30: asks for tab and window; idle shell: no question) | — |
-| 10 lowering scrollback | A lower limit is held as pending and applied when new output arrives. Raising it applies at once. | `testScrollbackLazyTrim` (281 lines kept after lowering to 50, then 50 after output) | — |
+| 10 lowering scrollback | A lower limit is held as pending and applied when the Settings dialog closes (PR #6 review N2; it was "when new output arrives"). Raising it applies at once. | `testScrollbackLazyTrim` (no trim on output; trimmed on commit), `testScrollbackSettingsSlip` | — |
 | 12 default profile | `amber` is the default (`kDefaultProfile`). `plain` stays selectable. | `profiles`, `review` | screenshot `default-amber.png` |
 | 14 frame stats | Frame-time samples are recorded only with `--stats`; the counters stay. | no samples without `--stats` | — |
 
 Before/after details (configurations, raw files) are in [`bench/m5/review/README.md`](bench/m5/review/README.md).
+
+## PR #6 review (Ted): B1, N1-N4
+
+| # | Root cause / what changed | Evidence (`bench/m5/tests/`) |
+|---|---|---|
+| B1 view test flaky (no demotion) | **Governor logic bug.** The 5 % hysteresis on interval changes also blocked the last step to the 1 fps cap. If the window that straddles the cost change produced a target in about (952, 1000) ms, e.g. 146 -> 974 ms, the next target, 1000 ms, was within 5 % and skipped. The tick stayed at 974 ms; demotion needs the interval at the cap (1000 ms), so it never demoted and the 3900 ms phase failed too. The same bug held the tick at 104/105 ms instead of the 100 ms base on the way down. Fix (`src/effects_governor.cpp`, a007299): a step that lands exactly on the cap or the base is always taken. Not the test, not PTY slices: in every traced run the flood had already finished (topLine 399995) before the cost was set, because `pump()` drains it. | `view-b1-failing-trace.txt` (failing run: tick stuck at 975 ms, load 0.41 for 9 windows, no demotion); `governor-b1-unfixed.txt` (new governor_test cases fail on the old code: "0 demotion(s), tick 974 ms"); 10-run logs `view-10runs-*.txt` |
+| N1 amber flood throughput ~halved vs master | Between PTY slices the view painted effects frames at up to 30 fps; on llvmpipe each amber frame costs ~19 ms (DERIVED), so the flood ran at about half speed. Master painted ~0.3 frames/s because the UI was frozen (the item-1 bug). Fix (`src/terminal_view.cpp`, c3e3164): while a PTY slice was cut in the last 100 ms, an effects view paints at most 10 content frames per s (`kFloodFps`). Plain is unchanged. Slice length is unchanged: longer slices helped less and made the 10 ms timer gaps worse (table below). `src/vterm_session.cpp` untouched, so no fuzz run. | `throughput-master-vs-branch.txt`, `throughput-master-vs-n1fix.txt`, `flood-bench-n1fix.txt`, `review-n1-unfixed-cap30.txt` (new `testFloodFrameCap` fails at a 30 fps cap: 56 frames in 2 s), `review-n1-fixed.txt` (19 frames in 2 s) |
+| N2 scrollback limit applied mid-edit | Lowering the limit in Settings applied it as soon as output arrived, while the spin button was still being edited (e.g. passing 50 on the way to 5000 trimmed 1019 lines to 50). Now a lower limit is applied when the Settings dialog closes (`commitScrollbackLimit()`); raising still applies at once. | `review-pr6fix-unfixed-repro.txt` (1019 -> 50 during the slip) / `review-pr6fix-fixed.txt` (1019 -> 1123 -> 1157) |
+| N3 dead key leaked into a Ctrl chord | The IM was bypassed for Ctrl/Alt chords and keypad keys but kept its pending dead key, so dead_acute, Ctrl+C, q sent `03 c2 b4`. Now the IM context is reset before such a key. | `testDeadKeyChord`: unfixed `03 c2 b4`, fixed `03 71 78` |
+| N4 second close request replaced the first question | A second confirm request while the dialog was open replaced it, and accepting closed the wrong tab. Now the open dialog is presented again and keeps its tab. | `testConfirmKeepsFirst`: unfixed closed the wrong tab; fixed closes the first (sleep) tab |
+
+**N1 numbers** (REAL, llvmpipe, Xvfb 1280x800, `lterm-m5-throughput-bench`, sequential, 3 reps; NOT a GPU):
+
+| Run | master 27a9d46 | branch a007299 (before N1) | head c3e3164 (N1 fix) |
+|---|---|---|---|
+| amber `seq 1 3000000`, s | 6.94-7.61 | 13.15-14.14 | 9.20-9.78 |
+| plain `seq 1 3000000`, s | 12.30-13.09 | 13.53-14.26 | 14.03-14.23 |
+| amber `cat` 6.19 MB, MB/s | 2.75-2.88 | 1.45-1.54 | 2.05-2.23 |
+| amber Ctrl+C at 2 s | sent at 6843-7151 ms (UI frozen) | sent at 2005-2015 ms, child gone 1-22 ms later | sent at 2007-2010 ms, gone 1-3 ms later |
+| 10 ms timer longest gap, amber seq | 4.5-13.1 s (all master runs) | 87-103 ms | 87-119 ms |
+| amber content frames per s | 0.1-0.3 | ~25 | ~9.5 |
+
+Recovered (DERIVED from the means): amber seq 13.7 -> 9.6 s against master's 7.2 s, about 63 % of the loss; amber cat 1.49 -> 2.17 MB/s against 2.83, about 51 %. Head is still ~1.3x slower than master on amber floods, because master did no rendering at all during a flood. Plain is ~9-11 % slower than master (it draws ~41 frames/s, master drew none); not changed by N1.
+
+Experiment matrix (REAL, 2 reps, n1-exp worktree with knobs, not committed): slice 10/25/50 ms without a cap gave amber seq 13.5-14.1 / 11.5-12.5 / 9.4-9.6 s, but timer gaps up to 103-134 ms (p99 up to 134 ms at 50 ms). A 10 fps cap at 10 ms slices: 8.6-8.9 s, 2.27-2.29 MB/s, gaps 84-96 ms; 15 fps: 9.6-10.3 s, 2.01-2.14 MB/s; 25 ms slices + 10 fps: 8.7-9.1 s with gaps 100-114 ms. So the cap was taken, and the slice was not changed.
+
+Item 1 after N1 (`flood-bench-n1fix.txt`, REAL): `yes` plain/amber longest gap 20/102 ms, child exits 4/3 ms after Ctrl+C; `seq` plain/amber 18/79 ms, 437/67 frames in 10 s.
 
 ## Font qualification (licence-clean only; evidence from each package's `debian/copyright`)
 
@@ -164,7 +191,10 @@ Neither failure came back in the 10 later sanitizer runs (7 before PR #6, 3 afte
 - **Item 9.** Only interactive shells use job control (a separate foreground process group). With
   `-e cmd`, the command is the child itself, so closing does not ask.
 - **Item 4** is a stopgap. Scrollback storage is unchanged, and the shown size is an upper bound.
-- **Item 1** caps reads, not rendering. One amber effects frame on llvmpipe can still take ~100 ms.
+- **Item 1 / N1** caps reads, and effects frames at 10 per s while flooding. One amber effects frame on llvmpipe can still take ~100 ms. Amber floods are still ~1.3x slower than master, which painted nothing during a flood; plain floods ~9-11 % slower (REAL, llvmpipe).
+- **N8 tab-close timing.** view_test:882 (worst of 19 closes < 25 ms) failed once in 10 serial release runs (27.31 ms; other runs 6.6-13.7 ms) and several times under parallel load. view_test is ASan-linked with the slow unwinder even in release. The check now applies the 25 ms limit to the second-worst close and allows the worst up to 50 ms (83db14a); the M2 regression it guards (>= 50 ms on every close) still fails it (DERIVED from the check, not re-run against the old code).
+- **Governor test comment.** view_test's "Heavy output for a few seconds" comment is stale: `pump()` drains the flood before the cost is set. Left as is.
+- **Not addressed from Ted's review:** N6, N7. `debian/control` (follow-up, not in scope).
 - **Test timing under ASan (scaled in PR #6).** Two waits were tight in the first M5 runs:
   (a) testProbeDeferred pumped a fixed 2.5 s (serial no-load run 1 failed with 0 polls
   deferred); (b) in serial no-load run 3, "probe reached Normal" took 17 694 ms against the 15 s
