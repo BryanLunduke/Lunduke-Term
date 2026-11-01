@@ -849,12 +849,13 @@ static void testTabClose() {
             pump(5);
         }
         pump(400);
-        double worst = 0, total = 0;
+        double worst = 0, second = 0, total = 0;
         while (w.tabCount() > 1) {
             TerminalView* v = w.view(w.tabCount() - 1);
             const auto t0 = std::chrono::steady_clock::now();
             w.closeTab(v);
             const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+            second = std::max(second, std::min(worst, ms));
             worst = std::max(worst, ms);
             total += ms;
             pump(2);
@@ -876,10 +877,16 @@ static void testTabClose() {
         // M2 regression: >= 50 ms per tab whose child ignores SIGHUP. The release build keeps the
         // 25 ms limit and catches it; ASan+UBSan with every core busy measured 27.7 and 30.5 ms
         // (review), so build-san only checks 75 ms (a gross regression, e.g. a blocking wait).
+        // PR #6 review: one close in 19 can be hit by a box stall (27.3 ms seen once in 10 serial
+        // release runs, view_test is ASan-linked with the slow unwinder), so the limit applies to
+        // the second-worst close and the worst may reach twice the limit. The M2 regression slows
+        // every close and still fails both checks.
         const double closeLimit = ltermTimingLimitMs(25.0, 75.0);
         std::printf("tab close (%s): %d closes, worst %.2f ms, total %.2f ms; %d still running right after, "
-                    "all reaped %.0f ms later (limit %.0f ms)\n", ltermBuildLabel(), n - 1, worst, total, running, goneMs, closeLimit);
-        CHECK(worst < closeLimit);
+                    "all reaped %.0f ms later (limit %.0f ms for the 2nd worst %.2f ms)\n", ltermBuildLabel(), n - 1, worst, total,
+                    running, goneMs, closeLimit, second);
+        CHECK(second < closeLimit);
+        CHECK(worst < 2 * closeLimit);
         CHECK(waitFor([&] { return w.trims() >= 1; }, ltermWaitMs(3000, 8000)));
         pump(500);
         CHECK(w.trims() == 1);  // debounced: one trim for the 19 closes
