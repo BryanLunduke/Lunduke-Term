@@ -1,0 +1,74 @@
+# head 08eac7c, build-san (-Db_sanitize=address,undefined, leak checking on: meson's ASAN_OPTIONS detect_leaks=1 + tests/lsan.supp), meson test --num-processes 1 --timeout-multiplier 4, LD_LIBRARY_PATH=lterm-tools (metainfo), Xvfb :44, llvmpipe (NOT a GPU), REAL
+# load: libFuzzer run p (1 core, 100 %) running alongside, plus other agents on the shared box
+# note: meson test rebuilds before each run: run 1 used binaries from 8505761 (08eac7c only added README text); review_test was relinked at 12:36:12 CST with 6b5b2d2's test change, so runs 2 and 3 ran the final review test. The fuzzer (run p) ran 12:28:16-12:39:17 CST, so runs 1 and 2 had it alongside; run 3 started after it ended (other agents only).
+## run 1 start 2026-11-01 12:31:22 CST
+   loadavg at start: 1.75 1.44 1.20, nproc 8
+ 1/16 desktop-file OK               0.01s
+ 2/16 metainfo     OK               0.02s
+ 3/16 effects      OK               1.81s
+ 4/16 governor     OK               0.01s
+ 5/16 profiles     OK               0.01s
+ 6/16 painter      OK               0.31s
+ 7/16 fonts        OK               0.05s
+ 8/16 vterm        OK               0.02s
+ 9/16 gl-match     OK              89.98s
+10/16 session      OK               0.12s
+11/16 fixes        OK               0.45s
+12/16 fuzz-regress OK               0.03s
+13/16 unicode      OK               0.02s
+14/16 search       OK              20.83s
+15/16 view         OK             123.60s
+16/16 review       OK              48.38s
+Ok:                 16  
+Fail:               0   
+Timeout:            0   
+governor auto (ASan+UBSan build): probe reached Normal 3039 ms after auto came back (wait limit 15000 ms)
+governor cpu (ASan+UBSan build): probe reached Normal 6038 ms after auto came back (wait limit 15000 ms)
+## run 2 start 2026-11-01 12:36:08 CST
+   loadavg at start: 1.65 1.91 1.51, nproc 8
+ 1/16 desktop-file OK               0.01s
+ 2/16 metainfo     OK               0.01s
+ 3/16 effects      OK               1.61s
+ 4/16 governor     OK               0.01s
+ 5/16 profiles     OK               0.01s
+ 6/16 painter      OK               0.34s
+ 7/16 fonts        OK               0.06s
+ 8/16 vterm        OK               0.02s
+ 9/16 gl-match     OK              89.27s
+10/16 session      OK               0.11s
+11/16 fixes        OK               0.45s
+12/16 fuzz-regress OK               0.03s
+13/16 unicode      OK               0.02s
+14/16 search       OK              20.70s
+15/16 view         OK             128.03s
+16/16 review       OK              48.87s
+Ok:                 16  
+Fail:               0   
+Timeout:            0   
+governor auto (ASan+UBSan build): probe reached Normal 3036 ms after auto came back (wait limit 15000 ms)
+governor cpu (ASan+UBSan build): probe reached Normal 10458 ms after auto came back (wait limit 15000 ms)
+## run 3 start 2026-11-01 12:41:02 CST
+   loadavg at start: 1.10 1.91 1.68, nproc 8
+ 1/16 desktop-file OK               0.00s
+ 2/16 metainfo     OK               0.01s
+ 3/16 effects      OK               1.50s
+ 4/16 governor     OK               0.01s
+ 5/16 profiles     OK               0.01s
+ 6/16 painter      OK               0.29s
+ 7/16 fonts        OK               0.05s
+ 8/16 vterm        OK               0.02s
+ 9/16 gl-match     OK              86.84s
+10/16 session      OK               0.11s
+11/16 fixes        OK               0.45s
+12/16 fuzz-regress OK               0.03s
+13/16 unicode      OK               0.02s
+14/16 search       OK              20.59s
+15/16 view         OK             111.36s
+16/16 review       OK              47.50s
+Ok:                 16  
+Fail:               0   
+Timeout:            0   
+governor auto (ASan+UBSan build): probe reached Normal 3027 ms after auto came back (wait limit 15000 ms)
+governor cpu (ASan+UBSan build): probe reached Normal 3010 ms after auto came back (wait limit 15000 ms)
+## end 2026-11-01 12:45:31 CST
+SANDONE
