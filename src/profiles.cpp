@@ -335,6 +335,21 @@ std::vector<Profile> makeProfiles() {
         v.push_back(p);
     }
     {
+        // fonts-sixtyfour (OFL-1.1, an original redrawing by the Homecomputer Fonts Project, not
+        // the Style64/Kreative fonts): 8-bit home computer 40-column text mode. Added on the
+        // editor's decision (M5 PR #6); the Debian family name is the only place the mark appears.
+        Profile p = amber;
+        p.id = "pixel-40col";
+        p.label = "Pixel 40-column";
+        p.fx.fontColor = hex(0xa0a0ff);  // light blue text
+        p.fx.chromaColor = 0.0f;
+        p.fx.rasterization = 1;
+        p.fx.screenCurvature = 0.25f;
+        p.fx.frameColor = hex(0xc8bca0);  // beige case
+        setFonts(p, {{"C-64", 32}}, kTerminus);  // 8x8 design grid on a 1 em advance: 32 px = 4x, 40 columns at 1280 px
+        v.push_back(p);
+    }
+    {
         Profile p = amber;  // fonts-hermit / fonts-proggy (cool-retro-term's "modern" fonts)
         p.id = "modern";
         p.label = "Modern (mint)";

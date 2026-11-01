@@ -93,7 +93,7 @@ int main() {
     }
     // Every profile has its own palette (no two effect profiles share one), except the documented
     // amber family (green, green-scanlines, ibm-3278 and the M5 font profiles pixel-8bit,
-    // pixel-hires-mono, pixel-16bit and modern reuse amber's phosphor Tango palette).
+    // pixel-hires-mono, pixel-16bit, pixel-40col and modern reuse amber's phosphor Tango palette).
     {
         std::set<std::string> seen;
         for (const auto& p : all) {
@@ -118,6 +118,16 @@ int main() {
         for (const auto& f : p.fonts) {
             std::string fam = f.family;
             std::transform(fam.begin(), fam.end(), fam.begin(), [](unsigned char c) { return std::tolower(c); });
+            // "c64" catches Style64's C64 Pro / C64 Pro Mono / C64 Elite Mono. The one allowed family
+            // with the mark is Debian fonts-sixtyfour's exact "C-64" (OFL-1.1, editor decision M5),
+            // and only in pixel-40col.
+            if (fam == "c-64") {
+                if (f.family != "C-64" || p.id != "pixel-40col") {
+                    std::fprintf(stderr, "%s uses '%s' (only pixel-40col may use C-64)\n", p.id.c_str(), f.family.c_str());
+                    ++failures;
+                }
+                continue;
+            }
             for (const char* bad : {"petme", "commodore", "c64", "c-64", "printchar", "prnumber", "apple", "atariclassic"})
                 if (fam.find(bad) != std::string::npos) {
                     std::fprintf(stderr, "%s uses forbidden font family '%s'\n", p.id.c_str(), f.family.c_str());
@@ -126,14 +136,22 @@ int main() {
         }
     }
     CHECK(findProfile("c64") == nullptr);
-    // M5 item 2: neutral profile names (no Atari/Amiga/Commodore marks in id or label); fonts-sixtyfour
-    // ("C-64") has no profile yet (an editor decision, docs/FONTS.md).
-    for (const char* id : {"pixel-8bit", "pixel-hires-mono", "pixel-16bit", "modern"}) CHECK(findProfile(id) != nullptr);
+    // M5 item 2: neutral profile names (no Atari/Amiga/Commodore/C64 marks in id or label);
+    // fonts-sixtyfour ("C-64") is in pixel-40col (editor decision, docs/FONTS.md).
+    for (const char* id : {"pixel-8bit", "pixel-hires-mono", "pixel-16bit", "pixel-40col", "modern"})
+        CHECK(findProfile(id) != nullptr);
     for (const auto& p : all) {
         std::string s = p.id + " " + p.label;
         std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
-        CHECK(s.find("atari") == std::string::npos && s.find("amiga") == std::string::npos);
+        CHECK(s.find("atari") == std::string::npos && s.find("amiga") == std::string::npos &&
+              s.find("commodore") == std::string::npos && s.find("c64") == std::string::npos &&
+              s.find("c-64") == std::string::npos);
     }
+    // The forbidden fonts stay out: no profile names PetMe, C64 Pro (Mono), Apple II or AtariClassic.
+    for (const auto& p : all)
+        for (const auto& f : p.fonts)
+            for (const char* bad : {"PetMe", "C64 Pro Mono", "C64 Pro", "PrintChar21", "PRNumber3", "AtariClassic"})
+                CHECK(f.family.find(bad) == std::string::npos);
     if (failures == 0) std::printf("profiles_test: OK\n");
     return failures ? 1 : 0;
 }

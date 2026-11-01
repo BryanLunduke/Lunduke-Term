@@ -137,7 +137,7 @@ int main() {
         // design size; with only DejaVu they fall back to it at the fallback's size (22 px).
         const struct { const char* id; const char* family; int px; } want[] = {
             {"pixel-8bit", "\"Atari800\"", 32}, {"pixel-hires-mono", "Atari", 32},
-            {"pixel-16bit", "Amiga", 32}, {"modern", "Hermit", 20}};
+            {"pixel-16bit", "Amiga", 32}, {"pixel-40col", "C-64", 32}, {"modern", "Hermit", 20}};
         for (const auto& w : want) {
             const Profile* p = findProfile(w.id);
             CHECK(p && !p->fonts.empty() && p->fonts.front().family == w.family && p->fonts.front().px == w.px);
