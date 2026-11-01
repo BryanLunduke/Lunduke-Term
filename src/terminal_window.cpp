@@ -285,10 +285,9 @@ TerminalView* TerminalWindow::newTab(bool first) {
     tab->label.pack_start(tab->close, false, false);
     tab->label.show_all();
     // Deferred: the button lives in the tab that is closed.
+    // sigc::mem_fun (trackable): the idle is dropped if the window goes first.
     tab->close.signal_clicked().connect([this, id] {
-        Glib::signal_idle().connect_once([this, id] {
-            if (Tab* t = tabById(id)) requestCloseTab(t->view.get());
-        });
+        Glib::signal_idle().connect_once(sigc::bind(sigc::mem_fun(*this, &TerminalWindow::requestCloseTabById), id));
     });
 
     v->signalTitle.connect([this, v](const std::string& t) {
@@ -360,11 +359,17 @@ void TerminalWindow::confirm(const std::string& question, const std::string& act
     confirmDialog_->set_default_response(Gtk::RESPONSE_CANCEL);
     confirmDialog_->signal_response().connect([this, yes](int r) {
         confirmDialog_->hide();
-        Glib::signal_idle().connect_once([this] { confirmDialog_.reset(); });
+        Glib::signal_idle().connect_once(sigc::mem_fun(*this, &TerminalWindow::dropConfirmDialog));
         if (r == Gtk::RESPONSE_ACCEPT) yes();
     });
     confirmDialog_->show();
 }
+
+void TerminalWindow::requestCloseTabById(unsigned long id) {
+    if (Tab* t = tabById(id)) requestCloseTab(t->view.get());
+}
+
+void TerminalWindow::dropConfirmDialog() { confirmDialog_.reset(); }
 
 void TerminalWindow::requestCloseTab(TerminalView* v) {
     if (indexOf(v) < 0) return;

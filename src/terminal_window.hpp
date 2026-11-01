@@ -83,6 +83,8 @@ protected:
 private:
     void confirm(const std::string& question, const std::string& action, std::function<void()> yes);
     std::unique_ptr<Gtk::MessageDialog> confirmDialog_;
+    void dropConfirmDialog();
+    void requestCloseTabById(unsigned long id);
     bool closeConfirmed_ = false;
     struct Tab {
         std::unique_ptr<TerminalView> view;
