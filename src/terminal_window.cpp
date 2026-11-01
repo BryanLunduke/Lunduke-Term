@@ -351,6 +351,12 @@ void TerminalWindow::confirm(const std::string& question, const std::string& act
         if (confirmHook(question)) yes();
         return;
     }
+    // PR #6 review N4: a second close request while a question is open keeps the first one
+    // (it is raised again); replacing it lost the first answer's target.
+    if (confirmDialog_ && confirmDialog_->get_visible()) {
+        confirmDialog_->present();
+        return;
+    }
     confirmDialog_ = std::make_unique<Gtk::MessageDialog>(*this, question, false, Gtk::MESSAGE_QUESTION,
                                                           Gtk::BUTTONS_NONE, true);
     confirmDialog_->set_secondary_text("Closing ends it.");
@@ -369,7 +375,9 @@ void TerminalWindow::requestCloseTabById(unsigned long id) {
     if (Tab* t = tabById(id)) requestCloseTab(t->view.get());
 }
 
-void TerminalWindow::dropConfirmDialog() { confirmDialog_.reset(); }
+void TerminalWindow::dropConfirmDialog() {
+    if (confirmDialog_ && !confirmDialog_->get_visible()) confirmDialog_.reset();
+}
 
 void TerminalWindow::requestCloseTab(TerminalView* v) {
     if (indexOf(v) < 0) return;

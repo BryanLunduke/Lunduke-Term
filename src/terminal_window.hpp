@@ -63,6 +63,7 @@ public:
 
     void showSettings();
     SettingsDialog* settingsDialog() { return settings_.get(); }
+    Gtk::MessageDialog* confirmDialog() { return confirmDialog_.get(); }  // tests
     // Applies the dialog's options to every tab and to tabs opened later.
     void applySettings(const ViewOptions& o);
     void commitScrollbackLimits();  // Settings closed: apply pending lower limits

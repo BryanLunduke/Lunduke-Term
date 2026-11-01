@@ -254,6 +254,43 @@ static void testHiddenTab() {
     std::printf("hidden tab: %ld frame requests skipped in 1 s, 0 painted\n", busy->stats().framesHidden - h0);
 }
 
+// ---- PR #6 review N4: a second close request keeps the open question ----
+static void testConfirmKeepsFirst() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-i"};
+    TerminalWindow w(o);
+    w.settingsFile = "/dev/null";
+    w.set_default_size(480, 320);
+    w.show();
+    TerminalView* a = w.newTab(true);
+    TerminalView* b = w.newTab(true);
+    CHECK(a && b);
+    if (!a || !b) return;
+    pump(500);
+    a->session().sendBytes("sleep 30\n", 9);
+    b->session().sendBytes("cat\n", 4);
+    CHECK(waitFor([&] { return a->foregroundJob() == "sleep" && b->foregroundJob() == "cat"; },
+                  ltermWaitMs(3000, 10000)));
+    w.requestCloseTab(a);  // "Close this tab? "sleep" is still running."
+    pump(100);
+    Gtk::MessageDialog* first = w.confirmDialog();
+    CHECK(first != nullptr && first->get_visible());
+    if (!first) return;
+    const std::string q1 = first->property_text().get_value();
+    w.requestCloseTab(b);  // a second request while the first is open
+    pump(100);
+    Gtk::MessageDialog* now = w.confirmDialog();
+    const std::string q2 = now ? now->property_text().get_value() : "";
+    CHECK(now == first && q2 == q1 && q2.find("sleep") != std::string::npos);
+    if (now) now->response(Gtk::RESPONSE_ACCEPT);  // answers the first question
+    pump(200);
+    CHECK(w.tabCount() == 1 && w.view(0) == b);  // the sleep tab closed, the cat tab kept
+    CHECK(w.confirmDialog() == nullptr);
+    std::printf("confirm: second request kept \"%s\"; accept closed %s tab\n", q2.c_str(),
+                (w.tabCount() == 1 && w.view(0) == b) ? "the first (sleep)" : "the WRONG");
+}
+
 // ---- item 9: confirm closing a running job ----
 static void testConfirmClose() {
     ViewOptions o;
@@ -577,6 +614,7 @@ int main(int argc, char** argv) {
     testBlinkTimeout();
     testHiddenTab();
     testConfirmClose();
+    testConfirmKeepsFirst();
     testScrollbackLazyTrim();
     testScrollbackSettingsSlip();
     testScrollbackMax();
