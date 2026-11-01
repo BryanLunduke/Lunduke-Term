@@ -31,3 +31,9 @@ inline const char* ltermBuildLabel() {
 inline double ltermTimingLimitMs(double releaseMs, double sanitizedMs) {
     return LTERM_SANITIZED_BUILD ? sanitizedMs : releaseMs;
 }
+
+// Upper bounds of waitFor()-style polls on wall-clock events (governor windows, child reaping):
+// the release value, or a longer one in build-san. Only a failing case waits the whole time.
+inline int ltermWaitMs(int releaseMs, int sanitizedMs) {
+    return LTERM_SANITIZED_BUILD ? sanitizedMs : releaseMs;
+}
