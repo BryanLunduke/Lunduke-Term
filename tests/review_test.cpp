@@ -327,12 +327,60 @@ static void testScrollbackLazyTrim() {
     v.setScrollbackLines(50);
     pump(200);
     CHECK(v.session().scrollbackSize() == full);
-    v.session().sendBytes("\n", 1);  // new output: now it is trimmed
-    CHECK(waitFor([&] { return v.session().scrollbackSize() <= 50; }, ltermWaitMs(2000, 8000)));
+    v.session().sendBytes("\n", 1);  // new output: PR #6 review N2: still not trimmed
+    CHECK(waitFor([&] { return screenText(v.shownGrid()).find("more") != std::string::npos; }, ltermWaitMs(2000, 8000)));
+    pump(200);
+    CHECK(v.session().scrollbackSize() >= full && v.pendingScrollbackLimit() == 50);
+    v.commitScrollbackLimit();  // what closing Settings does
+    CHECK(v.session().scrollbackSize() <= 50);
     CHECK(v.pendingScrollbackLimit() == -1 && v.session().scrollbackLimit() == 50);
     v.setScrollbackLines(20000);  // raising is immediate
     CHECK(v.session().scrollbackLimit() == 20000);
-    std::printf("scrollback: %zu lines kept until new output, then %zu\n", full, v.session().scrollbackSize());
+    std::printf("scrollback: %zu lines kept through new output, %zu after commit\n", full, v.session().scrollbackSize());
+}
+
+// ---- PR #6 review N2: a live spin change in Settings never trims a tab that has output ----
+// Ted's repro: history 2981 -> limit 50 for 0.6 s -> limit back up -> 50 lines left, because
+// the pending trim fired on the next output. Now a lower limit is applied only when the
+// Settings dialog is closed (its Close button, Esc or the window's close).
+static void testScrollbackSettingsSlip() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.scrollbackLines = 5000;
+    o.command = {"/bin/sh", "-c", "i=0; while :; do echo line $i; i=$((i+1)); sleep 0.005; done"};
+    TerminalWindow w(o);
+    w.settingsFile = "/dev/null";
+    w.set_default_size(640, 400);
+    w.show();
+    TerminalView* v = w.newTab(true);
+    CHECK(v != nullptr);
+    if (!v) return;
+    CHECK(waitFor([&] { return v->session().scrollbackSize() >= 1000; }, ltermWaitMs(15000, 40000)));
+    w.showSettings();
+    pump(100);
+    SettingsDialog* d = w.settingsDialog();
+    CHECK(d != nullptr);
+    if (!d) return;
+    const size_t before = v->session().scrollbackSize();
+    d->scrollback.set_value(50);  // a slip (or "100" typed for "10000") ...
+    pump(600);                    // ... while the tab keeps printing ...
+    const size_t during = v->session().scrollbackSize();
+    d->scrollback.set_value(5000);  // ... and back
+    pump(200);
+    const size_t after = v->session().scrollbackSize();
+    std::printf("scrollback slip with output: %zu lines before, %zu during the 0.6 s at 50, %zu after\n", before,
+                during, after);
+    CHECK(during >= before && after >= before);
+    CHECK(v->session().scrollbackLimit() == 5000 && v->pendingScrollbackLimit() == -1);
+    // Lowering and then closing the dialog confirms it: trimmed at once.
+    d->scrollback.set_value(50);
+    pump(300);
+    CHECK(v->session().scrollbackSize() > 50);
+    d->response(Gtk::RESPONSE_CLOSE);
+    pump(100);
+    CHECK(v->session().scrollbackLimit() == 50 && v->session().scrollbackSize() <= 50);
+    CHECK(v->pendingScrollbackLimit() == -1);
+    std::printf("scrollback: lowered to 50 on dialog close: %zu lines\n", v->session().scrollbackSize());
 }
 
 // ---- item 4: lower maximum, size note in Settings ----
@@ -503,6 +551,7 @@ int main(int argc, char** argv) {
     testHiddenTab();
     testConfirmClose();
     testScrollbackLazyTrim();
+    testScrollbackSettingsSlip();
     testScrollbackMax();
     testInputMethod();
     testHiddenFrees("gl");

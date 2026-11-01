@@ -1065,11 +1065,6 @@ bool TerminalView::readSlice(bool* more) {
     const bool alive = session_->readAvailable(kPtySliceUs, more);
     const long pushed = session_->topLine() - top0;
     const bool damaged = session_->takeDamage();
-    if (pendingSbLimit_ >= 0 && (damaged || pushed != 0)) {  // review item 10: trim on new output
-        session_->setScrollbackLimit(static_cast<size_t>(pendingSbLimit_));
-        pendingSbLimit_ = -1;
-        if (!searchQuery_.empty()) refreshSearch();
-    }
     if (pushed != 0 && scrollOffset_ > 0)  // keep a scrolled-back view still while output arrives
         scrollOffset_ = std::clamp(scrollOffset_ + static_cast<int>(pushed), 0,
                                    static_cast<int>(session_->scrollbackSize()));
@@ -1588,13 +1583,26 @@ void TerminalView::setEffectsQuality(EffectsQuality q) {
 void TerminalView::setScrollbackLines(long long lines) {
     opts_.scrollbackLines = lines;
     const size_t want = clampScrollbackLines(lines);
-    // Review item 10: lowering it does not drop history at once (a slip of the spin button in
-    // Settings, then back up, loses nothing); the trim happens when new output arrives.
+    // Review item 10 / PR #6 review N2: lowering it never drops history at once (a slip of the
+    // spin button in Settings, or "100" typed for "10000", then back up, loses nothing, even in
+    // a tab that keeps printing); the trim waits for commitScrollbackLimit(), which Settings
+    // calls when its dialog is closed.
     if (want < session_->scrollbackSize()) {
         pendingSbLimit_ = static_cast<long long>(want);
         return;
     }
     pendingSbLimit_ = -1;
+    applyScrollbackLimit(want);
+}
+
+void TerminalView::commitScrollbackLimit() {
+    if (pendingSbLimit_ < 0) return;
+    const size_t want = static_cast<size_t>(pendingSbLimit_);
+    pendingSbLimit_ = -1;
+    applyScrollbackLimit(want);
+}
+
+void TerminalView::applyScrollbackLimit(size_t want) {
     session_->setScrollbackLimit(want);
     scrollOffset_ = std::min(scrollOffset_, static_cast<int>(session_->scrollbackSize()));
     if (sel_.active() && sel_.start().line < session_->firstLine()) sel_.clear();

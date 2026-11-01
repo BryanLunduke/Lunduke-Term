@@ -145,6 +145,7 @@ public:
     void setFont(const std::string& family, int px);  // "" / 0: the profile's
     void setEffectsQuality(EffectsQuality q);
     void setScrollbackLines(long long lines);
+    void commitScrollbackLimit();  // applies a pending lower limit (Settings closed)
     long long pendingScrollbackLimit() const { return pendingSbLimit_; }  // -1: none
     void setFrame(int frame);  // -1 profile default, 0 off, 1 on (only profiles with a bezel option)
     pid_t childPid() const { return session_->childPid(); }
@@ -305,6 +306,7 @@ private:
     bool effectsFreed_ = false;
     void freeHiddenEffects();
     long long pendingSbLimit_ = -1;  // review item 10
+    void applyScrollbackLimit(size_t lines);
     bool blinkExpired_ = false;  // blinked for the timeout without activity: solid until then
     double blinkSinceMs_ = 0;    // last key, output or focus-in
     int blinkTimeoutMs() const;

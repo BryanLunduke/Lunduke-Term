@@ -65,6 +65,7 @@ public:
     SettingsDialog* settingsDialog() { return settings_.get(); }
     // Applies the dialog's options to every tab and to tabs opened later.
     void applySettings(const ViewOptions& o);
+    void commitScrollbackLimits();  // Settings closed: apply pending lower limits
     const ViewOptions& options() const { return opts_; }
     std::string settingsFile;  // where "Save as default" writes (tests point it elsewhere)
 

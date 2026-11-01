@@ -538,6 +538,10 @@ void TerminalWindow::showSettings() {
     settings_->present();
 }
 
+void TerminalWindow::commitScrollbackLimits() {
+    for (auto& t : tabs_) t->view->commitScrollbackLimit();
+}
+
 void TerminalWindow::applySettings(const ViewOptions& o) {
     for (auto& t : tabs_) {
         TerminalView& v = *t->view;
@@ -563,6 +567,9 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     set_default_size(420, -1);
     add_button("_Close", Gtk::RESPONSE_CLOSE);
     signal_response().connect([this](int) { hide(); });
+    // PR #6 review N2: a lower scrollback limit is applied when the dialog closes (Close, Esc,
+    // the window's close button), never on a live spin-button change.
+    signal_hide().connect([this] { win_.commitScrollbackLimits(); });
 
     for (const auto& p : builtinProfiles()) profile.append(p.id, p.label + (p.id == kDefaultProfile ? "  (default)" : ""));
     // Monospaced families that are installed, plus the profile's own choice.
