@@ -81,12 +81,28 @@ TerminalView::TerminalView(const ViewOptions& opts)
     sel_.setWordChars(opts_.wordChars);
     t0_ = g_get_monotonic_time();
 
+    im_ = gtk_im_multicontext_new();
+    gtk_im_context_set_use_preedit(im_, FALSE);
+    g_signal_connect(im_, "commit", G_CALLBACK(+[](GtkIMContext*, const char* text, gpointer self) {
+        static_cast<TerminalView*>(self)->onImCommit(text);
+    }), this);
     for (Gtk::Widget* w : {static_cast<Gtk::Widget*>(&area_), static_cast<Gtk::Widget*>(&gl_)}) {
         w->set_can_focus(true);
         w->set_no_show_all(true);  // chooseMode() shows exactly one of the two
-        w->add_events(Gdk::KEY_PRESS_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK |
+        w->add_events(Gdk::KEY_PRESS_MASK | Gdk::KEY_RELEASE_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK |
                       Gdk::POINTER_MOTION_MASK | Gdk::SCROLL_MASK | Gdk::SMOOTH_SCROLL_MASK);
         w->signal_key_press_event().connect(sigc::mem_fun(*this, &TerminalView::onKey), false);
+        w->signal_key_release_event().connect([this](GdkEventKey* ev) {
+            return ev->window && gtk_im_context_filter_keypress(im_, ev);
+        }, false);
+        w->signal_focus_in_event().connect([this](GdkEventFocus*) {
+            gtk_im_context_focus_in(im_);
+            return false;
+        });
+        w->signal_focus_out_event().connect([this](GdkEventFocus*) {
+            gtk_im_context_focus_out(im_);
+            return false;
+        });
         w->signal_button_press_event().connect(sigc::mem_fun(*this, &TerminalView::onButtonPress), false);
         w->signal_button_release_event().connect(sigc::mem_fun(*this, &TerminalView::onButtonRelease), false);
         w->signal_motion_notify_event().connect(sigc::mem_fun(*this, &TerminalView::onMotion), false);
@@ -102,6 +118,8 @@ TerminalView::TerminalView(const ViewOptions& opts)
     area_.signal_draw().connect(sigc::mem_fun(*this, &TerminalView::onPaintBegin), false);
     gl_.signal_draw().connect(sigc::mem_fun(*this, &TerminalView::onPaintBegin), false);
     signal_realize().connect([this] {
+        if (Gtk::Widget* top = get_toplevel())
+            if (top->get_window()) gtk_im_context_set_client_window(im_, top->get_window()->gobj());
         disconnectAfterPaint();
         if (GdkFrameClock* fc = gtk_widget_get_frame_clock(GTK_WIDGET(gobj()))) {
             afterPaintClock_ = GDK_FRAME_CLOCK(g_object_ref(fc));
@@ -163,6 +181,9 @@ void TerminalView::reapInBackground(pid_t pid, unsigned killAfterMs) {
 }
 
 TerminalView::~TerminalView() {
+    g_signal_handlers_disconnect_by_data(im_, this);
+    gtk_im_context_set_client_window(im_, nullptr);
+    g_object_unref(im_);
     alive_.reset();  // pending clipboard replies must not touch this object any more
     if (childWatch_) {
         g_source_remove(childWatch_);
@@ -1298,6 +1319,14 @@ bool TerminalView::onKey(GdkEventKey* ev) {
             signalChildExited.emit();
         return true;
     }
+    // The input method sees the key first (it may start or end a compose sequence, or pick a
+    // CJK candidate with Space/Return), except Ctrl/Alt chords (sent as they are) and keypad
+    // keys (application keypad mode). Synthetic events without a window skip it.
+    const bool keypad = ev->keyval >= GDK_KEY_KP_Space && ev->keyval <= GDK_KEY_KP_9;
+    if (ev->window && !(ev->state & (GDK_CONTROL_MASK | GDK_MOD1_MASK)) && !keypad) {
+        updateImCursor();
+        if (gtk_im_context_filter_keypress(im_, ev)) return true;
+    }
     const VTermModifier mod = modsOf(ev->state);
     VTermKey key;
     if (mapKey(ev->keyval, key)) {
@@ -1313,6 +1342,25 @@ bool TerminalView::onKey(GdkEventKey* ev) {
         return true;
     }
     return false;
+}
+
+void TerminalView::onImCommit(const char* text) {
+    if (holding_ || exited_ || !text || !*text || !g_utf8_validate(text, -1, nullptr)) return;
+    ++imCommits_;
+    for (const char* p = text; *p; p = g_utf8_next_char(p)) session_->sendChar(g_utf8_get_char(p), VTERM_MOD_NONE);
+    sendKeyInput();
+}
+
+void TerminalView::updateImCursor() {
+    Gtk::Widget* top = get_toplevel();
+    if (!top || !get_realized() || !painter_) return;
+    const int s = std::max(1, scale_);
+    const int cx = (marginX_ + cur_.cursorCol * painter_->cellWidth()) / s;
+    const int cy = (marginY_ + cur_.cursorRow * painter_->cellHeight()) / s;
+    int tx = 0, ty = 0;
+    if (!translate_coordinates(*top, cx, cy, tx, ty)) return;
+    GdkRectangle r{tx, ty, std::max(1, painter_->cellWidth() / s), std::max(1, painter_->cellHeight() / s)};
+    gtk_im_context_set_cursor_location(im_, &r);
 }
 
 // ---- M2 stage 3: search ----

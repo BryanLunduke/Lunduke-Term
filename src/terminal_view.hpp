@@ -107,6 +107,7 @@ public:
     void testButton(bool press, int button, double x, double y, guint state = 0);
     void testMotion(double x, double y, guint state);
     bool testKey(GdkEventKey* ev) { return onKey(ev); }  // a key press as GTK would deliver it
+    long imCommits() const { return imCommits_; }
     bool bezelActive() const { return frameActive(); }
     int marginX() const { return marginX_; }
     int marginY() const { return marginY_; }
@@ -170,6 +171,12 @@ private:
     std::string fontWarned_;  // the --font value already warned about
     enum class Mode { Plain, Cpu, Gl };
     bool onKey(GdkEventKey* ev);
+    // Review item 2: input methods (dead keys, Compose, ibus/fcitx for CJK). The IM shows its
+    // own preedit (use_preedit off); committed text goes to the PTY.
+    // gtkmm 3 has no IMContext wrapper: the GTK C API (a GtkIMMulticontext).
+    GtkIMContext* im_ = nullptr;
+    void onImCommit(const char* text);
+    void updateImCursor();
     bool onButtonPress(GdkEventButton* ev);
     bool onButtonRelease(GdkEventButton* ev);
     bool onMotion(GdkEventMotion* ev);
@@ -289,6 +296,7 @@ private:
     bool bellFlash_ = false;
     bool inverseShown_ = false;  // margins currently painted for reverse video
     bool blinkOff_ = false;
+    long imCommits_ = 0;
     long long pendingSbLimit_ = -1;  // review item 10
     bool blinkExpired_ = false;  // blinked for the timeout without activity: solid until then
     double blinkSinceMs_ = 0;    // last key, output or focus-in

@@ -7,6 +7,7 @@
 //   9  closing a tab/window with a foreground job asks first
 //   10 lowering the scrollback drops history only when new output arrives
 //   4  scrollback maximum 100,000; Settings shows the memory it can take
+//   2  input method: dead key and Compose sequences reach the PTY as UTF-8 (gtk-im-context-simple)
 //   8  output compares only the on-screen part of a selection with its snapshot
 //   14 frame-time samples only with --stats
 //   12 the retro look (amber) is the default profile; plain stays selectable
@@ -366,6 +367,35 @@ static void testScrollbackMax() {
     d->response(Gtk::RESPONSE_CLOSE);
 }
 
+// ---- item 2: input methods ----
+static void testInputMethod() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-c", "stty raw -echo; dd bs=1 count=5 2>/dev/null | od -An -tx1; exec sleep 30"};
+    Win w(o);
+    TerminalView& v = *w.view;
+    CHECK(v.start());
+    w.view->grabTerminalFocus();
+    pump(400);
+    auto key = [&](guint kv) {
+        GdkEventKey e = keyEv(kv, 0);
+        e.window = w.win.get_window()->gobj();  // the IM needs the event's window
+        v.testKey(&e);
+    };
+    key(GDK_KEY_dead_acute);  // dead key: nothing yet
+    key(GDK_KEY_e);           // -> e acute, U+00E9 = c3 a9
+    key(GDK_KEY_Multi_key);   // Compose o c -> U+00A9 = c2 a9
+    key(GDK_KEY_o);
+    key(GDK_KEY_c);
+    key(GDK_KEY_x);           // plain key, through the IM too
+    const bool ok = waitFor([&] { return screenText(v.shownGrid()).find("c3 a9 c2 a9 78") != std::string::npos; },
+                            ltermWaitMs(3000, 10000));
+    CHECK(ok);
+    CHECK(v.imCommits() == 3);
+    if (!ok) std::fprintf(stderr, "screen: %s\n", screenText(v.shownGrid()).substr(0, 240).c_str());
+    std::printf("input method: dead_acute e, Compose o c, x -> c3 a9 c2 a9 78 (%ld commits)\n", v.imCommits());
+}
+
 // ---- item 14: no frame statistics unless --stats ----
 static void testStatsOff(bool stats) {
     ViewOptions o;
@@ -416,6 +446,7 @@ int main(int argc, char** argv) {
     }
     signal(SIGPIPE, SIG_IGN);
     setenv("SHELL", "/bin/sh", 1);
+    setenv("GTK_IM_MODULE", "gtk-im-context-simple", 1);  // item 2: no ibus/fcitx here
     auto app = Gtk::Application::create(argc, argv, "org.lunduke.TerminalReviewTest", Gio::APPLICATION_NON_UNIQUE);
     app->register_application();
     testFlood("plain");
@@ -427,6 +458,7 @@ int main(int argc, char** argv) {
     testConfirmClose();
     testScrollbackLazyTrim();
     testScrollbackMax();
+    testInputMethod();
     testSelectionCompare();
     testStatsOff(false);
     testStatsOff(true);
