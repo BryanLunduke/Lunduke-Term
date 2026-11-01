@@ -499,7 +499,7 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     add_button("_Close", Gtk::RESPONSE_CLOSE);
     signal_response().connect([this](int) { hide(); });
 
-    for (const auto& p : builtinProfiles()) profile.append(p.id, p.label + (p.effects ? "" : "  (default)"));
+    for (const auto& p : builtinProfiles()) profile.append(p.id, p.label + (p.id == kDefaultProfile ? "  (default)" : ""));
     // Monospaced families that are installed, plus the profile's own choice.
     font.append("", "Profile font");
     {

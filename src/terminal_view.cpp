@@ -59,8 +59,8 @@ TerminalView::TerminalView(const ViewOptions& opts)
     : Gtk::Box(Gtk::ORIENTATION_VERTICAL), opts_(opts) {
     const Profile* p = findProfile(opts_.profile);
     if (!p) {
-        std::fprintf(stderr, "lunduke-terminal: unknown profile '%s', using plain\n", opts_.profile.c_str());
-        p = findProfile("plain");
+        std::fprintf(stderr, "lunduke-terminal: unknown profile '%s', using %s\n", opts_.profile.c_str(), kDefaultProfile);
+        p = findProfile(kDefaultProfile);
     }
     profile_ = *p;
     {

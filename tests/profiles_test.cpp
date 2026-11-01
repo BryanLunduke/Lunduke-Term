@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Profiles: plain is the default and has no effects; phosphor palettes keep every ANSI colour
+// Profiles: amber is the default (M5), plain has no effects and stays selectable; phosphor palettes keep every ANSI colour
 // bright enough to read after the monochrome tint (the M0 "dark blue ls directory" problem).
 #include "profiles.hpp"
 
@@ -25,6 +25,10 @@ int main() {
     const auto& all = builtinProfiles();
     CHECK(!all.empty());
     CHECK(all.front().id == "plain");
+    // M5 (review item 12, editor's decision): the retro look is the default.
+    CHECK(std::string(kDefaultProfile) == "amber");
+    CHECK(findProfile(kDefaultProfile) && findProfile(kDefaultProfile)->effects);
+    CHECK(findProfile("plain") && !findProfile("plain")->effects);
     CHECK(!all.front().effects);
     for (const char* id : {"plain", "amber", "green", "green-scanlines", "ibm-dos", "ibm-3278"})
         CHECK(findProfile(id) != nullptr);

@@ -2,6 +2,7 @@
 // M5 review fixes (docs/M5-NOTES.md, numbering from the 2026-11-01 code review). Needs an X
 // display; skipped without one.
 //   1  an output flood does not freeze the main loop, and Ctrl+C reaches the child
+//   12 the retro look (amber) is the default profile; plain stays selectable
 #include "sanitizer.hpp"
 #include "terminal_view.hpp"
 #include "terminal_window.hpp"
@@ -132,6 +133,31 @@ static void testFloodEnds() {
     CHECK(waitFor([&] { return screenHas("after-pause"); }, ltermWaitMs(5000, 15000)));
 }
 
+// ---- item 12: the retro look is the default profile ----
+static void testDefaultProfile() {
+    CHECK(ViewOptions{}.profile == "amber");
+    ViewOptions o;
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    TerminalWindow w(o);
+    w.settingsFile = "/dev/null";
+    w.show();
+    TerminalView* v = w.newTab(true);
+    pump(300);
+    CHECK(v && v->profile().id == "amber" && v->effectsOn());
+    GdkEventKey e = keyEv(GDK_KEY_S, GDK_CONTROL_MASK | GDK_SHIFT_MASK);
+    CHECK(w.handleKey(&e));
+    pump(100);
+    SettingsDialog* d = w.settingsDialog();
+    CHECK(d && d->profile.get_active_id() == "amber");
+    if (!d) return;
+    CHECK(d->profile.get_active_text().find("(default)") != Glib::ustring::npos);
+    d->profile.set_active_id("plain");  // plain stays selectable
+    pump(100);
+    CHECK(d->profile.get_active_text().find("(default)") == Glib::ustring::npos);
+    CHECK(v->profile().id == "plain" && !v->effectsOn());
+    d->response(Gtk::RESPONSE_CLOSE);
+}
+
 int main(int argc, char** argv) {
     if (!getenv("DISPLAY") || !*getenv("DISPLAY")) {
         std::printf("review test skipped: no DISPLAY\n");
@@ -144,6 +170,7 @@ int main(int argc, char** argv) {
     testFlood("plain");
     testFlood("amber");
     testFloodEnds();
+    testDefaultProfile();
     if (failures) {
         std::fprintf(stderr, "%d failure(s)\n", failures);
         return 1;

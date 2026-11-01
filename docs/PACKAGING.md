@@ -55,7 +55,7 @@ Suggests: fonts-hermit,
 
 | Package | License | Used by |
 |---|---|---|
-| fonts-dejavu-core / fonts-dejavu-mono | Bitstream-Vera + PD | `plain` (default) and last fallback for every profile. Hard dependency, so the default never lands on a proportional font. |
+| fonts-dejavu-core / fonts-dejavu-mono | Bitstream-Vera + PD | `plain` and last fallback for every profile, including the default `amber` (M5). Hard dependency, so no profile ever lands on a proportional font. |
 | fonts-terminus (TTF, family `Terminus (TTF)`) or fonts-terminus-otb (`Terminus`) | OFL-1.1 | amber, green, green-scanlines, vintage, futuristic, paper-white (the CRT-1.2.0-style profiles) |
 | fonts-pc (`Px IBM VGA8`, …) | CC-BY-SA-4.0 | ibm-dos |
 | fonts-3270 (`IBM 3270`) | BSD-3-Clause OR OFL-1.1 | ibm-3278 |

@@ -18,7 +18,7 @@
 namespace lterm {
 
 struct ViewOptions {
-    std::string profile = "plain";
+    std::string profile = kDefaultProfile;
     int effects = -1;               // -1: the profile decides, 0: off, 1: on
     std::string renderer = "auto";  // auto (GL, C++ if GL fails) | gl | cpu
     int threads = 4;                // C++ fallback threads

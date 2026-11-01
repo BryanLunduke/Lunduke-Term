@@ -26,7 +26,7 @@ highlight and the screen's glow reflected on the frame; pre-rendered, so it cost
 Stage 3: three more CRT 1.2.0-derived profiles (`vintage`, `futuristic`, `paper-white`, each with its
 own palette and licence-clean fonts only), tabs, scrollback search with highlighting, a settings
 dialog, and packaging prep (`.desktop`, AppStream metainfo, icon, `meson install`,
-an unbuilt `debian/`; see [`docs/PACKAGING.md`](docs/PACKAGING.md)). The default stays `plain`.
+an unbuilt `debian/`; see [`docs/PACKAGING.md`](docs/PACKAGING.md)). The default was `plain` until M5; since M5 it is `amber` (see below).
 
 M3 item 1 (see [`docs/M3-NOTES.md`](docs/M3-NOTES.md)): the search does not block typing (an idle-built
 cache, 10000-match cap), the governor measures render cost only and recovers, closing a tab
@@ -68,8 +68,8 @@ Without them, the profiles fall back to DejaVu Sans Mono. See `docs/FONTS.md`.
 
 ### Run
 
-    build/lunduke-terminal                         # plain profile, no effects (default)
-    build/lunduke-terminal --profile amber         # Default Amber CRT look (GLSL, C++ fallback)
+    build/lunduke-terminal                         # amber CRT look (default since M5; GLSL, C++ fallback)
+    build/lunduke-terminal --profile plain         # no effects at all
     build/lunduke-terminal --list-profiles         # profiles and the font each resolves to here
     build/lunduke-terminal --effects               # plain colours with the CRT effects
     build/lunduke-terminal --profile green --renderer cpu --threads 4

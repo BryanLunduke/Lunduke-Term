@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Built-in looks. "plain" (the default) has no effects at all; the others take their effect
+// Built-in looks. "amber" is the default (M5, editor's decision: the retro look first); "plain"
+// has no effects at all and stays selectable. The tube profiles take their effect
 // values from the cool-retro-term 1.2.0 profiles of the same name and add a palette tuned so
 // every ANSI colour stays readable after the monochrome phosphor tint.
 #pragma once
@@ -54,6 +55,8 @@ struct TubeOverrides {
 std::string applyTubeOverrides(Profile& p, const TubeOverrides& o);
 bool parseHexColor(const std::string& s, Rgb& out);
 
+// The profile used when nothing (command line, settings.ini) picks one.
+inline constexpr const char* kDefaultProfile = "amber";
 const std::vector<Profile>& builtinProfiles();
 // The installed font this profile will use (falls back along `fonts`, then to Monospace).
 FontPick profileFont(const Profile& p);

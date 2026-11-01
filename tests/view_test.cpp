@@ -138,6 +138,7 @@ static void testClipboardAfterClose() {
     pump(50);
     for (int i = 0; i < 5; ++i) {
         ViewOptions o;
+        o.profile = "plain";  // M5: the default is amber now
         o.command = {"/bin/cat"};
         o.onExit = "close";
         Win w(o);
@@ -150,6 +151,7 @@ static void testClipboardAfterClose() {
     }
     {   // Control: with the view alive the paste does arrive.
         ViewOptions o;
+        o.profile = "plain";  // M5: the default is amber now
         o.command = {"/bin/cat"};
         Win w(o);
         CHECK(w.view->start());
@@ -171,6 +173,7 @@ static void testReapAfterHangup() {
     pid_t pid;
     {
         ViewOptions o;
+        o.profile = "plain";  // M5: the default is amber now
         o.command = {"/bin/sleep", "30"};
         Win w(o);
         CHECK(w.view->start());
@@ -185,6 +188,7 @@ static void testReapAfterHangup() {
     CHECK(gone(pid));  // not left as a zombie
     {   // A child that ignores SIGHUP and exits a bit later is reaped by the GLib child watch.
         ViewOptions o;
+        o.profile = "plain";  // M5: the default is amber now
         o.command = {"/bin/sh", "-c", "trap '' HUP; sleep 0.6"};
         Win w(o);
         CHECK(w.view->start());
@@ -198,11 +202,13 @@ static void testReapAfterHangup() {
 
 static void testScrollbackClampView() {
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.command = {"/bin/true"};
     o.scrollbackLines = 1LL << 40;
     Win w(o);
     CHECK(w.view->session().scrollbackLimit() == kMaxScrollbackLines);
     ViewOptions n;
+    n.profile = "plain";  // M5: the default is amber now
     n.command = {"/bin/true"};
     n.scrollbackLines = -3;
     Win w2(n);
@@ -387,6 +393,7 @@ static int searchSync(TerminalView& v, const std::string& q, bool cs) {
 
 static void testSearchView() {
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.command = {"/bin/sh", "-c",
                  "i=0; while [ $i -lt 200 ]; do echo row $i; i=$((i+1)); done; echo 'find ME here';"
                  "i=0; while [ $i -lt 100 ]; do echo after $i; i=$((i+1)); done; echo 'ME again'; exec cat"};
@@ -454,6 +461,7 @@ static void testSearchView() {
 // short idle slices (the query is pending meanwhile), then each keystroke is a quick find().
 static void testSearchBig() {
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.scrollbackLines = 100000;
     Win w(o);
     TerminalView& v = *w.view;
@@ -500,6 +508,7 @@ static void testSearchBig() {
 
 static void testSearchBar() {
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.command = {"/bin/sh", "-c", "echo alpha; echo beta ALPHA; exec sleep 30"};
     TerminalWindow w(o);
     w.set_default_size(480, 320);
@@ -540,6 +549,7 @@ static void testSettingsDialog() {
     g_mkdir_with_parents(dir.c_str(), 0700);
     Glib::file_set_contents(ini, "# kept\n[terminal]\ncursor-shape=bar\nprofile=green\n");
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.command = {"/bin/sh", "-c", "exec sleep 30"};
     TerminalWindow w(o);
     w.settingsFile = ini;
@@ -751,6 +761,7 @@ static void testCorruptSettings() {
     const std::string bad = "[terminal\nprofile=green\n\xff\xfe garbage\n";
     Glib::file_set_contents(ini, bad);
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.command = {"/bin/sh", "-c", "exec sleep 30"};
     TerminalWindow w(o);
     w.settingsFile = ini;
@@ -816,6 +827,7 @@ static char procState(pid_t pid) {  // 0: gone
 // M3 item 1c: closing tabs never blocks on the child; one that ignores SIGHUP is killed later.
 static void testTabClose() {
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.command = {"/bin/sh", "-c", "trap '' HUP; sleep 30"};  // ignores SIGHUP: needs the SIGKILL
     {
         TerminalWindow w(o);
@@ -872,6 +884,7 @@ static void testTabClose() {
 // M3 item 1d: deferred closes use tab ids (run under ASan: a stale pointer would show).
 static void testTabIds() {
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.command = {"/bin/sh", "-c", "exec sleep 30"};
     {   // The close button clicked twice: one close.
         TerminalWindow w(o);

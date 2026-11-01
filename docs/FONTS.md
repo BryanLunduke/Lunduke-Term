@@ -86,8 +86,8 @@ at integer multiples of their design size.
 
 | Profile | 1st choice (package) | then | Suggested relation |
 |---|---|---|---|
-| plain (default) | `DejaVu Sans Mono` 16 px (fonts-dejavu-core) | `Monospace` | Depends: fonts-dejavu-core |
-| amber, green, green-scanlines | `Terminus (TTF)` 22 px (fonts-terminus) | `Terminus` (fonts-terminus-otb), `DejaVu Sans Mono`, `Monospace` | Recommends: fonts-terminus \| fonts-terminus-otb |
+| plain | `DejaVu Sans Mono` 16 px (fonts-dejavu-core) | `Monospace` | Depends: fonts-dejavu-core |
+| amber (default since M5), green, green-scanlines | `Terminus (TTF)` 22 px (fonts-terminus) | `Terminus` (fonts-terminus-otb), `DejaVu Sans Mono`, `Monospace` | Recommends: fonts-terminus \| fonts-terminus-otb |
 | ibm-dos | `Px IBM VGA8` **32 px** (fonts-pc): exactly 2× the 8×16 VGA glyphs, about 80×25 at 1280×800 | `Px437 IBM VGA8` and `PxPlus IBM VGA8` at 32 px (int10h originals, if the user installed them), then the Terminus chain at 22 px | Recommends: fonts-pc |
 | ibm-3278 | `IBM 3270` 22 px (fonts-3270) | `3270`, then the Terminus chain | Recommends: fonts-3270 |
 
