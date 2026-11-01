@@ -289,15 +289,19 @@ static void testConfirmClose() {
     pump(100);
     CHECK(asked.size() == 1 && w.tabCount() == 1);
     CHECK(!asked.empty() && asked.back().find("sleep") != std::string::npos);
+    // The tab's close button (deferred to an idle) asks too.
+    if (Gtk::Button* b = w.closeButton(busy)) b->clicked();
+    pump(200);
+    CHECK(asked.size() == 2 && w.tabCount() == 1);
     // The window's close button too.
     CHECK(w.deleteEventForTest() == true);  // kept
-    CHECK(asked.size() == 2);
+    CHECK(asked.size() == 3);
     answer = true;
     CHECK(w.deleteEventForTest() == false);  // confirmed: GTK may destroy it
     // "Close Tab" closes it.
     w.requestCloseTab(busy);
     pump(200);
-    CHECK(asked.size() == 4 && w.tabCount() == 0);
+    CHECK(asked.size() == 5 && w.tabCount() == 0);
     CHECK(waitFor([&] { return TerminalView::pendingReaps() == 0; }, ltermWaitMs(5000, 12000)));
     std::printf("confirm close: asked %zu times (\"%s\")\n", asked.size(), asked.empty() ? "" : asked.front().c_str());
 }
