@@ -577,7 +577,8 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     quality.set_tooltip_text("auto: reduced on software rendering; static: no animation (0% idle CPU)");
     scrollback.set_range(0, static_cast<double>(kMaxScrollbackLines));
     scrollback.set_increments(1000, 10000);
-    scrollback.set_tooltip_text("Lines of history kept per tab");
+    scrollback.set_tooltip_text("Lines of history kept per tab (at most 100,000). Lowering it drops the oldest "
+                                "lines when new output arrives.");
     frame.append("-1", "Profile default");
     frame.append("1", "On");
     frame.append("0", "Off");
@@ -601,6 +602,11 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     addRow("Font size (px)", fontPx);
     addRow("Effects quality", quality);
     addRow("Scrollback lines", scrollback);
+    scrollbackNote.set_halign(Gtk::ALIGN_START);
+    scrollbackNote.set_xalign(0);
+    scrollbackNote.set_line_wrap(true);
+    scrollbackNote.set_max_width_chars(60);
+    grid->attach(scrollbackNote, 1, row++, 1, 1);
     addRow("Bezel (frame)", frame);
     status.set_halign(Gtk::ALIGN_START);
     status.set_line_wrap(true);
@@ -635,6 +641,7 @@ void SettingsDialog::load(const ViewOptions& o) {
     fontPx.set_value(std::max(0, o.fontPx));
     quality.set_active_id(effectsQualityName(o.effectsQuality));
     scrollback.set_value(static_cast<double>(clampScrollbackLines(o.scrollbackLines)));
+    updateScrollbackNote();
     frame.set_active_id(std::to_string(o.tube.frame < 0 ? -1 : (o.tube.frame > 0 ? 1 : 0)));
     status.set_text("");
     updateFrameSensitivity();
@@ -657,7 +664,21 @@ void SettingsDialog::updateFrameSensitivity() {
     frame.set_sensitive(p && p->bezelOption);
 }
 
+void SettingsDialog::updateScrollbackNote() {
+    TerminalView* v = win_.currentView();
+    const int cols = v ? std::max(v->session().cols(), 1) : 80;
+    const size_t lines = clampScrollbackLines(static_cast<long long>(scrollback.get_value()));
+    const double mb = VtermSession::scrollbackBytesFull(lines, cols) / (1024.0 * 1024.0);
+    char t[200];
+    if (mb >= 100)
+        std::snprintf(t, sizeof t, "Warning: up to %.0f MB per tab when full (%d columns). Every tab keeps its own.", mb, cols);
+    else
+        std::snprintf(t, sizeof t, "Up to %.*f MB per tab when full (%d columns).", mb < 10 ? 1 : 0, mb, cols);
+    scrollbackNote.set_text(t);
+}
+
 void SettingsDialog::changed() {
+    updateScrollbackNote();
     if (loading_) return;
     updateFrameSensitivity();
     status.set_text("");

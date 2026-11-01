@@ -140,6 +140,7 @@ public:
     void setFont(const std::string& family, int px);  // "" / 0: the profile's
     void setEffectsQuality(EffectsQuality q);
     void setScrollbackLines(long long lines);
+    long long pendingScrollbackLimit() const { return pendingSbLimit_; }  // -1: none
     void setFrame(int frame);  // -1 profile default, 0 off, 1 on (only profiles with a bezel option)
     pid_t childPid() const { return session_->childPid(); }
     // Review item 9: the PTY's foreground process group is not the child's own (a shell runs a
@@ -288,6 +289,7 @@ private:
     bool bellFlash_ = false;
     bool inverseShown_ = false;  // margins currently painted for reverse video
     bool blinkOff_ = false;
+    long long pendingSbLimit_ = -1;  // review item 10
     bool blinkExpired_ = false;  // blinked for the timeout without activity: solid until then
     double blinkSinceMs_ = 0;    // last key, output or focus-in
     int blinkTimeoutMs() const;

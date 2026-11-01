@@ -5,6 +5,8 @@
 //   5  cursor blink stops after the blink timeout, restarts on a key
 //   7  a hidden tab does not paint; showing it paints once
 //   9  closing a tab/window with a foreground job asks first
+//   10 lowering the scrollback drops history only when new output arrives
+//   4  scrollback maximum 100,000; Settings shows the memory it can take
 //   8  output compares only the on-screen part of a selection with its snapshot
 //   14 frame-time samples only with --stats
 //   12 the retro look (amber) is the default profile; plain stays selectable
@@ -298,6 +300,72 @@ static void testConfirmClose() {
     std::printf("confirm close: asked %zu times (\"%s\")\n", asked.size(), asked.empty() ? "" : asked.front().c_str());
 }
 
+// ---- item 10: lowering the scrollback trims on new output ----
+static void testScrollbackLazyTrim() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.scrollbackLines = 5000;
+    o.command = {"/bin/sh", "-c", "i=0; while [ $i -lt 300 ]; do echo $i; i=$((i+1)); done; read x; echo more; exec sleep 30"};
+    Win w(o);
+    TerminalView& v = *w.view;
+    CHECK(v.start());
+    CHECK(waitFor([&] { return v.session().scrollbackSize() >= 250; }, ltermWaitMs(3000, 10000)));
+    pump(200);
+    const size_t full = v.session().scrollbackSize();
+    v.setScrollbackLines(50);  // a slip in Settings ...
+    pump(200);
+    CHECK(v.session().scrollbackSize() == full && v.pendingScrollbackLimit() == 50);
+    v.setScrollbackLines(5000);  // ... and back: nothing lost
+    CHECK(v.session().scrollbackSize() == full && v.pendingScrollbackLimit() == -1);
+    CHECK(v.session().scrollbackLimit() == 5000);
+    v.setScrollbackLines(50);
+    pump(200);
+    CHECK(v.session().scrollbackSize() == full);
+    v.session().sendBytes("\n", 1);  // new output: now it is trimmed
+    CHECK(waitFor([&] { return v.session().scrollbackSize() <= 50; }, ltermWaitMs(2000, 8000)));
+    CHECK(v.pendingScrollbackLimit() == -1 && v.session().scrollbackLimit() == 50);
+    v.setScrollbackLines(20000);  // raising is immediate
+    CHECK(v.session().scrollbackLimit() == 20000);
+    std::printf("scrollback: %zu lines kept until new output, then %zu\n", full, v.session().scrollbackSize());
+}
+
+// ---- item 4: lower maximum, size note in Settings ----
+static void testScrollbackMax() {
+    CHECK(kMaxScrollbackLines == 100000);
+    CHECK(clampScrollbackLines(1000000) == 100000);
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    TerminalWindow w(o);
+    w.settingsFile = "/dev/null";
+    w.set_default_size(640, 400);
+    w.show();
+    TerminalView* v = w.newTab(true);
+    pump(300);
+    CHECK(v != nullptr);
+    if (!v) return;
+    w.showSettings();
+    pump(100);
+    SettingsDialog* d = w.settingsDialog();
+    CHECK(d != nullptr);
+    if (!d) return;
+    double lo, hi;
+    d->scrollback.get_range(lo, hi);
+    CHECK(hi == 100000);
+    d->scrollback.set_value(1000);
+    pump(50);
+    const std::string small = d->scrollbackNote.get_text();
+    CHECK(small.find("MB per tab") != std::string::npos && small.find("Warning") == std::string::npos);
+    d->scrollback.set_value(100000);
+    pump(50);
+    const std::string big = d->scrollbackNote.get_text();
+    const size_t est = VtermSession::scrollbackBytesFull(100000, v->session().cols());
+    CHECK((est >= 100u * 1024 * 1024) == (big.find("Warning") != std::string::npos));
+    CHECK(v->options().scrollbackLines == 100000);
+    std::printf("settings: \"%s\" / \"%s\"\n", small.c_str(), big.c_str());
+    d->response(Gtk::RESPONSE_CLOSE);
+}
+
 // ---- item 14: no frame statistics unless --stats ----
 static void testStatsOff(bool stats) {
     ViewOptions o;
@@ -357,6 +425,8 @@ int main(int argc, char** argv) {
     testBlinkTimeout();
     testHiddenTab();
     testConfirmClose();
+    testScrollbackLazyTrim();
+    testScrollbackMax();
     testSelectionCompare();
     testStatsOff(false);
     testStatsOff(true);

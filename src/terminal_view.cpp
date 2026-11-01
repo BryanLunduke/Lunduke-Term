@@ -1005,6 +1005,12 @@ bool TerminalView::readSlice(bool* more) {
     const long top0 = session_->topLine();
     const bool alive = session_->readAvailable(kPtySliceUs, more);
     const long pushed = session_->topLine() - top0;
+    const bool damaged = session_->takeDamage();
+    if (pendingSbLimit_ >= 0 && (damaged || pushed != 0)) {  // review item 10: trim on new output
+        session_->setScrollbackLimit(static_cast<size_t>(pendingSbLimit_));
+        pendingSbLimit_ = -1;
+        if (!searchQuery_.empty()) refreshSearch();
+    }
     if (pushed != 0 && scrollOffset_ > 0)  // keep a scrolled-back view still while output arrives
         scrollOffset_ = std::clamp(scrollOffset_ + static_cast<int>(pushed), 0,
                                    static_cast<int>(session_->scrollbackSize()));
@@ -1015,7 +1021,7 @@ bool TerminalView::readSlice(bool* more) {
         sel_.clear();
         scrollOffset_ = 0;
     }
-    if (session_->takeDamage()) {
+    if (damaged) {
         contentDirty_ = true;
         if (!searchQuery_.empty() && !searchRefresh_.connected())  // debounced: 250 ms after output
             searchRefresh_ = Glib::signal_timeout().connect(
@@ -1495,7 +1501,15 @@ void TerminalView::setEffectsQuality(EffectsQuality q) {
 
 void TerminalView::setScrollbackLines(long long lines) {
     opts_.scrollbackLines = lines;
-    session_->setScrollbackLimit(clampScrollbackLines(lines));
+    const size_t want = clampScrollbackLines(lines);
+    // Review item 10: lowering it does not drop history at once (a slip of the spin button in
+    // Settings, then back up, loses nothing); the trim happens when new output arrives.
+    if (want < session_->scrollbackSize()) {
+        pendingSbLimit_ = static_cast<long long>(want);
+        return;
+    }
+    pendingSbLimit_ = -1;
+    session_->setScrollbackLimit(want);
     scrollOffset_ = std::min(scrollOffset_, static_cast<int>(session_->scrollbackSize()));
     if (sel_.active() && sel_.start().line < session_->firstLine()) sel_.clear();
     if (!searchQuery_.empty()) refreshSearch();

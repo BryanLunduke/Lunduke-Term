@@ -1255,6 +1255,10 @@ void VtermSession::cbOutput(const char* bytes, size_t len, void* user) {
     else s->sendBytes(bytes, len);
 }
 
+size_t VtermSession::scrollbackBytesFull(size_t lines, int cols) {
+    return lines * (sizeof(SbLine) + static_cast<size_t>(std::max(cols, 0)) * sizeof(VTermScreenCell));
+}
+
 size_t VtermSession::scrollbackBytes() const {
     size_t b = 0;
     for (const SbLine& l : sb_) b += sizeof(SbLine) + l.cells.capacity() * sizeof(VTermScreenCell);
