@@ -975,12 +975,22 @@ bool TerminalView::readSlice(bool* more) {
         updateBlink();  // DECSCUSR / ?12 may have changed blinking
         // Output overwrote the selected text (clear, an editor redraw): drop the selection. A
         // selection that merely scrolled keeps its text and stays (it is anchored to lines).
-        if (sel_.active() && !selecting_ && sel_.end().line >= session_->topLine() &&
-            sel_.text(*session_) != selSnapshot_)
+        if (sel_.active() && !selecting_ && sel_.end().line >= session_->topLine() && selectionOverwritten())
             sel_.clear();
     }
     ensureWriteWatch();  // replies (DA, DSR) that did not fit
     return alive;  // false: EOF/HUP; the child watch decides what happens to the window
+}
+
+bool TerminalView::selectionOverwritten() {
+    const long from = std::max(sel_.start().line, session_->topLine());
+    for (long l = from; l <= sel_.end().line; ++l) {
+        const long i = l - selLinesBase_;
+        ++stats_.selLinesCompared;
+        if (i < 0 || i >= static_cast<long>(selLines_.size()) || sel_.text(*session_, l, l) != selLines_[static_cast<size_t>(i)])
+            return true;
+    }
+    return false;
 }
 
 void TerminalView::ensureWriteWatch() {
@@ -1121,6 +1131,9 @@ bool TerminalView::onButtonRelease(GdkEventButton* ev) {
         selecting_ = false;
         if (sel_.active()) {
             selSnapshot_ = sel_.text(*session_);
+            selLinesBase_ = sel_.start().line;
+            selLines_.clear();
+            for (long l = sel_.start().line; l <= sel_.end().line; ++l) selLines_.push_back(sel_.text(*session_, l, l));
             if (!selSnapshot_.empty()) Gtk::Clipboard::get(GDK_SELECTION_PRIMARY)->set_text(selSnapshot_);
             else sel_.clear();  // only blanks: nothing to copy, do not leave a highlight behind
             selectionChanged();

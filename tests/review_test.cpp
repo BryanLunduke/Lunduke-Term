@@ -2,6 +2,7 @@
 // M5 review fixes (docs/M5-NOTES.md, numbering from the 2026-11-01 code review). Needs an X
 // display; skipped without one.
 //   1  an output flood does not freeze the main loop, and Ctrl+C reaches the child
+//   8  output compares only the on-screen part of a selection with its snapshot
 //   14 frame-time samples only with --stats
 //   12 the retro look (amber) is the default profile; plain stays selectable
 #include "sanitizer.hpp"
@@ -134,6 +135,63 @@ static void testFloodEnds() {
     CHECK(waitFor([&] { return screenHas("after-pause"); }, ltermWaitMs(5000, 15000)));
 }
 
+// ---- item 8: the selection is not rebuilt on every read ----
+static bool findXY(TerminalView& v, int row, int col, double& x, double& y) {
+    for (int yy = 0; yy < 2000; ++yy)
+        for (int xx = 0; xx < 2000; xx += 2) {
+            int r, c;
+            if (v.cellAtLogical(xx, yy, r, c) && r == row && c == col) {
+                x = xx + 1;
+                y = yy + 1;
+                return true;
+            }
+            if (r > row) return false;
+        }
+    return false;
+}
+
+static void testSelectionCompare() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.scrollbackLines = 5000;
+    o.command = {"/bin/sh", "-c",
+                 "seq 1 3000; sleep 3; i=0; while [ $i -lt 5 ]; do echo tick $i; sleep 0.05; i=$((i+1)); done;"
+                 "sleep 1; printf '\\033[H\\033[2J'; exec sleep 30"};
+    Win w(o);
+    TerminalView& v = *w.view;
+    CHECK(v.start());
+    auto screen = [&] {  // the live screen (the view may be scrolled back)
+        std::string t;
+        VtermSession& s = v.session();
+        for (long l = s.topLine(); l < s.endLine(); ++l) {
+            for (int c = 0; c < s.cols(); ++c) t += s.cellText(l, c).empty() ? " " : s.cellText(l, c);
+            t += '\n';
+        }
+        return t;
+    };
+    CHECK(waitFor([&] { return screen().find("3000") != std::string::npos; }, ltermWaitMs(5000, 20000)));
+    const int rows = v.shownGrid().rows;
+    double x0, y0, x1, y1;
+    CHECK(findXY(v, rows - 2, 0, x0, y0) && findXY(v, 0, 0, x1, y1));
+    // Press on the last line of output, drag above the top: every motion scrolls one line back.
+    v.testButton(true, 1, x0, y0);
+    for (int i = 0; i < 1000; ++i) v.testMotion(x1, 0, GDK_BUTTON1_MASK);
+    v.testMotion(x1, y1, GDK_BUTTON1_MASK);
+    v.testButton(false, 1, x1, y1);
+    CHECK(v.selection().active());
+    const long selLines = v.selection().end().line - v.selection().start().line + 1;
+    CHECK(selLines > 1000);
+    const long cmp0 = v.stats().selLinesCompared;
+    CHECK(waitFor([&] { return screen().find("tick 4") != std::string::npos; }, ltermWaitMs(8000, 20000)));
+    const long compared = v.stats().selLinesCompared - cmp0;
+    CHECK(v.selection().active());  // output only scrolled it
+    // A few reads, each compares at most the selected lines still on the screen (M4: the whole
+    // selection's text, > 1000 lines, per read).
+    CHECK(compared > 0 && compared <= 8L * rows);
+    CHECK(waitFor([&] { return !v.selection().active(); }, ltermWaitMs(4000, 12000)));  // cleared screen
+    std::printf("selection of %ld lines: %ld lines compared over the ticks (screen %d rows)\n", selLines, compared, rows);
+}
+
 // ---- item 14: no frame statistics unless --stats ----
 static void testStatsOff(bool stats) {
     ViewOptions o;
@@ -190,6 +248,7 @@ int main(int argc, char** argv) {
     testFlood("amber");
     testFloodEnds();
     testDefaultProfile();
+    testSelectionCompare();
     testStatsOff(false);
     testStatsOff(true);
     if (failures) {

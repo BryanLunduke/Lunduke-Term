@@ -60,6 +60,9 @@ public:
     SelPos end() const { return end_; }
     bool contains(long line, int col) const;
     std::string text(const LineSource& src) const;
+    // The part of text() that lines [from, to] contribute (clipped to the selection); the
+    // newline after a hard line end is included only between lines of the range.
+    std::string text(const LineSource& src, long from, long to) const;
 
 private:
     bool isWord(const std::string& ch) const;

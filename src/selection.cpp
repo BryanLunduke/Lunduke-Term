@@ -91,11 +91,15 @@ bool wideJumpGap(const LineSource& src, long line, int col, long end) {
     return col == src.cols() - 1 && line + 1 < end && src.wrapped(line) && src.cellWidth(line + 1, 0) == 2;
 }
 
-std::string Selection::text(const LineSource& src) const {
+std::string Selection::text(const LineSource& src) const { return text(src, start_.line, end_.line); }
+
+std::string Selection::text(const LineSource& src, long from, long to) const {
     std::string out;
     if (!active_) return out;
     const int cols = src.cols();
-    for (long l = start_.line; l <= end_.line; ++l) {
+    from = std::max(from, start_.line);
+    to = std::min(to, end_.line);
+    for (long l = from; l <= to; ++l) {
         int c0 = l == start_.line ? start_.col : 0;
         int c1 = l == end_.line ? end_.col : cols - 1;
         std::string row;
@@ -112,7 +116,7 @@ std::string Selection::text(const LineSource& src) const {
             while (!row.empty() && row.back() == ' ') row.pop_back();
         }
         out += row;
-        if (l != end_.line && !soft) out += '\n';
+        if (l != to && !soft) out += '\n';
     }
     return out;
 }

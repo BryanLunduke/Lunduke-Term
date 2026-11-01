@@ -51,7 +51,8 @@ struct ViewOptions {
 // Frame statistics (ms), kept for --stats and the benchmarks in docs/.
 struct ViewStats {
     long contentFrames = 0, ticks = 0, rowsPainted = 0, fullRepaints = 0;
-    long ptySlicesCut = 0;  // PTY reads stopped at the time budget (output flood)
+    long ptySlicesCut = 0;
+    long selLinesCompared = 0;  // selected lines re-read to see whether output overwrote them  // PTY reads stopped at the time budget (output flood)
     std::vector<double> paintMs, effectsSourceMs, tickMs;
     double finalTickIntervalMs = 0;  // governor state on exit
     long probesDeferred = 0;         // M5: due probe polls skipped while hidden/unfocused
@@ -263,7 +264,13 @@ private:
     int scrollOffset_ = 0;
     Selection sel_;
     bool selecting_ = false;
-    std::string selSnapshot_;  // the selected text; the selection is dropped when it changes
+    std::string selSnapshot_;  // the selected text (primary selection)
+    // Review item 8: the selected text per line, taken once when the selection is made. Output
+    // compares only the selected lines that are on the screen (history lines do not change), so
+    // a big selection is not rebuilt on every PTY read.
+    std::vector<std::string> selLines_;
+    long selLinesBase_ = 0;
+    bool selectionOverwritten();
     int pressedButtons_ = 0;  // bitmask of buttons reported to the application
     double wheelAccum_ = 0;
     bool exited_ = false, holding_ = false;
