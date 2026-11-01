@@ -206,6 +206,8 @@ private:
         if (opts_.stats) v.push_back(ms);
     }  // one time-boxed PTY read + the view updates; false on EOF/HUP
     static constexpr int64_t kPtySliceUs = 10000;  // review item 1: at most ~10 ms per slice
+    static constexpr int kFloodFps = 10;  // PR #6 review N1: effects frames per s while flooding
+    double lastSliceCutMs_ = -1e9;
     bool onDraw(const Cairo::RefPtr<Cairo::Context>& cr);
     bool onGlRender(const Glib::RefPtr<Gdk::GLContext>& ctx);
     void onGlRealize();

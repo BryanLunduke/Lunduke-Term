@@ -1,0 +1,30 @@
+# review_test with kFloodFps temporarily set to 30 (= the pre-N1 effects cap), release build, Xvfb :44, llvmpipe, Nov 1 2026 CST. REAL. Shows testFloodFrameCap catches the uncapped code.
+
+(review_test:1140360): dbind-WARNING **: 15:10:59.437: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+FAIL ../tests/review_test.cpp:161: frames > 0 && frames <= static_cast<long>(s * 10 + 3)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: plain, no effects
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+flood plain (release build): longest main-loop gap 16 ms, 128 slices cut, 59 content frames, Ctrl+C -> exit 21 ms
+flood amber (release build): longest main-loop gap 19 ms, 115 slices cut, 34 content frames, Ctrl+C -> exit 21 ms
+flood amber: 56 content frames in 2.0 s (cap 10 per s while flooding)
+blink: stopped after the timeout, restarted by a key
+hidden tab: 47 frame requests skipped in 1 s, 0 painted
+confirm close: asked 5 times ("Close this tab? "sleep" is still running.")
+confirm: second request kept "Close this tab? "sleep" is still running."; accept closed the first (sleep) tab
+scrollback: 281 lines kept through new output, 50 after commit
+scrollback slip with output: 1022 lines before, 1125 during the 0.6 s at 50, 1159 after
+scrollback: lowered to 50 on dialog close: 50 lines
+settings: "Up to 2.4 MB per tab when full (63 columns)." / "Warning: up to 243 MB per tab when full (63 columns). Every tab keeps its own."
+input method: dead_acute e, Compose o c, x -> c3 a9 c2 a9 78 (3 commits)
+dead key + Ctrl chord: dead_acute, Ctrl+C, q, x -> 03 71 78
+hidden tab frees (gl, amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)): textures 5.9 MB shown -> 2.0 MB after 0.5 s hidden -> 5.9 MB again
+hidden tab frees (cpu, amber, effects: C++ fallback (4 threads), quality static): textures 0.0 MB shown -> 0.0 MB after 0.5 s hidden -> 0.0 MB again
+selection of 1019 lines: 80 lines compared over the ticks (screen 20 rows)
+stats off: 12 content frames, 0 samples kept
+stats on: 12 content frames, 29 samples kept
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=12 full-repaints=1 rows-painted=35 ticks=5 median paint 0.17 ms, median effects-source 4.11 ms, median tick 1.07 ms, glyphs cached 10
+stats: quality=reduced software=1 tick-interval 100.0 ms
+1 failure(s)
+rc=1

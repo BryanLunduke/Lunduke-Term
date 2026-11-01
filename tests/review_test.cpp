@@ -142,6 +142,33 @@ static void testFloodEnds() {
     CHECK(waitFor([&] { return screenHas("after-pause"); }, ltermWaitMs(5000, 15000)));
 }
 
+// PR #6 review N1: while flooding, an effects view paints at most ~10 content frames per second
+// (each one is a full effects pass between PTY slices); the end of the output is still shown.
+static void testFloodFrameCap() {
+    ViewOptions o;
+    o.profile = "amber";
+    o.onExit = "hold";
+    o.command = {"/bin/sh", "-c", "seq 1 1000000000"};
+    Win w(o);
+    CHECK(w.view->start());
+    pump(500);
+    const long f0 = w.view->stats().contentFrames;
+    const gint64 t0 = g_get_monotonic_time();
+    pump(2000);
+    const double s = (g_get_monotonic_time() - t0) / 1e6;
+    const long frames = w.view->stats().contentFrames - f0;
+    CHECK(w.view->stats().ptySlicesCut > 0);
+    CHECK(frames > 0 && frames <= static_cast<long>(s * 10 + 3));
+    std::printf("flood amber: %ld content frames in %.1f s (cap 10 per s while flooding)\n", frames, s);
+    ViewOptions e;
+    e.profile = "amber";
+    e.command = {"/bin/sh", "-c", "seq 1 150000; exec sleep 30"};
+    Win v(e);
+    CHECK(v.view->start());
+    CHECK(waitFor([&] { return screenText(v.view->shownGrid()).find("150000") != std::string::npos; },
+                  ltermWaitMs(10000, 40000)));
+}
+
 // ---- item 8: the selection is not rebuilt on every read ----
 static bool findXY(TerminalView& v, int row, int col, double& x, double& y) {
     for (int yy = 0; yy < 2000; ++yy)
@@ -610,6 +637,7 @@ int main(int argc, char** argv) {
     testFlood("plain");
     testFlood("amber");
     testFloodEnds();
+    testFloodFrameCap();
     testDefaultProfile();
     testBlinkTimeout();
     testHiddenTab();

@@ -787,7 +787,11 @@ void TerminalView::requestFrame() {
         return;
     }
     // Effects re-run bloom/burn-in/static passes for every content frame: cap those at 30 fps.
-    const int fps = std::max(1, mode_ == Mode::Plain ? opts_.maxFps : std::min(opts_.maxFps, 30));
+    int fps = std::max(1, mode_ == Mode::Plain ? opts_.maxFps : std::min(opts_.maxFps, 30));
+    // PR #6 review N1: during a flood (a PTY slice was cut in the last 100 ms) an effects frame
+    // between slices halved throughput on llvmpipe (seq 1 3000000: 13.5 s vs 7.0 s on master);
+    // at most kFloodFps effects frames then (8.6-8.9 s). Plain is cheap and keeps its rate.
+    if (mode_ != Mode::Plain && nowMs() - lastSliceCutMs_ < 100.0) fps = std::min(fps, kFloodFps);
     const double delay = std::max(0.0, lastFrameMs_ + 1000.0 / fps - nowMs());
     frameTimer_ = Glib::signal_timeout().connect(
         [this] {
@@ -1063,6 +1067,7 @@ bool TerminalView::onPtyIo(Glib::IOCondition) {
 bool TerminalView::readSlice(bool* more) {
     const long top0 = session_->topLine();
     const bool alive = session_->readAvailable(kPtySliceUs, more);
+    if (*more) lastSliceCutMs_ = nowMs();  // flooding: content frames are capped lower
     const long pushed = session_->topLine() - top0;
     const bool damaged = session_->takeDamage();
     if (pushed != 0 && scrollOffset_ > 0)  // keep a scrolled-back view still while output arrives
