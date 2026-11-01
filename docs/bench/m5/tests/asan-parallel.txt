@@ -1,0 +1,50 @@
+# head c23120a, build-san (-Db_sanitize=address,undefined, leak checking on: meson's ASAN_OPTIONS detect_leaks=1 + tests/lsan.supp), meson test --num-processes 2 --timeout-multiplier 4, LD_LIBRARY_PATH=lterm-tools (metainfo), Xvfb :44, llvmpipe (NOT a GPU), REAL
+# load: two tests at a time (--num-processes 2), other agents on the shared box
+## run 1 start 2026-11-01 13:08:36 CST
+   loadavg at start: 1.44 1.71 1.61, nproc 8
+ 1/16 desktop-file OK               0.01s
+ 2/16 metainfo     OK               0.03s
+ 3/16 governor     OK               0.01s
+ 4/16 profiles     OK               0.01s
+ 5/16 painter      OK               0.33s
+ 6/16 fonts        OK               0.07s
+ 7/16 vterm        OK               0.02s
+ 8/16 effects      OK               1.90s
+ 9/16 session      OK               0.16s
+10/16 fixes        OK               0.45s
+11/16 fuzz-regress OK               0.03s
+12/16 unicode      OK               0.02s
+13/16 search       OK              21.21s
+14/16 gl-match     OK              90.49s
+15/16 view         OK             115.45s
+16/16 review       OK              48.32s
+Ok:                 16  
+Fail:               0   
+Timeout:            0   
+governor auto (ASan+UBSan build): probe reached Normal 3028 ms after auto came back (wait limit 15000 ms)
+governor cpu (ASan+UBSan build): probe reached Normal 3025 ms after auto came back (wait limit 15000 ms)
+## run 2 start 2026-11-01 13:12:51 CST
+   loadavg at start: 0.83 1.46 1.56, nproc 8
+ 1/16 desktop-file OK               0.01s
+ 2/16 metainfo     OK               0.01s
+ 3/16 governor     OK               0.01s
+ 4/16 profiles     OK               0.02s
+ 5/16 painter      OK               0.32s
+ 6/16 fonts        OK               0.06s
+ 7/16 vterm        OK               0.02s
+ 8/16 effects      OK               1.65s
+ 9/16 session      OK               0.12s
+10/16 fixes        OK               0.45s
+11/16 fuzz-regress OK               0.03s
+12/16 unicode      OK               0.03s
+13/16 search       OK              21.50s
+14/16 gl-match     OK              90.55s
+15/16 view         OK             121.48s
+16/16 review       OK              49.00s
+Ok:                 16  
+Fail:               0   
+Timeout:            0   
+governor auto (ASan+UBSan build): probe reached Normal 3009 ms after auto came back (wait limit 15000 ms)
+governor cpu (ASan+UBSan build): probe reached Normal 5255 ms after auto came back (wait limit 15000 ms)
+## end 2026-11-01 13:17:13 CST
+SANDONE

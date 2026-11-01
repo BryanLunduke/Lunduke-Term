@@ -1,0 +1,5 @@
+# 2026-11-01 11:20 CST code 3bf5d97 + item 1c fix (uncommitted at run time: GlPipeline::setParams, probe deferral), llvmpipe on Xvfb :44, NOT a GPU; lterm-m5-probe-bench cpu 30 focused
+renderer amber, effects: C++ fallback (4 threads), quality reduced, focused, window 1024x768, software=1
+run 30.0 s: 14 probe(s) started, 14 completed; process CPU 3161 ms total (10.5 % of a core)
+idle between probes: 80.70 ms CPU per s
+per probe (net of idle): median 52.9 ms, min 46.8, max 59.6, mean 52.7 (n=14)

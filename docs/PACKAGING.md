@@ -47,17 +47,24 @@ Recommends: fonts-terminus | fonts-terminus-otb,
             fonts-pc,
             fonts-3270
 Suggests: fonts-hermit,
-          fonts-proggy
+          fonts-proggy,
+          fonts-atarismall,
+          fonts-atarist,
+          fonts-amiga
 ```
 
 | Package | License | Used by |
 |---|---|---|
-| fonts-dejavu-core / fonts-dejavu-mono | Bitstream-Vera + PD | `plain` (default) and last fallback for every profile. Hard dependency, so the default never lands on a proportional font. |
+| fonts-dejavu-core / fonts-dejavu-mono | Bitstream-Vera + PD | `plain` and last fallback for every profile, including the default `amber` (M5). Hard dependency, so no profile ever lands on a proportional font. |
 | fonts-terminus (TTF, family `Terminus (TTF)`) or fonts-terminus-otb (`Terminus`) | OFL-1.1 | amber, green, green-scanlines, vintage, futuristic, paper-white (the CRT-1.2.0-style profiles) |
 | fonts-pc (`Px IBM VGA8`, …) | CC-BY-SA-4.0 | ibm-dos |
 | fonts-3270 (`IBM 3270`) | BSD-3-Clause OR OFL-1.1 | ibm-3278 |
-| fonts-hermit (`Hermit`) | OFL-1.1 | optional font choice in the settings dialog / `--font Hermit` |
-| fonts-proggy (`ProggyTinyTT`) | MIT | optional font choice / `--font ProggyTinyTT` |
+| fonts-hermit (`Hermit`) | OFL-1.1 | `modern` (M5); also `--font Hermit` |
+| fonts-proggy (`ProggyTinyTT`) | MIT | `modern`'s second choice (M5); also `--font ProggyTinyTT` |
+| fonts-atarismall (`"Atari800"`) | permissive, non-SPDX (one legal read advised, FONTS.md) | `pixel-8bit` (M5) |
+| fonts-atarist (`Atari`) | BSD-3-Clause | `pixel-hires-mono` (M5) |
+| fonts-amiga (`Amiga`) | OFL-1.1 | `pixel-16bit` (M5) |
+| fonts-sixtyfour (`C-64`) | OFL-1.1 | `pixel-40col` (M5, editor decision) |
 
 - fonts-terminus, fonts-hermit and fonts-proggy are built from Debian's `cool-retro-term`
   source, which is repacked as `+ds2` without the non-free Kreative and Style64 fonts.

@@ -88,6 +88,18 @@ executable('lterm-m3-bench', 'tools/m3_bench.cpp',
 executable('lterm-m3-close-bench', 'tools/m3_close_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
+executable('lterm-m5-probe-bench', 'tools/m5_probe_bench.cpp', 'src/terminal_view.cpp',
+  include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
+  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
+executable('lterm-m5-idle-bench', 'tools/m5_idle_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp',
+  include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
+  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
+executable('lterm-m5-flood-bench', 'tools/m5_flood_bench.cpp', 'src/terminal_view.cpp',
+  include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
+  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
+executable('lterm-m5-throughput-bench', 'tools/m5_throughput_bench.cpp', 'src/terminal_view.cpp',
+  include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
+  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
 test('effects', executable('effects_test', 'tests/effects_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]), env : test_env)
 test('governor', executable('governor_test', 'tests/governor_test.cpp',
@@ -127,3 +139,8 @@ view_test_exe = executable('view_test', 'tests/view_test.cpp', 'src/terminal_vie
   cpp_args : ['-fsanitize=address', '-fno-omit-frame-pointer'], link_args : ['-fsanitize=address'])
 test('view', view_test_exe, env : view_env,
   timeout : 150, is_parallel : false)
+# M5 review fixes (output flood, input method, hidden tabs, ...). Skips without $DISPLAY.
+review_test_exe = executable('review_test', 'tests/review_test.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp',
+  include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
+  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
+test('review', review_test_exe, env : view_env, timeout : 120, is_parallel : false)

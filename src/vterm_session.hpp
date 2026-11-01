@@ -8,6 +8,7 @@
 #include <vterm.h>
 
 #include <array>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <string>
@@ -35,7 +36,7 @@ std::string sanitizePaste(const std::string& text);
 
 // Limits against hostile or runaway input.
 constexpr size_t kMaxTitleBytes = 4096;            // OSC 0/2 window title
-constexpr size_t kMaxScrollbackLines = 1000000;    // scrollback-lines setting / --scrollback
+constexpr size_t kMaxScrollbackLines = 100000;     // scrollback-lines setting / --scrollback (M5 stopgap: was 1,000,000)
 // Negative -> 0, above kMaxScrollbackLines -> kMaxScrollbackLines.
 size_t clampScrollbackLines(long long requested);
 // Child side of spawn(): closes every fd >= 3 (close_range, or close() up to maxFd).
@@ -68,7 +69,9 @@ public:
     void markExited() { pid_ = -1; }
 
     // Reads whatever is available on the PTY and feeds libvterm. Returns false on EOF/HUP.
-    bool readAvailable();
+    // With budgetUs > 0 it stops after that much time even if more is waiting (an output flood)
+    // and sets *more; the caller lets the main loop run (redraw, keys) before reading on.
+    bool readAvailable(int64_t budgetUs = 0, bool* more = nullptr);
     // Feeds bytes directly (tests, local messages; no PTY needed).
     void feed(const char* bytes, size_t len);
     void feed(const std::string& s) { feed(s.data(), s.size()); }
@@ -110,6 +113,9 @@ public:
     size_t scrollbackLimit() const { return sbLimit_; }
     size_t scrollbackSize() const { return sb_.size(); }
     size_t scrollbackBytes() const;  // M4 item 4: cell storage of the history (capacity, not size)
+    // Review item 4: what `lines` full lines of `cols` cells take in the scrollback (the same
+    // sum as scrollbackBytes(); blank line ends are trimmed, so real use is usually lower).
+    static size_t scrollbackBytesFull(size_t lines, int cols);
     long topLine() const { return pushed_; }
     long firstLine() const override { return pushed_ - static_cast<long>(sb_.size()); }
     long endLine() const override { return pushed_ + rows_; }

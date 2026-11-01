@@ -26,6 +26,12 @@ public:
     std::string renderer() const;
 
     void resize(int width, int height);  // frees the previous size's textures and FBOs
+    // M5 item 1c: new effect parameters (a quality switch, e.g. a governor probe) without
+    // recompiling: the shader programs and the noise texture stay; the size-dependent
+    // textures/FBOs are freed and come back on the next resize() (burn-in/bezel depend on them).
+    void setParams(const EffectParams& params);
+    // Programs compiled by every GlPipeline in this process so far (tests: a probe must not recompile).
+    static long programsCompiled();
     int width() const { return w_; }
     int height() const { return h_; }
     // Uploads rows [rowBegin, rowEnd) (rowEnd < 0: all) of an 8-bit source image and runs the
@@ -38,6 +44,9 @@ public:
     // Effects tick into the internal output FBO and read it back as RGBA8, row 0 = top.
     void renderToMemory(float timeMs, uint8_t* out);
     void release();  // deletes every GL object this pipeline owns
+    // Review item 3: frees the size-dependent textures/FBOs (nearly all of the memory) and keeps
+    // the compiled programs; the next resize() brings them back (burn-in starts over).
+    void releaseSized();
 
     // Leak accounting: textures / framebuffers currently owned by this pipeline.
     int liveTextures() const { return liveTex_; }

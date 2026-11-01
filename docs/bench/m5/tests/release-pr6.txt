@@ -1,0 +1,28 @@
+# 2026-11-01 13:31 CST head 9de3b75, build/ (release: -O3, assertions on; view_test always links -fsanitize=address), meson test --num-processes 2, LD_LIBRARY_PATH=lterm-tools (metainfo), Xvfb :44, llvmpipe (NOT a GPU), REAL
+ 1/16 desktop-file OK               0.01s
+ 2/16 metainfo     OK               0.02s
+ 3/16 governor     OK               0.00s
+ 4/16 profiles     OK               0.00s
+ 5/16 painter      OK               0.10s
+ 6/16 fonts        OK               0.02s
+ 7/16 vterm        OK               0.01s
+ 8/16 effects      OK               0.26s
+ 9/16 session      OK               0.08s
+10/16 fixes        OK               0.39s
+11/16 fuzz-regress OK               0.01s
+12/16 unicode      OK               0.00s
+13/16 search       OK               0.93s
+14/16 gl-match     OK              12.66s
+15/16 view         OK              99.78s
+16/16 review       OK              26.36s
+Ok:                 16  
+Fail:               0   
+Skipped:            0   
+Timeout:            0   
+governor auto (release build, ASan in this test only): probe reached Normal 3023 ms after auto came back (wait limit 6000 ms)
+governor cpu (release build, ASan in this test only): probe reached Normal 3036 ms after auto came back (wait limit 6000 ms)
+probe deferral auto (unfocused): 8 due poll(s) deferred, state 1
+probe deferral auto (hidden): 10 due poll(s) deferred, state 1
+probe deferral cpu (unfocused): 8 due poll(s) deferred, state 1
+probe deferral cpu (hidden): 10 due poll(s) deferred, state 1
+RELDONE

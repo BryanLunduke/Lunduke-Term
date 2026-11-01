@@ -133,6 +133,18 @@ int main() {
         const Profile* m3278 = findProfile("ibm-3278");
         CHECK(m3278 && !m3278->fonts.empty() && m3278->fonts.front().family == "IBM 3270");
         CHECK(profileFont(*dos).fallback);
+        // M5 item 2: the pixel-font profiles name their Debian family first, at a multiple of the
+        // design size; with only DejaVu they fall back to it at the fallback's size (22 px).
+        const struct { const char* id; const char* family; int px; } want[] = {
+            {"pixel-8bit", "\"Atari800\"", 32}, {"pixel-hires-mono", "Atari", 32},
+            {"pixel-16bit", "Amiga", 32}, {"pixel-40col", "C-64", 32}, {"modern", "Hermit", 20}};
+        for (const auto& w : want) {
+            const Profile* p = findProfile(w.id);
+            CHECK(p && !p->fonts.empty() && p->fonts.front().family == w.family && p->fonts.front().px == w.px);
+            if (!p) continue;
+            const FontPick f = profileFont(*p);
+            CHECK(f.fallback && f.family == "DejaVu Sans Mono" && f.px == 22 && f.monospace);
+        }
     }
 
     // --- No monospace font at all: the pick is flagged so the terminal can warn -------------

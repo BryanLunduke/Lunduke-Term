@@ -1,0 +1,2 @@
+# 2026-11-01 11:33 CST code badd3f9 (M4 PTY read path), lterm-m5-flood-bench yes plain 10, Xvfb :44, llvmpipe (NOT a GPU), REAL
+(no output: the bench was still frozen when `timeout 120` killed it; exit 124, the timer never ran a 2nd time)

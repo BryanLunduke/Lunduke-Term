@@ -285,7 +285,10 @@ TerminalView* TerminalWindow::newTab(bool first) {
     tab->label.pack_start(tab->close, false, false);
     tab->label.show_all();
     // Deferred: the button lives in the tab that is closed.
-    tab->close.signal_clicked().connect([this, id] { closeTabLater(id); });
+    // sigc::mem_fun (trackable): the idle is dropped if the window goes first.
+    tab->close.signal_clicked().connect([this, id] {
+        Glib::signal_idle().connect_once(sigc::bind(sigc::mem_fun(*this, &TerminalWindow::requestCloseTabById), id));
+    });
 
     v->signalTitle.connect([this, v](const std::string& t) {
         const int i = indexOf(v);
@@ -330,6 +333,76 @@ TerminalView* TerminalWindow::newTab(bool first) {
     updateVisibility();
     v->grabTerminalFocus();
     return v;
+}
+
+std::string TerminalWindow::runningJobs() const {
+    std::string out;
+    for (const auto& t : tabs_) {
+        const std::string j = t->view->foregroundJob();
+        if (j.empty()) continue;
+        if (!out.empty()) out += ", ";
+        out += j;
+    }
+    return out;
+}
+
+void TerminalWindow::confirm(const std::string& question, const std::string& action, std::function<void()> yes) {
+    if (confirmHook) {
+        if (confirmHook(question)) yes();
+        return;
+    }
+    // PR #6 review N4: a second close request while a question is open keeps the first one
+    // (it is raised again); replacing it lost the first answer's target.
+    if (confirmDialog_ && confirmDialog_->get_visible()) {
+        confirmDialog_->present();
+        return;
+    }
+    confirmDialog_ = std::make_unique<Gtk::MessageDialog>(*this, question, false, Gtk::MESSAGE_QUESTION,
+                                                          Gtk::BUTTONS_NONE, true);
+    confirmDialog_->set_secondary_text("Closing ends it.");
+    confirmDialog_->add_button("_Cancel", Gtk::RESPONSE_CANCEL);
+    confirmDialog_->add_button(action, Gtk::RESPONSE_ACCEPT);
+    confirmDialog_->set_default_response(Gtk::RESPONSE_CANCEL);
+    confirmDialog_->signal_response().connect([this, yes](int r) {
+        confirmDialog_->hide();
+        Glib::signal_idle().connect_once(sigc::mem_fun(*this, &TerminalWindow::dropConfirmDialog));
+        if (r == Gtk::RESPONSE_ACCEPT) yes();
+    });
+    confirmDialog_->show();
+}
+
+void TerminalWindow::requestCloseTabById(unsigned long id) {
+    if (Tab* t = tabById(id)) requestCloseTab(t->view.get());
+}
+
+void TerminalWindow::dropConfirmDialog() {
+    if (confirmDialog_ && !confirmDialog_->get_visible()) confirmDialog_.reset();
+}
+
+void TerminalWindow::requestCloseTab(TerminalView* v) {
+    if (indexOf(v) < 0) return;
+    const std::string job = v->foregroundJob();
+    if (job.empty()) {
+        closeTab(v);
+        return;
+    }
+    const unsigned long id = tabId(v);
+    confirm("Close this tab? \"" + job + "\" is still running.", "Close _Tab", [this, id] {
+        if (Tab* t = tabById(id)) closeTab(t->view.get());
+    });
+}
+
+bool TerminalWindow::on_delete_event(GdkEventAny* ev) {
+    if (closeConfirmed_) return ev ? Gtk::Window::on_delete_event(ev) : false;
+    const std::string jobs = runningJobs();
+    if (jobs.empty()) return ev ? Gtk::Window::on_delete_event(ev) : false;
+    confirm("Close this window? Still running: " + jobs + ".", "Close _Window", [this] {
+        closeConfirmed_ = true;
+        if (confirmHook) return;  // tests: the delete event's caller sees "go ahead"
+        close();
+    });
+    if (confirmHook && closeConfirmed_) return false;
+    return true;  // keep the window (the dialog decides)
 }
 
 void TerminalWindow::closeTab(TerminalView* v) {
@@ -433,7 +506,7 @@ bool TerminalWindow::handleKey(GdkEventKey* ev) {
         switch (k) {
         case GDK_KEY_t: newTab(); return true;
         case GDK_KEY_w:
-            if (auto* v = currentView()) closeTab(v);
+            if (auto* v = currentView()) requestCloseTab(v);
             return true;
         case GDK_KEY_f: showSearch(); return true;
         case GDK_KEY_s: showSettings(); return true;
@@ -473,6 +546,10 @@ void TerminalWindow::showSettings() {
     settings_->present();
 }
 
+void TerminalWindow::commitScrollbackLimits() {
+    for (auto& t : tabs_) t->view->commitScrollbackLimit();
+}
+
 void TerminalWindow::applySettings(const ViewOptions& o) {
     for (auto& t : tabs_) {
         TerminalView& v = *t->view;
@@ -498,8 +575,11 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     set_default_size(420, -1);
     add_button("_Close", Gtk::RESPONSE_CLOSE);
     signal_response().connect([this](int) { hide(); });
+    // PR #6 review N2: a lower scrollback limit is applied when the dialog closes (Close, Esc,
+    // the window's close button), never on a live spin-button change.
+    signal_hide().connect([this] { win_.commitScrollbackLimits(); });
 
-    for (const auto& p : builtinProfiles()) profile.append(p.id, p.label + (p.effects ? "" : "  (default)"));
+    for (const auto& p : builtinProfiles()) profile.append(p.id, p.label + (p.id == kDefaultProfile ? "  (default)" : ""));
     // Monospaced families that are installed, plus the profile's own choice.
     font.append("", "Profile font");
     {
@@ -517,7 +597,8 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     quality.set_tooltip_text("auto: reduced on software rendering; static: no animation (0% idle CPU)");
     scrollback.set_range(0, static_cast<double>(kMaxScrollbackLines));
     scrollback.set_increments(1000, 10000);
-    scrollback.set_tooltip_text("Lines of history kept per tab");
+    scrollback.set_tooltip_text("Lines of history kept per tab (at most 100,000). Lowering it drops the oldest "
+                                "lines when new output arrives.");
     frame.append("-1", "Profile default");
     frame.append("1", "On");
     frame.append("0", "Off");
@@ -541,6 +622,11 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     addRow("Font size (px)", fontPx);
     addRow("Effects quality", quality);
     addRow("Scrollback lines", scrollback);
+    scrollbackNote.set_halign(Gtk::ALIGN_START);
+    scrollbackNote.set_xalign(0);
+    scrollbackNote.set_line_wrap(true);
+    scrollbackNote.set_max_width_chars(60);
+    grid->attach(scrollbackNote, 1, row++, 1, 1);
     addRow("Bezel (frame)", frame);
     status.set_halign(Gtk::ALIGN_START);
     status.set_line_wrap(true);
@@ -575,6 +661,7 @@ void SettingsDialog::load(const ViewOptions& o) {
     fontPx.set_value(std::max(0, o.fontPx));
     quality.set_active_id(effectsQualityName(o.effectsQuality));
     scrollback.set_value(static_cast<double>(clampScrollbackLines(o.scrollbackLines)));
+    updateScrollbackNote();
     frame.set_active_id(std::to_string(o.tube.frame < 0 ? -1 : (o.tube.frame > 0 ? 1 : 0)));
     status.set_text("");
     updateFrameSensitivity();
@@ -597,7 +684,21 @@ void SettingsDialog::updateFrameSensitivity() {
     frame.set_sensitive(p && p->bezelOption);
 }
 
+void SettingsDialog::updateScrollbackNote() {
+    TerminalView* v = win_.currentView();
+    const int cols = v ? std::max(v->session().cols(), 1) : 80;
+    const size_t lines = clampScrollbackLines(static_cast<long long>(scrollback.get_value()));
+    const double mb = VtermSession::scrollbackBytesFull(lines, cols) / (1024.0 * 1024.0);
+    char t[200];
+    if (mb >= 100)
+        std::snprintf(t, sizeof t, "Warning: up to %.0f MB per tab when full (%d columns). Every tab keeps its own.", mb, cols);
+    else
+        std::snprintf(t, sizeof t, "Up to %.*f MB per tab when full (%d columns).", mb < 10 ? 1 : 0, mb, cols);
+    scrollbackNote.set_text(t);
+}
+
 void SettingsDialog::changed() {
+    updateScrollbackNote();
     if (loading_) return;
     updateFrameSensitivity();
     status.set_text("");

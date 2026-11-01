@@ -1,0 +1,125 @@
+# meson test -C build view x10, release build (view_test ASan-linked), head c3e3164 (code), Xvfb :44, llvmpipe, sequential, Nov 1 2026 CST. REAL.
+# Attempt 1: run 5 FAILED view_test.cpp:882 (tab-close worst 27.31 ms > 25 ms limit; N8). All 10 runs demoted twice (B1 phases green).
+run 1 15:29:54 exit 0 demoted at 7.9 s demoted at 7.3 s  0 FAIL-lines
+run 2 15:31:34 exit 0 demoted at 7.8 s demoted at 7.3 s  0 FAIL-lines
+run 3 15:33:11 exit 0 demoted at 7.0 s demoted at 7.3 s  0 FAIL-lines
+run 4 15:34:51 exit 0 demoted at 7.5 s demoted at 8.1 s  0 FAIL-lines
+run 5 15:36:30 exit 1 demoted at 7.9 s demoted at 7.3 s  1 FAIL-lines
+run 6 15:38:10 exit 0 demoted at 7.5 s demoted at 7.3 s  0 FAIL-lines
+run 7 15:39:49 exit 0 demoted at 7.8 s demoted at 7.0 s  0 FAIL-lines
+run 8 15:41:29 exit 0 demoted at 7.9 s demoted at 7.3 s  0 FAIL-lines
+run 9 15:43:08 exit 0 demoted at 8.3 s demoted at 7.2 s  0 FAIL-lines
+run 10 15:44:47 exit 0 demoted at 7.7 s demoted at 7.1 s  0 FAIL-lines
+DONE
+
+## run 1
+tab close (release build, ASan in this test only): 19 closes, worst 6.58 ms, total 89.47 ms; 19 still running right after, all reaped 1989 ms later (limit 25 ms)
+governor auto (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): after 4 s of output: quality reduced, demoted 0, tick 377 ms, frame 3.9 ms
+governor auto (release build, ASan in this test only): probe reached Normal 3034 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.9 s, back to reduced, tick 100 ms
+governor cpu (amber, effects: C++ fallback (4 threads), quality reduced): after 4 s of output: quality reduced, demoted 0, tick 100 ms, frame 3.7 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3044 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.3 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 2
+tab close (release build, ASan in this test only): 19 closes, worst 11.56 ms, total 97.87 ms; 19 still running right after, all reaped 2012 ms later (limit 25 ms)
+governor auto (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): after 4 s of output: quality reduced, demoted 0, tick 251 ms, frame 3.9 ms
+governor auto (release build, ASan in this test only): probe reached Normal 3027 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.8 s, back to reduced, tick 100 ms
+governor cpu (amber, effects: C++ fallback (4 threads), quality reduced): after 4 s of output: quality reduced, demoted 0, tick 100 ms, frame 4.9 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3036 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.3 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 3
+tab close (release build, ASan in this test only): 19 closes, worst 8.79 ms, total 92.70 ms; 19 still running right after, all reaped 2012 ms later (limit 25 ms)
+governor auto (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): after 4 s of output: quality reduced, demoted 0, tick 377 ms, frame 3.9 ms
+governor auto (release build, ASan in this test only): probe reached Normal 3025 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.0 s, back to reduced, tick 100 ms
+governor cpu (amber, effects: C++ fallback (4 threads), quality reduced): after 4 s of output: quality reduced, demoted 0, tick 100 ms, frame 3.8 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3030 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.3 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 4
+tab close (release build, ASan in this test only): 19 closes, worst 10.82 ms, total 97.77 ms; 19 still running right after, all reaped 2014 ms later (limit 25 ms)
+governor auto (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): after 4 s of output: quality reduced, demoted 0, tick 244 ms, frame 3.7 ms
+governor auto (release build, ASan in this test only): probe reached Normal 3042 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.5 s, back to reduced, tick 100 ms
+governor cpu (amber, effects: C++ fallback (4 threads), quality reduced): after 4 s of output: quality reduced, demoted 0, tick 100 ms, frame 3.4 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3031 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 8.1 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 5
+tab close (release build, ASan in this test only): 19 closes, worst 27.31 ms, total 136.53 ms; 19 still running right after, all reaped 2012 ms later (limit 25 ms)
+governor auto (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): after 4 s of output: quality reduced, demoted 0, tick 237 ms, frame 4.0 ms
+governor auto (release build, ASan in this test only): probe reached Normal 3037 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.9 s, back to reduced, tick 100 ms
+governor cpu (amber, effects: C++ fallback (4 threads), quality reduced): after 4 s of output: quality reduced, demoted 0, tick 100 ms, frame 3.4 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3021 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.3 s, back to reduced, tick 100 ms
+FAIL ../tests/view_test.cpp:882: worst < closeLimit
+Ok:                 0   
+Expected Fail:      0   
+Fail:               1   
+## run 6
+tab close (release build, ASan in this test only): 19 closes, worst 10.62 ms, total 95.72 ms; 19 still running right after, all reaped 2012 ms later (limit 25 ms)
+governor auto (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): after 4 s of output: quality reduced, demoted 0, tick 236 ms, frame 4.5 ms
+governor auto (release build, ASan in this test only): probe reached Normal 3033 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.5 s, back to reduced, tick 100 ms
+governor cpu (amber, effects: C++ fallback (4 threads), quality reduced): after 4 s of output: quality reduced, demoted 0, tick 100 ms, frame 3.5 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3037 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.3 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 7
+tab close (release build, ASan in this test only): 19 closes, worst 13.23 ms, total 97.59 ms; 19 still running right after, all reaped 2004 ms later (limit 25 ms)
+governor auto (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): after 4 s of output: quality reduced, demoted 0, tick 251 ms, frame 4.1 ms
+governor auto (release build, ASan in this test only): probe reached Normal 3028 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.8 s, back to reduced, tick 100 ms
+governor cpu (amber, effects: C++ fallback (4 threads), quality reduced): after 4 s of output: quality reduced, demoted 0, tick 100 ms, frame 3.9 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3046 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.0 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 8
+tab close (release build, ASan in this test only): 19 closes, worst 9.88 ms, total 95.17 ms; 19 still running right after, all reaped 2011 ms later (limit 25 ms)
+governor auto (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): after 4 s of output: quality reduced, demoted 0, tick 233 ms, frame 3.8 ms
+governor auto (release build, ASan in this test only): probe reached Normal 3025 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.9 s, back to reduced, tick 100 ms
+governor cpu (amber, effects: C++ fallback (4 threads), quality reduced): after 4 s of output: quality reduced, demoted 0, tick 100 ms, frame 3.4 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3040 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.3 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 9
+tab close (release build, ASan in this test only): 19 closes, worst 13.66 ms, total 99.23 ms; 19 still running right after, all reaped 2010 ms later (limit 25 ms)
+governor auto (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): after 4 s of output: quality reduced, demoted 0, tick 251 ms, frame 3.5 ms
+governor auto (release build, ASan in this test only): probe reached Normal 3037 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 8.3 s, back to reduced, tick 100 ms
+governor cpu (amber, effects: C++ fallback (4 threads), quality reduced): after 4 s of output: quality reduced, demoted 0, tick 100 ms, frame 3.5 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3037 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.2 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   
+## run 10
+tab close (release build, ASan in this test only): 19 closes, worst 13.18 ms, total 97.77 ms; 19 still running right after, all reaped 2009 ms later (limit 25 ms)
+governor auto (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): after 4 s of output: quality reduced, demoted 0, tick 252 ms, frame 3.9 ms
+governor auto (release build, ASan in this test only): probe reached Normal 3011 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.7 s, back to reduced, tick 100 ms
+governor cpu (amber, effects: C++ fallback (4 threads), quality reduced): after 4 s of output: quality reduced, demoted 0, tick 100 ms, frame 3.6 ms
+governor cpu (release build, ASan in this test only): probe reached Normal 3020 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.1 s, back to reduced, tick 100 ms
+Ok:                 1   
+Expected Fail:      0   
+Fail:               0   

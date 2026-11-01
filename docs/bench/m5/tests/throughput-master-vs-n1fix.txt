@@ -1,0 +1,122 @@
+# lterm-m5-throughput-bench, master 27a9d46 (tp-master worktree + this bench) vs head c3e3164 (N1 flood frame cap). REAL, llvmpipe, Xvfb :44 1280x800, sequential, 3 reps, Nov 01 2026 CST (times below are CST).
+== 15:13:08 /workspace/m5-work/tp-master/build/lterm-m5-throughput-bench seq amber 3000000 (rep 1)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 7.61 s
+10 ms timer: 3 runs, longest gap 7582 ms, p99 7582 ms; content frames 1 (0.1/s)
+exit 0
+== 15:13:15 /workspace/m5-work/tp-master/build/lterm-m5-throughput-bench seq plain 3000000 (rep 1)
+seq 3000000, profile plain (plain, no effects), 1280x800
+on screen after 13.09 s
+10 ms timer: 2 runs, longest gap 13081 ms, p99 13081 ms; content frames 1 (0.1/s)
+exit 0
+== 15:13:29 /workspace/m5-work/tp-master/build/lterm-m5-throughput-bench cat amber /workspace/m5-work/flood6.txt (rep 1)
+cat /workspace/m5-work/flood6.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 2.25 s, 2.75 MB/s
+10 ms timer: 3 runs, longest gap 2224 ms, p99 2224 ms; content frames 1 (0.4/s)
+exit 0
+== 15:13:31 /workspace/m5-work/tp-master/build/lterm-m5-throughput-bench seq amber 3000000 ctrlc (rep 1)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+ctrl+c: sent at 7111 ms, child gone 3 ms later
+10 ms timer: 21 runs, longest gap 7108 ms, p99 7108 ms; content frames 2 (0.3/s)
+exit 0
+== 15:13:38 /workspace/lunduke-term-m5/build/lterm-m5-throughput-bench seq amber 3000000 (rep 1)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 9.78 s
+10 ms timer: 796 runs, longest gap 104 ms, p99 23 ms; content frames 93 (9.5/s)
+exit 0
+== 15:13:48 /workspace/lunduke-term-m5/build/lterm-m5-throughput-bench seq plain 3000000 (rep 1)
+seq 3000000, profile plain (plain, no effects), 1280x800
+on screen after 14.23 s
+10 ms timer: 1175 runs, longest gap 49 ms, p99 14 ms; content frames 589 (41.4/s)
+exit 0
+== 15:14:03 /workspace/lunduke-term-m5/build/lterm-m5-throughput-bench cat amber /workspace/m5-work/flood6.txt (rep 1)
+cat /workspace/m5-work/flood6.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 3.03 s, 2.05 MB/s
+10 ms timer: 229 runs, longest gap 115 ms, p99 31 ms; content frames 28 (9.3/s)
+exit 0
+== 15:14:06 /workspace/lunduke-term-m5/build/lterm-m5-throughput-bench seq amber 3000000 ctrlc (rep 1)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+ctrl+c: sent at 2010 ms, child gone 1 ms later
+10 ms timer: 176 runs, longest gap 119 ms, p99 25 ms; content frames 19 (8.6/s)
+exit 0
+== 15:14:08 /workspace/m5-work/tp-master/build/lterm-m5-throughput-bench seq amber 3000000 (rep 2)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 7.29 s
+10 ms timer: 3 runs, longest gap 7260 ms, p99 7260 ms; content frames 1 (0.1/s)
+exit 0
+== 15:14:16 /workspace/m5-work/tp-master/build/lterm-m5-throughput-bench seq plain 3000000 (rep 2)
+seq 3000000, profile plain (plain, no effects), 1280x800
+on screen after 12.76 s
+10 ms timer: 2 runs, longest gap 12750 ms, p99 12750 ms; content frames 1 (0.1/s)
+exit 0
+== 15:14:29 /workspace/m5-work/tp-master/build/lterm-m5-throughput-bench cat amber /workspace/m5-work/flood6.txt (rep 2)
+cat /workspace/m5-work/flood6.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 2.19 s, 2.82 MB/s
+10 ms timer: 3 runs, longest gap 2168 ms, p99 2168 ms; content frames 1 (0.5/s)
+exit 0
+== 15:14:31 /workspace/m5-work/tp-master/build/lterm-m5-throughput-bench seq amber 3000000 ctrlc (rep 2)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+ctrl+c: sent at 7082 ms, child gone 4 ms later
+10 ms timer: 21 runs, longest gap 7080 ms, p99 7080 ms; content frames 2 (0.3/s)
+exit 0
+== 15:14:38 /workspace/lunduke-term-m5/build/lterm-m5-throughput-bench seq amber 3000000 (rep 2)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 9.72 s
+10 ms timer: 799 runs, longest gap 89 ms, p99 26 ms; content frames 90 (9.3/s)
+exit 0
+== 15:14:48 /workspace/lunduke-term-m5/build/lterm-m5-throughput-bench seq plain 3000000 (rep 2)
+seq 3000000, profile plain (plain, no effects), 1280x800
+on screen after 14.03 s
+10 ms timer: 1145 runs, longest gap 31 ms, p99 15 ms; content frames 573 (40.8/s)
+exit 0
+== 15:15:02 /workspace/lunduke-term-m5/build/lterm-m5-throughput-bench cat amber /workspace/m5-work/flood6.txt (rep 2)
+cat /workspace/m5-work/flood6.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 2.78 s, 2.23 MB/s
+10 ms timer: 227 runs, longest gap 93 ms, p99 21 ms; content frames 26 (9.3/s)
+exit 0
+== 15:15:05 /workspace/lunduke-term-m5/build/lterm-m5-throughput-bench seq amber 3000000 ctrlc (rep 2)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+ctrl+c: sent at 2010 ms, child gone 3 ms later
+10 ms timer: 180 runs, longest gap 87 ms, p99 23 ms; content frames 19 (8.6/s)
+exit 0
+== 15:15:08 /workspace/m5-work/tp-master/build/lterm-m5-throughput-bench seq amber 3000000 (rep 3)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 7.24 s
+10 ms timer: 3 runs, longest gap 7212 ms, p99 7212 ms; content frames 1 (0.1/s)
+exit 0
+== 15:15:15 /workspace/m5-work/tp-master/build/lterm-m5-throughput-bench seq plain 3000000 (rep 3)
+seq 3000000, profile plain (plain, no effects), 1280x800
+on screen after 12.87 s
+10 ms timer: 4 runs, longest gap 12585 ms, p99 12585 ms; content frames 2 (0.2/s)
+exit 0
+== 15:15:28 /workspace/m5-work/tp-master/build/lterm-m5-throughput-bench cat amber /workspace/m5-work/flood6.txt (rep 3)
+cat /workspace/m5-work/flood6.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 2.20 s, 2.82 MB/s
+10 ms timer: 3 runs, longest gap 2173 ms, p99 2173 ms; content frames 1 (0.5/s)
+exit 0
+== 15:15:30 /workspace/m5-work/tp-master/build/lterm-m5-throughput-bench seq amber 3000000 ctrlc (rep 3)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+ctrl+c: sent at 7151 ms, child gone 3 ms later
+10 ms timer: 21 runs, longest gap 7149 ms, p99 7149 ms; content frames 2 (0.3/s)
+exit 0
+== 15:15:38 /workspace/lunduke-term-m5/build/lterm-m5-throughput-bench seq amber 3000000 (rep 3)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 9.20 s
+10 ms timer: 770 runs, longest gap 102 ms, p99 24 ms; content frames 88 (9.6/s)
+exit 0
+== 15:15:47 /workspace/lunduke-term-m5/build/lterm-m5-throughput-bench seq plain 3000000 (rep 3)
+seq 3000000, profile plain (plain, no effects), 1280x800
+on screen after 14.05 s
+10 ms timer: 1145 runs, longest gap 52 ms, p99 15 ms; content frames 576 (41.0/s)
+exit 0
+== 15:16:01 /workspace/lunduke-term-m5/build/lterm-m5-throughput-bench cat amber /workspace/m5-work/flood6.txt (rep 3)
+cat /workspace/m5-work/flood6.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 2.78 s, 2.23 MB/s
+10 ms timer: 228 runs, longest gap 98 ms, p99 20 ms; content frames 26 (9.4/s)
+exit 0
+== 15:16:04 /workspace/lunduke-term-m5/build/lterm-m5-throughput-bench seq amber 3000000 ctrlc (rep 3)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+ctrl+c: sent at 2007 ms, child gone 1 ms later
+10 ms timer: 185 runs, longest gap 90 ms, p99 20 ms; content frames 19 (8.6/s)
+exit 0
+TPDONE

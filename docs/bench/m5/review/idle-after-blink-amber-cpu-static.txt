@@ -1,0 +1,6 @@
+# 2026-11-01 12:09 CST code working tree on 38acc4e + items 5/7 (also 2/4/9/10 uncommitted; commit SHAs in README), lterm-m5-idle-bench blink amber cpu static 30, Xvfb :44 1024x640, llvmpipe (NOT a GPU), terminal process CPU only, REAL
+blink amber cpu static: amber, effects: C++ fallback (4 threads), quality static, window visible 1, active 1
+   0-10 s:     614 ms CPU =   6.1 % of one core, 13 content frames
+  10-20 s:       0 ms CPU =   0.0 % of one core, 0 content frames
+  20-30 s:       0 ms CPU =   0.0 % of one core, 0 content frames
+  total 615 ms CPU over 30 s = 2.0 %

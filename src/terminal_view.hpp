@@ -18,7 +18,7 @@
 namespace lterm {
 
 struct ViewOptions {
-    std::string profile = "plain";
+    std::string profile = kDefaultProfile;
     int effects = -1;               // -1: the profile decides, 0: off, 1: on
     std::string renderer = "auto";  // auto (GL, C++ if GL fails) | gl | cpu
     int threads = 4;                // C++ fallback threads
@@ -43,6 +43,12 @@ struct ViewOptions {
     bool bellVisual = true, bellUrgent = true, bellAudible = false;
     std::string cursorShape = "block";  // block | underline | bar (DECSCUSR overrides)
     bool cursorBlink = false;           // DECSCUSR / ?12 override
+    // Review item 5: blinking stops (cursor solid) this long after the last key, output or
+    // focus-in, like GTK entries; -1: the desktop's gtk-cursor-blink-timeout (default 10 s).
+    int cursorBlinkTimeoutMs = -1;
+    // Review item 3: a tab hidden this long frees its effects buffers (GL textures or the C++
+    // path's float buffers); showing it rebuilds them. -1: never.
+    int effectsFreeHiddenMs = 3000;
     std::string wordChars = Selection::defaultWordChars();
     // M2 item 5: bezel / RGB shift overrides of the profile (see profiles.hpp).
     TubeOverrides tube;
@@ -51,8 +57,14 @@ struct ViewOptions {
 // Frame statistics (ms), kept for --stats and the benchmarks in docs/.
 struct ViewStats {
     long contentFrames = 0, ticks = 0, rowsPainted = 0, fullRepaints = 0;
+    long ptySlicesCut = 0;      // PTY reads stopped at the time budget (output flood)
+    long selLinesCompared = 0;  // selected lines re-read to see whether output overwrote them
+    long framesHidden = 0;      // frame requests skipped because the tab/window was hidden
+    long blinkToggles = 0;      // cursor blink phases shown
+    long effectsFreed = 0;      // times a hidden tab freed its effects buffers
     std::vector<double> paintMs, effectsSourceMs, tickMs;
     double finalTickIntervalMs = 0;  // governor state on exit
+    long probesDeferred = 0;         // M5: due probe polls skipped while hidden/unfocused
 };
 
 // M4 item 4: what one view holds in memory (for --stats-every), all in bytes unless counts.
@@ -98,6 +110,8 @@ public:
     // Test hooks: pointer events at logical coordinates, as GTK would deliver them.
     void testButton(bool press, int button, double x, double y, guint state = 0);
     void testMotion(double x, double y, guint state);
+    bool testKey(GdkEventKey* ev) { return onKey(ev); }  // a key press as GTK would deliver it
+    long imCommits() const { return imCommits_; }
     bool bezelActive() const { return frameActive(); }
     int marginX() const { return marginX_; }
     int marginY() const { return marginY_; }
@@ -131,8 +145,13 @@ public:
     void setFont(const std::string& family, int px);  // "" / 0: the profile's
     void setEffectsQuality(EffectsQuality q);
     void setScrollbackLines(long long lines);
+    void commitScrollbackLimit();  // applies a pending lower limit (Settings closed)
+    long long pendingScrollbackLimit() const { return pendingSbLimit_; }  // -1: none
     void setFrame(int frame);  // -1 profile default, 0 off, 1 on (only profiles with a bezel option)
     pid_t childPid() const { return session_->childPid(); }
+    // Review item 9: the PTY's foreground process group is not the child's own (a shell runs a
+    // job: ssh, an editor, a build). Returns the job's name ("" if none).
+    std::string foregroundJob() const;
     void grabTerminalFocus();
     // Test hooks: the last composed grid (what is painted), the pause state.
     const Grid& shownGrid() const { return cur_; }
@@ -157,6 +176,12 @@ private:
     std::string fontWarned_;  // the --font value already warned about
     enum class Mode { Plain, Cpu, Gl };
     bool onKey(GdkEventKey* ev);
+    // Review item 2: input methods (dead keys, Compose, ibus/fcitx for CJK). The IM shows its
+    // own preedit (use_preedit off); committed text goes to the PTY.
+    // gtkmm 3 has no IMContext wrapper: the GTK C API (a GtkIMMulticontext).
+    GtkIMContext* im_ = nullptr;
+    void onImCommit(const char* text);
+    void updateImCursor();
     bool onButtonPress(GdkEventButton* ev);
     bool onButtonRelease(GdkEventButton* ev);
     bool onMotion(GdkEventMotion* ev);
@@ -173,6 +198,16 @@ private:
     void sendKeyInput();       // common handling for anything typed
     void ensureWriteWatch();
     bool onPtyIo(Glib::IOCondition cond);
+    void connectPtyWatch();
+    bool readSlice(bool* more);
+    // Review item 14: the per-frame timing samples (ViewStats vectors) are kept only with --stats;
+    // without it they grew by one double per frame for the whole session.
+    void recordStat(std::vector<double>& v, double ms) {
+        if (opts_.stats) v.push_back(ms);
+    }  // one time-boxed PTY read + the view updates; false on EOF/HUP
+    static constexpr int64_t kPtySliceUs = 10000;  // review item 1: at most ~10 ms per slice
+    static constexpr int kFloodFps = 10;  // PR #6 review N1: effects frames per s while flooding
+    double lastSliceCutMs_ = -1e9;
     bool onDraw(const Cairo::RefPtr<Cairo::Context>& cr);
     bool onGlRender(const Glib::RefPtr<Gdk::GLContext>& ctx);
     void onGlRealize();
@@ -193,6 +228,7 @@ private:
     bool onTick();
     double nowMs() const;
     bool animationWanted() const;
+    bool probeWanted() const;
     void updateQuality();          // resolve effects-quality for the current renderer
     double baseTickIntervalMs() const;
     bool governTick();             // software rendering: keep the idle animation within cpuBudget
@@ -245,13 +281,19 @@ private:
     double lastContentMs_ = -1e9;
     double lastFrameMs_ = -1e9;
     bool active_ = true, visible_ = true;
-    sigc::connection io_, tick_, frameTimer_;
+    sigc::connection io_, ptyIdle_, tick_, frameTimer_;
     gint64 t0_ = 0;
     // Checkpoint B state
     int scrollOffset_ = 0;
     Selection sel_;
     bool selecting_ = false;
-    std::string selSnapshot_;  // the selected text; the selection is dropped when it changes
+    std::string selSnapshot_;  // the selected text (primary selection)
+    // Review item 8: the selected text per line, taken once when the selection is made. Output
+    // compares only the selected lines that are on the screen (history lines do not change), so
+    // a big selection is not rebuilt on every PTY read.
+    std::vector<std::string> selLines_;
+    long selLinesBase_ = 0;
+    bool selectionOverwritten();
     int pressedButtons_ = 0;  // bitmask of buttons reported to the application
     double wheelAccum_ = 0;
     bool exited_ = false, holding_ = false;
@@ -261,6 +303,16 @@ private:
     bool bellFlash_ = false;
     bool inverseShown_ = false;  // margins currently painted for reverse video
     bool blinkOff_ = false;
+    long imCommits_ = 0;
+    sigc::connection freeHidden_;  // review item 3
+    bool effectsFreed_ = false;
+    void freeHiddenEffects();
+    long long pendingSbLimit_ = -1;  // review item 10
+    void applyScrollbackLimit(size_t lines);
+    bool blinkExpired_ = false;  // blinked for the timeout without activity: solid until then
+    double blinkSinceMs_ = 0;    // last key, output or focus-in
+    int blinkTimeoutMs() const;
+    void noteBlinkActivity();    // restarts the blink timeout
     bool lastAlt_ = false;
     ViewStats stats_;
     // Search state

@@ -291,6 +291,78 @@ std::vector<Profile> makeProfiles() {
         setFonts(p, {}, kTerminus);
         v.push_back(p);
     }
+    // M5 item 2: retro pixel-font profiles, only fonts whose Debian copyright file is licence-clean
+    // (docs/FONTS.md has the evidence). Neutral names: no Atari/Amiga/Commodore marks in the ids
+    // or labels; the families are the Debian packages' own names. Mono tubes with amber's phosphor
+    // palette. Each falls back to the Terminus chain at its own size when the font is missing.
+    {
+        Profile p = amber;  // fonts-atarismall: 8-bit home computer text mode
+        p.id = "pixel-8bit";
+        p.label = "Pixel 8-bit (blue)";
+        p.fx.fontColor = hex(0x8cc0ff);
+        p.fx.chromaColor = 0.0f;
+        p.fx.rasterization = 1;
+        p.fx.frameColor = hex(0x3a3530);
+        // The family name really is "Atari800" *with* the quotes (an upstream wart); also try it
+        // without them in case a later package fixes that. 32 px = 4x the 8 px design size.
+        setFonts(p, {{"\"Atari800\"", 32}, {"Atari800", 32}}, kTerminus);
+        v.push_back(p);
+    }
+    {
+        Profile p = amber;  // fonts-atarist: 16-bit high-resolution monochrome monitor
+        p.id = "pixel-hires-mono";
+        p.label = "Pixel hi-res mono";
+        p.fx.fontColor = hex(0xe6ecf4);
+        p.fx.chromaColor = 0.0f;
+        p.fx.rasterization = 0;  // a 640x400 70 Hz monitor: no visible scanlines
+        p.fx.screenCurvature = 0.15f;
+        p.fx.flickering = 0.03f;
+        p.fx.horizontalSync = 0.0f;
+        p.fx.frameColor = hex(0xb8b4ac);
+        setFonts(p, {{"Atari", 32}}, kTerminus);  // 8x16 glyphs at 2x
+        v.push_back(p);
+    }
+    {
+        Profile p = amber;  // fonts-amiga: 16-bit home computer desktop text
+        p.id = "pixel-16bit";
+        p.label = "Pixel 16-bit";
+        p.fx.fontColor = hex(0xb4d8ff);
+        p.fx.chromaColor = 0.0f;
+        p.fx.rasterization = 1;
+        p.fx.screenCurvature = 0.25f;
+        p.fx.frameColor = hex(0xd0c8b8);
+        setFonts(p, {{"Amiga", 32}}, kTerminus);  // design grid 8 px wide, 32 px = 2x the 16 px em
+        v.push_back(p);
+    }
+    {
+        // fonts-sixtyfour (OFL-1.1, an original redrawing by the Homecomputer Fonts Project, not
+        // the Style64/Kreative fonts): 8-bit home computer 40-column text mode. Added on the
+        // editor's decision (M5 PR #6); the Debian family name is the only place the mark appears.
+        Profile p = amber;
+        p.id = "pixel-40col";
+        p.label = "Pixel 40-column";
+        p.fx.fontColor = hex(0xa0a0ff);  // light blue text
+        p.fx.chromaColor = 0.0f;
+        p.fx.rasterization = 1;
+        p.fx.screenCurvature = 0.25f;
+        p.fx.frameColor = hex(0xc8bca0);  // beige case
+        setFonts(p, {{"C-64", 32}}, kTerminus);  // 8x8 design grid on a 1 em advance: 32 px = 4x, 40 columns at 1280 px
+        v.push_back(p);
+    }
+    {
+        Profile p = amber;  // fonts-hermit / fonts-proggy (cool-retro-term's "modern" fonts)
+        p.id = "modern";
+        p.label = "Modern (mint)";
+        p.fx.fontColor = hex(0x7cffb4);
+        p.fx.chromaColor = 0.0f;
+        p.fx.rasterization = 0;
+        p.fx.screenCurvature = 0.1f;
+        p.fx.horizontalSync = 0.0f;
+        p.fx.jitter = 0.05f;
+        // Hermit is an outline font (any size); ProggyTiny is a 16 px pixel font.
+        setFonts(p, {{"Hermit", 20}, {"ProggyTinyTT", 32}}, kTerminus);
+        v.push_back(p);
+    }
     return v;
 }
 

@@ -1,0 +1,6 @@
+# 2026-11-01 11:35 CST code badd3f9 (M4 PTY read path), lterm-m5-flood-bench yes amber 10, Xvfb :44, llvmpipe (NOT a GPU), REAL
+mode yes, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 49.5 s wall
+10 ms timer: 1 runs, longest gap 49516 ms, p99 gap 49516 ms
+content frames: 0 (0.0 per s)
+ctrl+c: sent at 49518 ms (due 2000), child still running at the end
+exit 0

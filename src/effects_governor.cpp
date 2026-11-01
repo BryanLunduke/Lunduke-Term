@@ -75,7 +75,11 @@ EffectsGovernor::Action EffectsGovernor::evaluate(double nowMs, double& interval
             probeDelayMs_ = -1;
         }
     }
-    if (next != intervalMs && std::abs(next - intervalMs) > 0.05 * intervalMs) {
+    // Small steps are skipped (5 % hysteresis), except the last one to the cap or the base:
+    // PR #6 review B1: 146 ms -> 974 ms then stayed there (1000 was within 5 %), and demotion
+    // needs the cap, so a 400 ms renderer never demoted.
+    const bool toLimit = next == cfg_.maxIntervalMs || next == cfg_.baseIntervalMs;
+    if (next != intervalMs && (toLimit || std::abs(next - intervalMs) > 0.05 * intervalMs)) {
         intervalMs = next;
         return Action::Interval;
     }

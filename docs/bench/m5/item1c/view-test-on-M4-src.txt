@@ -1,0 +1,120 @@
+Log of Meson test suite run on 2026-11-01T11:16:07.527393
+
+Inherited environment: __CURSOR_SANDBOX_ENV_RESTORE='builtin unset CURSOR_CONVERSATION_ID CURSOR_REQUEST_ID CURSOR_AGENT_STORE_FILES_DIR CURSOR_AGENT_STORE_SHARED_PATHS 2>/dev/null || true; builtin unset CURSOR_CONVERSATION_ID CURSOR_REQUEST_ID CURSOR_AGENT_STORE_FILES_DIR CURSOR_AGENT_STORE_SHARED_PATHS 2>/dev/null || true; builtin export CURSOR_CONVERSATION_ID='"'"'sand-subagent-c8dc3736-7c04-dfa6-0834-426ba991e313'"'"'; builtin export CURSOR_REQUEST_ID='"'"'aa7f5370-034e-44a4-b304-f98eb7648e31'"'"'' SAND_BOX_SCRIPT_SYNC_DISABLED=1 AGENT_TRANSCRIPTS=/home/box/.cursor/projects/workspace/agent-transcripts _ZO_DOCTOR=0 SAND_BOX_TENANT_ID=309e836236dc80225062 SAND_SUPERVISOR_ENABLED=1 PWD=/workspace/lunduke-term-m5 SAND_BOX_TELEMETRY_LOG=/tmp/sand-box-telemetry.log SAND_BOX_STORE_HIBERNATE_HOOK=1 LOGNAME=box SAND_HTTP_PROXY_NAME=runner-egress-proxy SAND_EGRESS_TUNNEL_ENABLED=1 SAND_BOX_AUTH_ID='grok|user_01M0ET97V2KP8G939X9XRFQKAR' COREPACK_HOME=/usr/local/share/corepack HOME=/home/box SAND_BOX_STORE_COPY_IN=1 SAND_EGRESS_TUNNEL_PROXY_ADDR=127.0.0.1:8791 LANG=C.UTF-8 LS_COLORS='' CURSOR_CONVERSATION_ID=sand-subagent-c8dc3736-7c04-dfa6-0834-426ba991e313 CURSOR_RIPGREP_PATH=/exec-daemon/rg SAND_BOX_PERSISTENT_KEYRING=1 SAND_EGRESS_TUNNEL_WS_PORT=8790 SAND_MANIFEST_V2=1 FORCE_COLOR=0 SCREEN_HEIGHT=1200 SAND_BOX_CLUSTER=us12 SAND_HOST_PORT=1340 EXEC_DAEMON_CWD=/workspace SAND_BOX_DESKTOP_PANEL=1 SAND_AGENT_STORE_RPC_SERVICE=agent-store CURSOR_AGENT_SOCKET=/tmp/sand-identity.sock SAND_BOX_STORE_ID=300f0988-57ff-54bd-8b83-3cf6e3f5ca85 SAND_BOX_CREATED_AT_MS=1793383103945 CURSOR_AGENT=1 CURSOR_REQUEST_ID=aa7f5370-034e-44a4-b304-f98eb7648e31 SAND_BOX_BOOT_STARTED_AT_MS=1793383106569 NPM_CONFIG_PREFIX=/home/box/.local SAND_BOX_AUDIO_DEVICES=1 SAND_BOOT_CLEARS_HOST_WEBRTC_POLICY=1 TERM=dumb SAND_BOX_BOOT_STATIC_SNAPSHOT=sand-box-263d3bab72e7-amd64.v5 USER=box SAND_BOX_MAX_WINDOWS=100 DISPLAY=:44 SHLVL=3 SAND_BOX_STORE_BACKEND=v2 SAND_GATEWAY_BIND_HOST=0.0.0.0 LIBGL_ALWAYS_SOFTWARE=1 NO_COLOR=1 LD_LIBRARY_PATH=/workspace/lterm-tools/root/usr/lib/x86_64-linux-gnu XDG_RUNTIME_DIR=/tmp/xdg-runtime-box-7 SAND_EGRESS_TUNNEL_WS_ADDR=0.0.0.0:8790 SAND_BOX_BOOT_ID=7bb46a65-edfa-473b-8805-9171d2490342 SAND_USER_NON_ROOT=1 LC_ALL=C.UTF-8 SAND_STORE_BETTER_CLI=1 BROWSER=/usr/local/bin/box-chrome PATH=/workspace/lterm-tools/root/usr/bin:/workspace/lterm-tools/root/usr/bin:/workspace/lterm-tools/root/usr/bin:/home/box/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/xdg-runtime-box-7/bus SAND_HOST_UID_SPLIT_ACTIVE=0 SAND_BOX_STORE_SYNC=1 DEBIAN_FRONTEND=noninteractive SCREEN_WIDTH=1920 OLDPWD=/workspace/lunduke-term-m5 _=/usr/bin/meson 
+
+==================================== 1/1 =====================================
+test:         view
+start time:   17:16:07
+duration:     98.90s
+result:       exit status 1
+command:      UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-m5/tests/lsan.supp:print_suppressions=0 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 MESON_TEST_ITERATION=1 MALLOC_PERTURB_=190 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:fast_unwind_on_malloc=0 /workspace/lunduke-term-m5/build/view_test
+----------------------------------- stdout -----------------------------------
+plain (plain, no effects): scale 1 -> 2: device 400x240 -> 800x480, grid 39x12 -> 39x12
+amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): scale 1 -> 2: device 400x240 -> 800x480, grid 28x8 -> 28x8
+bezel (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): 640x400, grid 42x12, margins 47,38
+bezel drag from cell 0,17 to the corner: 'alpha beta gamma'
+bezel (amber, effects: C++ fallback (4 threads), quality reduced): 640x400, grid 42x12, margins 47,38
+bezel drag from cell 0,17 to the corner: 'alpha beta gamma'
+view search, 100000 lines (release build, ASan in this test only): first keystroke 5.25 ms (pending, 1 turns), worst later keystroke 3.04 ms, 'n' 100 / 'needle' 100 matches
+search bar: '2 of 2'
+corrupt settings: status 'Warning: /tmp/lterm-corrupt-test-925374/settings.ini was not valid (Key file contains line “[terminal” which is not a key-value pair, group, or comment); it was replaced, the old text is in /tmp/lterm-corrupt-test-925374/settings.ini.corrupt. Saved.'
+tab close (release build, ASan in this test only): 19 closes, worst 13.79 ms, total 95.43 ms; 19 still running right after, all reaped 2017 ms later (limit 25 ms)
+tab close trim: 1 trim(s), RSS dropped -4 kB (ASan has its own allocator: ~0 here)
+tab ids: double click -> 1 close, late close after reuse -> new tab kept, nested close ok
+governor auto (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): after 4 s of output: quality reduced, demoted 0, tick 722 ms, frame 4.6 ms
+governor auto: costly probe aborted after 1 frame(s), retry in 3.0 s
+governor auto (release build, ASan in this test only): probe reached Normal 2943 ms after auto came back (wait limit 6000 ms)
+governor auto: demoted at 7.5 s, back to reduced, tick 100 ms
+governor auto: GL programs compiled during demotion + 2 probes: 28
+governor cpu (amber, effects: C++ fallback (4 threads), quality reduced): after 4 s of output: quality reduced, demoted 0, tick 100 ms, frame 3.8 ms
+governor cpu: costly probe aborted after 1 frame(s), retry in 3.0 s
+governor cpu (release build, ASan in this test only): probe reached Normal 3040 ms after auto came back (wait limit 6000 ms)
+governor cpu: demoted at 7.1 s, back to reduced, tick 100 ms
+governor cpu: GL programs compiled during demotion + 2 probes: 0
+probe deferral auto (unfocused): 0 due poll(s) deferred, state 1
+probe deferral auto (hidden): 0 due poll(s) deferred, state 2
+probe deferral cpu (unfocused): 0 due poll(s) deferred, state 1
+probe deferral cpu (hidden): 0 due poll(s) deferred, state 2
+----------------------------------- stderr -----------------------------------
+
+(view_test:925374): dbind-WARNING **: 11:16:07.622: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+lunduke-terminal: scrollback-lines 1099511627776 is too large, using 1000000
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+
+(view_test:925374): Gtk-WARNING **: 11:16:31.812: Could not load a pixbuf from /org/gtk/libgtk/theme/Adwaita/assets/check-symbolic.svg.
+This may indicate that pixbuf loaders or the mime database could not be found.
+lunduke-terminal: amber, effects: GLSL on GtkGLArea, quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on GtkGLArea, quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on GtkGLArea, quality static (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+lunduke-terminal: amber, effects: GLSL on GtkGLArea, quality static (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+lunduke-terminal: amber, effects: GLSL on GtkGLArea, quality static (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+lunduke-terminal: plain, no effects
+lunduke-terminal: plain, no effects
+lunduke-terminal: plain, no effects
+lunduke-terminal: plain, no effects
+lunduke-terminal: plain, no effects
+lunduke-terminal: plain, no effects
+lunduke-terminal: plain, no effects
+lunduke-terminal: plain, no effects
+lunduke-terminal: plain, no effects
+lunduke-terminal: plain, no effects
+lunduke-terminal: plain, no effects
+lunduke-terminal: plain, no effects
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: /tmp/lterm-corrupt-test-925374/settings.ini was not valid (Key file contains line “[terminal” which is not a key-value pair, group, or comment); it was replaced, the old text is in /tmp/lterm-corrupt-test-925374/settings.ini.corrupt
+lunduke-terminal: animation needs 40% of a core at 1 fps (404 ms per frame); effects-quality auto -> static, retry in 1.5 s
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: animation needs 398% of a core at 1 fps (3982 ms per frame); effects-quality auto -> static, retry in 3.0 s
+lunduke-terminal: effects-quality auto: probing the animation again
+FAIL ../tests/view_test.cpp:697: GlPipeline::programsCompiled() == programs0
+lunduke-terminal: animation needs 40% of a core at 1 fps (404 ms per frame); effects-quality auto -> static, retry in 1.5 s
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: animation needs 390% of a core at 1 fps (3905 ms per frame); effects-quality auto -> static, retry in 3.0 s
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: animation needs 390% of a core at 1 fps (3904 ms per frame); effects-quality auto -> static, retry in 1.0 s
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: animation needs 397% of a core at 1 fps (3975 ms per frame); effects-quality auto -> static, retry in 1.0 s
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: animation needs 399% of a core at 1 fps (3989 ms per frame); effects-quality auto -> static, retry in 1.0 s
+FAIL ../tests/view_test.cpp:729: w.view->stats().probesDeferred > d0
+lunduke-terminal: effects-quality auto: probing the animation again
+FAIL ../tests/view_test.cpp:729: w.view->stats().probesDeferred > d0
+FAIL ../tests/view_test.cpp:730: w.view->qualityDemoted()
+FAIL ../tests/view_test.cpp:731: w.view->governor().state() == EffectsGovernor::State::Demoted
+lunduke-terminal: animation needs 390% of a core at 1 fps (3904 ms per frame); effects-quality auto -> static, retry in 1.0 s
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: animation needs 390% of a core at 1 fps (3904 ms per frame); effects-quality auto -> static, retry in 1.0 s
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: animation needs 390% of a core at 1 fps (3904 ms per frame); effects-quality auto -> static, retry in 1.0 s
+FAIL ../tests/view_test.cpp:729: w.view->stats().probesDeferred > d0
+lunduke-terminal: effects-quality auto: probing the animation again
+FAIL ../tests/view_test.cpp:729: w.view->stats().probesDeferred > d0
+FAIL ../tests/view_test.cpp:730: w.view->qualityDemoted()
+FAIL ../tests/view_test.cpp:731: w.view->governor().state() == EffectsGovernor::State::Demoted
+9 failure(s)
+==============================================================================
+
+
+Summary of Failures:
+
+1/1 view FAIL            98.90s   exit status 1
+
+Ok:                 0   
+Expected Fail:      0   
+Fail:               1   
+Unexpected Pass:    0   
+Skipped:            0   
+Timeout:            0   

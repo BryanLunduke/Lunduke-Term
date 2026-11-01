@@ -1,0 +1,283 @@
+# PR #6 review N2/N3/N4 tests on the FIXED code (REAL), release build, Xvfb, llvmpipe; 2026-11-01 14:35 CST, tree = 23f831a
+
+GOVPAINT t=109 cost=48.6 gov=1
+GOVPAINT t=137 cost=14.0 gov=1
+GOVTRACE t=160 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=162 cost=6.8 gov=1
+GOVPAINT t=189 cost=11.2 gov=1
+GOVPAINT t=205 cost=12.9 gov=1
+GOVPAINT t=243 cost=12.3 gov=1
+GOVTRACE t=266 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=267 cost=6.7 gov=1
+GOVPAINT t=306 cost=11.5 gov=1
+GOVPAINT t=347 cost=10.9 gov=1
+GOVTRACE t=369 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=371 cost=6.4 gov=1
+GOVPAINT t=400 cost=12.6 gov=1
+GOVPAINT t=417 cost=11.9 gov=1
+GOVPAINT t=454 cost=12.5 gov=1
+GOVTRACE t=477 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=478 cost=6.3 gov=1
+GOVPAINT t=507 cost=11.2 gov=1
+GOVPAINT t=523 cost=11.9 gov=1
+GOVTRACE t=582 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=584 cost=7.0 gov=1
+GOVPAINT t=622 cost=10.9 gov=1
+GOVPAINT t=659 cost=11.6 gov=1
+GOVTRACE t=682 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=683 cost=7.0 gov=1
+GOVPAINT t=699 cost=10.8 gov=1
+GOVPAINT t=739 cost=11.5 gov=1
+GOVPAINT t=780 cost=11.3 gov=1
+GOVTRACE t=792 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=805 cost=6.4 gov=1
+GOVPAINT t=848 cost=11.9 gov=1
+GOVTRACE t=893 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=898 cost=10.9 gov=1
+GOVPAINT t=972 cost=11.9 gov=1
+GOVTRACE t=995 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=997 cost=6.4 gov=1
+GOVPAINT t=1023 cost=10.9 gov=1
+GOVPAINT t=1059 cost=11.5 gov=1
+GOVTRACE t=1095 act=0 tick=100 next=100 load=0.12 frame=12 state=0
+GOVPAINT t=1097 cost=6.4 gov=1
+GOVPAINT t=1148 cost=10.8 gov=1
+GOVPAINT t=1196 cost=11.7 gov=1
+GOVTRACE t=1196 act=0 tick=100 next=100 load=0.12 frame=12 state=0
+GOVPAINT t=1221 cost=6.3 gov=1
+GOVPAINT t=1290 cost=11.8 gov=1
+GOVTRACE t=1300 act=0 tick=100 next=100 load=0.12 frame=12 state=0
+GOVPAINT t=1302 cost=6.2 gov=1
+GOVPAINT t=1330 cost=11.3 gov=1
+GOVPAINT t=1370 cost=11.0 gov=1
+GOVTRACE t=1404 act=0 tick=100 next=100 load=0.12 frame=12 state=0
+GOVPAINT t=1409 cost=11.8 gov=1
+GOVPAINT t=1451 cost=10.9 gov=1
+GOVPAINT t=1488 cost=11.5 gov=1
+GOVTRACE t=1509 act=0 tick=100 next=100 load=0.12 frame=12 state=0
+GOVPAINT t=1510 cost=6.4 gov=1
+GOVPAINT t=1536 cost=10.8 gov=1
+GOVPAINT t=1552 cost=11.6 gov=1
+GOVPAINT t=1602 cost=11.5 gov=1
+GOVTRACE t=1612 act=0 tick=100 next=100 load=0.12 frame=12 state=0
+GOVPAINT t=1614 cost=7.0 gov=1
+GOVPAINT t=1635 cost=12.2 gov=1
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+GOVPAINT t=56 cost=26.6 gov=1
+lunduke-terminal: plain, no effects
+GOVPAINT t=66 cost=45.0 gov=1
+GOVPAINT t=89 cost=12.9 gov=1
+GOVTRACE t=121 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=123 cost=6.9 gov=1
+GOVTRACE t=221 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=223 cost=7.0 gov=1
+GOVTRACE t=321 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=323 cost=6.7 gov=1
+GOVTRACE t=422 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=424 cost=7.4 gov=1
+GOVTRACE t=522 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=524 cost=7.1 gov=1
+GOVPAINT t=619 cost=11.9 gov=1
+GOVTRACE t=622 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=625 cost=6.5 gov=1
+GOVTRACE t=722 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=725 cost=8.6 gov=1
+GOVTRACE t=824 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=826 cost=8.0 gov=1
+GOVTRACE t=924 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=926 cost=8.0 gov=1
+GOVTRACE t=1025 act=0 tick=100 next=100 load=0.11 frame=11 state=0
+GOVPAINT t=1027 cost=7.7 gov=1
+GOVPAINT t=1041 cost=1.8 gov=1
+GOVTRACE t=1126 act=0 tick=100 next=100 load=0.11 frame=11 state=0
+GOVPAINT t=1128 cost=8.0 gov=1
+GOVPAINT t=1165 cost=12.5 gov=1
+GOVTRACE t=1227 act=0 tick=100 next=100 load=0.11 frame=11 state=0
+GOVPAINT t=1229 cost=7.3 gov=1
+GOVTRACE t=1327 act=0 tick=100 next=100 load=0.11 frame=11 state=0
+GOVPAINT t=1329 cost=7.8 gov=1
+GOVTRACE t=1428 act=0 tick=100 next=100 load=0.11 frame=11 state=0
+GOVPAINT t=1430 cost=7.7 gov=1
+GOVTRACE t=1529 act=0 tick=100 next=100 load=0.11 frame=11 state=0
+GOVPAINT t=1531 cost=8.8 gov=1
+GOVPAINT t=1589 cost=2.2 gov=1
+GOVTRACE t=1629 act=0 tick=100 next=100 load=0.11 frame=11 state=0
+GOVPAINT t=1632 cost=8.1 gov=1
+GOVTRACE t=1730 act=0 tick=100 next=100 load=0.11 frame=11 state=0
+GOVPAINT t=1733 cost=7.7 gov=1
+GOVTRACE t=1830 act=0 tick=100 next=100 load=0.11 frame=11 state=0
+GOVPAINT t=1832 cost=7.6 gov=1
+GOVTRACE t=1931 act=0 tick=100 next=100 load=0.11 frame=11 state=0
+GOVPAINT t=1933 cost=7.4 gov=1
+GOVTRACE t=2031 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=2033 cost=7.7 gov=1
+GOVPAINT t=2077 cost=1.9 gov=1
+GOVTRACE t=2132 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=2134 cost=7.3 gov=1
+GOVTRACE t=2232 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=2234 cost=7.6 gov=1
+GOVTRACE t=2333 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=2336 cost=8.4 gov=1
+GOVTRACE t=2433 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=2435 cost=7.1 gov=1
+GOVTRACE t=2534 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=2536 cost=7.7 gov=1
+GOVPAINT t=2564 cost=1.8 gov=1
+GOVTRACE t=2634 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=2636 cost=7.1 gov=1
+GOVTRACE t=2734 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=2736 cost=7.6 gov=1
+GOVTRACE t=2834 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=2837 cost=7.8 gov=1
+GOVTRACE t=2935 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=2937 cost=8.1 gov=1
+GOVTRACE t=3035 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=3037 cost=7.8 gov=1
+GOVPAINT t=3056 cost=1.9 gov=1
+GOVTRACE t=3136 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=3138 cost=7.6 gov=1
+GOVTRACE t=3236 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=3238 cost=7.6 gov=1
+GOVTRACE t=3337 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=3339 cost=7.7 gov=1
+GOVTRACE t=3437 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=3439 cost=8.1 gov=1
+GOVTRACE t=3537 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=3539 cost=7.4 gov=1
+GOVPAINT t=3557 cost=1.9 gov=1
+GOVTRACE t=3637 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=3639 cost=8.4 gov=1
+GOVTRACE t=3738 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=3740 cost=7.9 gov=1
+GOVPAINT t=3758 cost=1.8 gov=1
+GOVTRACE t=3839 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=3841 cost=7.4 gov=1
+GOVPAINT t=3873 cost=2.0 gov=1
+GOVTRACE t=3939 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=3941 cost=8.0 gov=1
+GOVTRACE t=4039 act=0 tick=100 next=100 load=0.06 frame=6 state=0
+GOVPAINT t=4042 cost=8.0 gov=1
+GOVTRACE t=4140 act=0 tick=100 next=100 load=0.06 frame=6 state=0
+GOVPAINT t=4142 cost=7.9 gov=1
+GOVPAINT t=4201 cost=2.3 gov=1
+GOVTRACE t=4241 act=0 tick=100 next=100 load=0.06 frame=6 state=0
+GOVPAINT t=4243 cost=8.4 gov=1
+GOVTRACE t=4342 act=0 tick=100 next=100 load=0.06 frame=6 state=0
+GOVPAINT t=4344 cost=7.9 gov=1
+GOVTRACE t=4442 act=0 tick=100 next=100 load=0.06 frame=6 state=0
+GOVPAINT t=4444 cost=8.3 gov=1
+GOVTRACE t=4543 act=0 tick=100 next=100 load=0.06 frame=6 state=0
+GOVPAINT t=4545 cost=8.5 gov=1
+GOVTRACE t=4643 act=0 tick=100 next=100 load=0.06 frame=6 state=0
+GOVPAINT t=4646 cost=8.2 gov=1
+GOVTRACE t=4744 act=0 tick=100 next=100 load=0.06 frame=6 state=0
+GOVPAINT t=4746 cost=7.6 gov=1
+GOVTRACE t=4844 act=0 tick=100 next=100 load=0.06 frame=6 state=0
+GOVPAINT t=4846 cost=7.6 gov=1
+GOVTRACE t=4944 act=0 tick=100 next=100 load=0.06 frame=6 state=0
+GOVPAINT t=4946 cost=7.7 gov=1
+GOVTRACE t=5045 act=0 tick=100 next=100 load=0.08 frame=8 state=0
+GOVPAINT t=5047 cost=8.3 gov=1
+GOVPAINT t=5073 cost=2.1 gov=1
+GOVPAINT t=5138 cost=2.1 gov=1
+GOVTRACE t=5145 act=0 tick=100 next=100 load=0.08 frame=8 state=0
+GOVPAINT t=5158 cost=8.1 gov=1
+GOVTRACE t=5246 act=0 tick=100 next=100 load=0.08 frame=8 state=0
+GOVPAINT t=5248 cost=7.9 gov=1
+GOVTRACE t=5346 act=0 tick=100 next=100 load=0.08 frame=8 state=0
+GOVPAINT t=5349 cost=8.7 gov=1
+GOVTRACE t=5447 act=0 tick=100 next=100 load=0.08 frame=8 state=0
+GOVPAINT t=5450 cost=8.8 gov=1
+GOVTRACE t=5547 act=0 tick=100 next=100 load=0.08 frame=8 state=0
+GOVPAINT t=5550 cost=8.6 gov=1
+GOVTRACE t=5648 act=0 tick=100 next=100 load=0.08 frame=8 state=0
+GOVPAINT t=5653 cost=8.7 gov=1
+GOVTRACE t=5749 act=0 tick=100 next=100 load=0.08 frame=8 state=0
+GOVPAINT t=5752 cost=9.0 gov=1
+GOVTRACE t=5850 act=0 tick=100 next=100 load=0.08 frame=8 state=0
+GOVPAINT t=5853 cost=9.4 gov=1
+GOVTRACE t=5951 act=0 tick=100 next=100 load=0.08 frame=8 state=0
+GOVPAINT t=5954 cost=8.4 gov=1
+GOVTRACE t=6051 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=6054 cost=7.8 gov=1
+GOVTRACE t=6151 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=6154 cost=7.8 gov=1
+GOVPAINT t=6207 cost=12.8 gov=1
+GOVTRACE t=6252 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=6254 cost=7.7 gov=1
+GOVTRACE t=6352 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=6354 cost=7.4 gov=1
+GOVTRACE t=6453 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=6456 cost=7.8 gov=1
+GOVTRACE t=6554 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=6557 cost=9.1 gov=1
+GOVTRACE t=6655 act=0 tick=100 next=100 load=0.07 frame=7 state=0
+GOVPAINT t=6658 cost=8.0 gov=1
+GOVPAINT t=6735 cost=13.1 gov=1
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+GOVPAINT t=74 cost=49.0 gov=1
+GOVPAINT t=98 cost=15.8 gov=1
+GOVTRACE t=126 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=128 cost=8.0 gov=1
+GOVPAINT t=169 cost=12.9 gov=1
+GOVPAINT t=199 cost=13.1 gov=1
+GOVTRACE t=227 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=229 cost=7.5 gov=1
+GOVPAINT t=268 cost=12.7 gov=1
+GOVPAINT t=301 cost=13.4 gov=1
+GOVTRACE t=327 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=329 cost=6.9 gov=1
+GOVPAINT t=367 cost=12.5 gov=1
+GOVPAINT t=403 cost=12.3 gov=1
+GOVTRACE t=427 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=429 cost=6.5 gov=1
+GOVPAINT t=465 cost=11.5 gov=1
+GOVPAINT t=505 cost=11.5 gov=1
+GOVTRACE t=527 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=529 cost=6.3 gov=1
+GOVPAINT t=567 cost=11.2 gov=1
+GOVPAINT t=608 cost=13.5 gov=1
+GOVPAINT t=59 cost=32.8 gov=1
+GOVPAINT t=88 cost=7.2 gov=1
+GOVTRACE t=121 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=124 cost=7.1 gov=1
+GOVPAINT t=161 cost=7.1 gov=1
+GOVPAINT t=194 cost=6.9 gov=1
+GOVTRACE t=221 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=224 cost=6.8 gov=1
+GOVPAINT t=261 cost=6.6 gov=1
+GOVPAINT t=295 cost=6.9 gov=1
+GOVTRACE t=322 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=324 cost=6.4 gov=1
+GOVPAINT t=363 cost=7.9 gov=1
+GOVPAINT t=394 cost=7.6 gov=1
+GOVTRACE t=422 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=425 cost=6.5 gov=1
+GOVPAINT t=461 cost=6.5 gov=1
+GOVPAINT t=495 cost=7.4 gov=1
+GOVTRACE t=523 act=0 tick=100 next=100 load=0.00 frame=0 state=0
+GOVPAINT t=524 cost=6.3 gov=1
+GOVPAINT t=561 cost=6.5 gov=1
+GOVPAINT t=597 cost=6.3 gov=1
+flood plain (release build): longest main-loop gap 16 ms, 125 slices cut, 57 content frames, Ctrl+C -> exit 21 ms
+flood amber (release build): longest main-loop gap 18 ms, 116 slices cut, 33 content frames, Ctrl+C -> exit 21 ms
+blink: stopped after the timeout, restarted by a key
+hidden tab: 48 frame requests skipped in 1 s, 0 painted
+confirm close: asked 5 times ("Close this tab? "sleep" is still running.")
+confirm: second request kept "Close this tab? "sleep" is still running."; accept closed the first (sleep) tab
+scrollback: 281 lines kept through new output, 50 after commit
+scrollback slip with output: 1019 lines before, 1123 during the 0.6 s at 50, 1157 after
+scrollback: lowered to 50 on dialog close: 50 lines
+settings: "Up to 2.4 MB per tab when full (63 columns)." / "Warning: up to 243 MB per tab when full (63 columns). Every tab keeps its own."
+input method: dead_acute e, Compose o c, x -> c3 a9 c2 a9 78 (3 commits)
+dead key + Ctrl chord: dead_acute, Ctrl+C, q, x -> 03 71 78
+hidden tab frees (gl, amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)): textures 5.9 MB shown -> 2.0 MB after 0.5 s hidden -> 5.9 MB again
+hidden tab frees (cpu, amber, effects: C++ fallback (4 threads), quality static): textures 0.0 MB shown -> 0.0 MB after 0.5 s hidden -> 0.0 MB again
+selection of 1019 lines: 80 lines compared over the ticks (screen 20 rows)
+stats off: 12 content frames, 0 samples kept
+stats on: 12 content frames, 29 samples kept
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=12 full-repaints=1 rows-painted=35 ticks=5 median paint 0.13 ms, median effects-source 4.38 ms, median tick 0.97 ms, glyphs cached 10
+stats: quality=reduced software=1 tick-interval 100.0 ms
+review tests passed
+exit 0

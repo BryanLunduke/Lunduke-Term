@@ -58,8 +58,8 @@ From `src/profiles.cpp` (`kTerminus`). The first installed family wins.
 
 | Profile | Font chain |
 |---|---|
-| plain (default) | DejaVu Sans Mono 16 px. **Does not use Terminus.** |
-| amber, green, green-scanlines, vintage, futuristic, paper-white | `Terminus (TTF)` → `Terminus` (otb) → `DejaVu Sans Mono` → `Monospace`, 22 px |
+| plain | DejaVu Sans Mono 16 px. **Does not use Terminus.** |
+| amber (**default since M5**), green, green-scanlines, vintage, futuristic, paper-white | `Terminus (TTF)` → `Terminus` (otb) → `DejaVu Sans Mono` → `Monospace`, 22 px |
 | ibm-dos | `Px IBM VGA8` 32 px (fonts-pc, on the ISO) first; Terminus chain only as fallback |
 | ibm-3278 | `IBM 3270` (fonts-3270, on the ISO) first; Terminus chain only as fallback |
 
@@ -78,7 +78,8 @@ From `src/profiles.cpp` (`kTerminus`). The first installed family wins.
   with fontconfig and keeps the cell grid monospace.
 - Without Terminus, the CRT profiles look right in colour and effects, but the type is DejaVu
   instead of the intended bitmap-style face. Nothing breaks.
-- The default `plain` profile is unaffected.
+- Until M4 the default was `plain`, which does not use Terminus. Since M5 the default is `amber`, so
+  without Terminus the *default* look uses DejaVu Sans Mono 22 px (output above is from M4).
 - The TCG VM runs in `docs/bench/` used the TTF from the fonts-terminus `.deb` (same SHA-256),
   copied onto the private payload disk with a private `FONTCONFIG_FILE`. It is not on the ISO.
 

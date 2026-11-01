@@ -1,0 +1,6 @@
+# 2026-11-01 12:01 CST code 38acc4e (before items 5/7), lterm-m5-idle-bench blink amber cpu static 30, Xvfb :44 1024x640, llvmpipe (NOT a GPU), terminal process CPU only, REAL
+blink amber cpu static: amber, effects: C++ fallback (4 threads), quality static, window visible 1, active 1
+   0-10 s:     884 ms CPU =   8.8 % of one core, 19 content frames
+  10-20 s:    1016 ms CPU =  10.2 % of one core, 19 content frames
+  20-30 s:    1004 ms CPU =  10.0 % of one core, 19 content frames
+  total 2905 ms CPU over 30 s = 9.7 %

@@ -11,6 +11,8 @@
 #include <cstring>
 #include <ctime>
 #include <sys/wait.h>
+#include <termios.h>
+#include <unistd.h>
 #include <csignal>
 
 namespace lterm {
@@ -59,8 +61,8 @@ TerminalView::TerminalView(const ViewOptions& opts)
     : Gtk::Box(Gtk::ORIENTATION_VERTICAL), opts_(opts) {
     const Profile* p = findProfile(opts_.profile);
     if (!p) {
-        std::fprintf(stderr, "lunduke-terminal: unknown profile '%s', using plain\n", opts_.profile.c_str());
-        p = findProfile("plain");
+        std::fprintf(stderr, "lunduke-terminal: unknown profile '%s', using %s\n", opts_.profile.c_str(), kDefaultProfile);
+        p = findProfile(kDefaultProfile);
     }
     profile_ = *p;
     {
@@ -79,12 +81,28 @@ TerminalView::TerminalView(const ViewOptions& opts)
     sel_.setWordChars(opts_.wordChars);
     t0_ = g_get_monotonic_time();
 
+    im_ = gtk_im_multicontext_new();
+    gtk_im_context_set_use_preedit(im_, FALSE);
+    g_signal_connect(im_, "commit", G_CALLBACK(+[](GtkIMContext*, const char* text, gpointer self) {
+        static_cast<TerminalView*>(self)->onImCommit(text);
+    }), this);
     for (Gtk::Widget* w : {static_cast<Gtk::Widget*>(&area_), static_cast<Gtk::Widget*>(&gl_)}) {
         w->set_can_focus(true);
         w->set_no_show_all(true);  // chooseMode() shows exactly one of the two
-        w->add_events(Gdk::KEY_PRESS_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK |
+        w->add_events(Gdk::KEY_PRESS_MASK | Gdk::KEY_RELEASE_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK |
                       Gdk::POINTER_MOTION_MASK | Gdk::SCROLL_MASK | Gdk::SMOOTH_SCROLL_MASK);
         w->signal_key_press_event().connect(sigc::mem_fun(*this, &TerminalView::onKey), false);
+        w->signal_key_release_event().connect([this](GdkEventKey* ev) {
+            return ev->window && gtk_im_context_filter_keypress(im_, ev);
+        }, false);
+        w->signal_focus_in_event().connect([this](GdkEventFocus*) {
+            gtk_im_context_focus_in(im_);
+            return false;
+        });
+        w->signal_focus_out_event().connect([this](GdkEventFocus*) {
+            gtk_im_context_focus_out(im_);
+            return false;
+        });
         w->signal_button_press_event().connect(sigc::mem_fun(*this, &TerminalView::onButtonPress), false);
         w->signal_button_release_event().connect(sigc::mem_fun(*this, &TerminalView::onButtonRelease), false);
         w->signal_motion_notify_event().connect(sigc::mem_fun(*this, &TerminalView::onMotion), false);
@@ -100,6 +118,8 @@ TerminalView::TerminalView(const ViewOptions& opts)
     area_.signal_draw().connect(sigc::mem_fun(*this, &TerminalView::onPaintBegin), false);
     gl_.signal_draw().connect(sigc::mem_fun(*this, &TerminalView::onPaintBegin), false);
     signal_realize().connect([this] {
+        if (Gtk::Widget* top = get_toplevel())
+            if (top->get_window()) gtk_im_context_set_client_window(im_, top->get_window()->gobj());
         disconnectAfterPaint();
         if (GdkFrameClock* fc = gtk_widget_get_frame_clock(GTK_WIDGET(gobj()))) {
             afterPaintClock_ = GDK_FRAME_CLOCK(g_object_ref(fc));
@@ -161,6 +181,9 @@ void TerminalView::reapInBackground(pid_t pid, unsigned killAfterMs) {
 }
 
 TerminalView::~TerminalView() {
+    g_signal_handlers_disconnect_by_data(im_, this);
+    gtk_im_context_set_client_window(im_, nullptr);
+    g_object_unref(im_);
     alive_.reset();  // pending clipboard replies must not touch this object any more
     if (childWatch_) {
         g_source_remove(childWatch_);
@@ -179,7 +202,9 @@ TerminalView::~TerminalView() {
     bellTimer_.disconnect();
     blink_.disconnect();
     io_.disconnect();
+    ptyIdle_.disconnect();
     tick_.disconnect();
+    freeHidden_.disconnect();
     frameTimer_.disconnect();
     if (opts_.stats) {
         auto med = [](std::vector<double> v) {
@@ -247,8 +272,8 @@ std::string TerminalView::backendName() const {
 
 bool TerminalView::start() {
     if (!session_->spawn(SpawnOptions{opts_.command, opts_.loginShell, opts_.cwd})) return false;
-    io_ = Glib::signal_io().connect(sigc::mem_fun(*this, &TerminalView::onPtyIo), session_->masterFd(),
-                                    Glib::IO_IN | Glib::IO_HUP | Glib::IO_ERR);
+    connectPtyWatch();
+    blinkSinceMs_ = nowMs();
     // GLib reaps the child (SIGCHLD) and reports the wait status on the main loop.
     childWatch_ = g_child_watch_add(
         session_->childPid(),
@@ -263,9 +288,10 @@ void TerminalView::onChildExit(int status) {
     childWatch_ = 0;
     exited_ = true;
     session_->markExited();
-    if (io_.connected()) {  // drain what the child wrote last
+    if (io_.connected() || ptyIdle_.connected()) {  // drain what the child wrote last
         session_->readAvailable();
         io_.disconnect();
+        ptyIdle_.disconnect();
     }
     signalExitStatus.emit(status);
     const bool ok = WIFEXITED(status) && WEXITSTATUS(status) == 0;
@@ -315,10 +341,23 @@ void TerminalView::onBell() {
 void TerminalView::updateBlink() {
     int b = session_->cursorBlink();
     const bool blink = b < 0 ? opts_.cursorBlink : b != 0;
-    const bool want = blink && active_ && visible_ && !holding_ && scrollOffset_ == 0;
+    const bool want = blink && active_ && visible_ && !holding_ && scrollOffset_ == 0 && !blinkExpired_;
     if (want && !blink_.connected()) {
         blink_ = Glib::signal_timeout().connect(
             [this] {
+                // Review item 5: each toggle is a content frame, and with effects the whole
+                // effects pass. Stop with the cursor shown after the timeout.
+                const int timeout = blinkTimeoutMs();
+                if (timeout >= 0 && nowMs() - blinkSinceMs_ >= timeout) {
+                    blinkExpired_ = true;
+                    if (blinkOff_) {
+                        blinkOff_ = false;
+                        contentDirty_ = true;
+                        requestFrame();
+                    }
+                    return false;
+                }
+                ++stats_.blinkToggles;
                 blinkOff_ = !blinkOff_;
                 contentDirty_ = true;
                 requestFrame();
@@ -333,6 +372,20 @@ void TerminalView::updateBlink() {
         contentDirty_ = true;
         requestFrame();
     }
+}
+
+int TerminalView::blinkTimeoutMs() const {
+    if (opts_.cursorBlinkTimeoutMs >= 0) return opts_.cursorBlinkTimeoutMs;
+    int s = 10;
+    if (auto settings = Gtk::Settings::get_default()) s = settings->property_gtk_cursor_blink_timeout().get_value();
+    if (s <= 0 || s >= 1000000) return -1;  // G_MAXINT: blink forever
+    return s * 1000;
+}
+
+void TerminalView::noteBlinkActivity() {
+    blinkSinceMs_ = nowMs();
+    blinkExpired_ = false;
+    updateBlink();
 }
 
 void TerminalView::applyProfile() {
@@ -462,8 +515,14 @@ bool TerminalView::onGlRender(const Glib::RefPtr<Gdk::GLContext>&) {
     // effects tick showed it; with nothing animating, the window stayed black).
     GLint fbo = 0;
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &fbo);
-    if (!glPipe_ || glParamsStale_) {
-        if (glPipe_) glPipe_->release();
+    if (glPipe_ && glParamsStale_) {
+        // M5 item 1c: a quality switch (a governor probe and its re-demotion, a profile or scale
+        // change) only changes uniforms and sized objects; keep the compiled programs.
+        glPipe_->setParams(fx_);
+        glParamsStale_ = false;
+        effectsSourceStale_ = true;
+    }
+    if (!glPipe_) {
         glPipe_.reset(new GlPipeline(fx_));
         glParamsStale_ = false;
         effectsSourceStale_ = true;
@@ -489,7 +548,7 @@ bool TerminalView::onGlRender(const Glib::RefPtr<Gdk::GLContext>&) {
                               PixelOrder::BGRA, static_cast<float>(t), y0, y1);
         if (opts_.stats) glFinish();
         if (frameCpu0_ >= 0) uploadCpuMs_ += processCpuMs() - u0;
-        stats_.effectsSourceMs.push_back(
+        recordStat(stats_.effectsSourceMs, 
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - e0).count());
         effectsSourceStale_ = false;
         srcDirtyY0_ = srcDirtyY1_ = 0;
@@ -499,7 +558,7 @@ bool TerminalView::onGlRender(const Glib::RefPtr<Gdk::GLContext>&) {
     if (opts_.stats) glFinish();
     if (!content) {
         ++stats_.ticks;
-        stats_.tickMs.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - r0).count());
+        recordStat(stats_.tickMs, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - r0).count());
     }
     lastFrameMs_ = t;
     return true;
@@ -518,7 +577,7 @@ bool TerminalView::onDraw(const Cairo::RefPtr<Cairo::Context>& cr) {
             cpu_->updateSource(cairo_image_surface_get_data(src_), cairo_image_surface_get_stride(src_),
                                PixelOrder::BGRA, static_cast<float>(t), y0, y1);
             if (frameCpu0_ >= 0) uploadCpuMs_ += processCpuMs() - u0;
-            stats_.effectsSourceMs.push_back(
+            recordStat(stats_.effectsSourceMs, 
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - e0).count());
             effectsSourceStale_ = false;
             srcDirtyY0_ = srcDirtyY1_ = 0;
@@ -537,7 +596,7 @@ bool TerminalView::onDraw(const Cairo::RefPtr<Cairo::Context>& cr) {
         }
         if (!content && rerender) {
             ++stats_.ticks;
-            stats_.tickMs.push_back(
+            recordStat(stats_.tickMs, 
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - r0).count());
         }
         lastFrameMs_ = t;
@@ -709,7 +768,7 @@ bool TerminalView::updateContent() {
     ++stats_.contentFrames;
     stats_.rowsPainted += n;
     if (full) ++stats_.fullRepaints;
-    stats_.paintMs.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
+    recordStat(stats_.paintMs, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
     lastContentMs_ = nowMs();
     if (mode_ == Mode::Plain) {
         const int ly0 = y0 / scale_, ly1 = (y1 + scale_ - 1) / scale_;  // logical
@@ -721,8 +780,18 @@ bool TerminalView::updateContent() {
 
 void TerminalView::requestFrame() {
     if (frameTimer_.connected()) return;
+    // Review item 7: a hidden tab (or minimised window) only parses; contentDirty_ stays set and
+    // setWindowVisible(true) paints the changed rows once.
+    if (!visible_) {
+        if (contentDirty_) ++stats_.framesHidden;
+        return;
+    }
     // Effects re-run bloom/burn-in/static passes for every content frame: cap those at 30 fps.
-    const int fps = std::max(1, mode_ == Mode::Plain ? opts_.maxFps : std::min(opts_.maxFps, 30));
+    int fps = std::max(1, mode_ == Mode::Plain ? opts_.maxFps : std::min(opts_.maxFps, 30));
+    // PR #6 review N1: during a flood (a PTY slice was cut in the last 100 ms) an effects frame
+    // between slices halved throughput on llvmpipe (seq 1 3000000: 13.5 s vs 7.0 s on master);
+    // at most kFloodFps effects frames then (8.6-8.9 s). Plain is cheap and keeps its rate.
+    if (mode_ != Mode::Plain && nowMs() - lastSliceCutMs_ < 100.0) fps = std::min(fps, kFloodFps);
     const double delay = std::max(0.0, lastFrameMs_ + 1000.0 / fps - nowMs());
     frameTimer_ = Glib::signal_timeout().connect(
         [this] {
@@ -733,6 +802,7 @@ void TerminalView::requestFrame() {
 }
 
 void TerminalView::onFrameTimer() {
+    if (!visible_) return;  // hidden since the request: paint on show (contentDirty_ stays set)
     if (mode_ == Mode::Plain) lastFrameMs_ = nowMs();
     const bool changed = updateContent();
     if (mode_ == Mode::Cpu && (changed || effectsSourceStale_)) area_.queue_draw();
@@ -855,9 +925,19 @@ bool TerminalView::governTick() {
     return false;
 }
 
+bool TerminalView::probeWanted() const {
+    // M5 item 1c: a probe renders animated frames; nobody sees them while the window is hidden
+    // or (with pause-when-unfocused) unfocused, and the animation would pause there anyway.
+    return effectsOn_ && mode_ != Mode::Plain && visible_ && (active_ || !opts_.pauseWhenUnfocused);
+}
+
 bool TerminalView::onProbeTimer() {
     if (!qualityDemoted_) return false;
     if (!gov_.probeDue(nowMs())) return true;
+    if (!probeWanted()) {
+        ++stats_.probesDeferred;
+        return true;  // due; starts once the window is visible/focused again (polled every 250 ms)
+    }
     // Try the auto level again; the governor demotes once more (with a longer wait) if it
     // is still too expensive.
     qualityDemoted_ = false;
@@ -882,6 +962,21 @@ bool TerminalView::onTick() {
     return !replaced;
 }
 
+std::string TerminalView::foregroundJob() const {
+    const pid_t child = session_->childPid();
+    const int fd = session_->masterFd();
+    if (exited_ || child <= 0 || fd < 0) return "";
+    const pid_t fg = tcgetpgrp(fd);
+    if (fg <= 0 || fg == getpgid(child)) return "";
+    std::string name;
+    try {
+        name = Glib::file_get_contents("/proc/" + std::to_string(fg) + "/comm");
+    } catch (const Glib::Error&) {
+    }
+    while (!name.empty() && (name.back() == '\n' || name.back() == ' ')) name.pop_back();
+    return name.empty() ? "a program" : name;
+}
+
 void TerminalView::setWindowActive(bool active) {
     if (active == active_) return;
     active_ = active;
@@ -889,21 +984,92 @@ void TerminalView::setWindowActive(bool active) {
     contentDirty_ = true;                   // hollow <-> solid cursor (one row)
     requestFrame();
     updateAnimation();
-    updateBlink();
+    if (active) noteBlinkActivity();  // focus-in restarts the blink timeout
+    else updateBlink();
 }
 
 void TerminalView::setWindowVisible(bool visible) {
     if (visible == visible_) return;
     visible_ = visible;
+    freeHidden_.disconnect();
+    if (!visible && opts_.effectsFreeHiddenMs >= 0)
+        freeHidden_ = Glib::signal_timeout().connect(
+            [this] {
+                freeHiddenEffects();
+                return false;
+            },
+            static_cast<unsigned>(opts_.effectsFreeHiddenMs));
+    if (visible && effectsFreed_) {
+        effectsFreed_ = false;
+        if (mode_ == Mode::Cpu && !cpu_) {
+            cpu_.reset(new CpuEffects(fx_, opts_.threads));
+            if (w_ > 0) cpu_->resize(w_, h_);
+            cpuOutValid_ = false;
+        }
+        fullRepaint_ = contentDirty_ = effectsSourceStale_ = true;  // GL: resized on the next render
+        updateContent();
+    }
     if (visible) requestFrame();
     updateAnimation();
     updateBlink();
 }
 
+void TerminalView::freeHiddenEffects() {
+    if (visible_ || effectsFreed_) return;
+    bool freed = false;
+    if (cpu_) {
+        cpu_.reset();
+        freed = true;
+    }
+    if (glPipe_ && gl_.get_realized()) {
+        gl_.make_current();
+        if (!gl_.has_error() && gdk_gl_context_get_current()) {
+            glPipe_->releaseSized();
+            freed = true;
+        }
+    }
+    if (!freed) return;
+    effectsFreed_ = true;
+    ++stats_.effectsFreed;
+}
+
+void TerminalView::connectPtyWatch() {
+    io_ = Glib::signal_io().connect(sigc::mem_fun(*this, &TerminalView::onPtyIo), session_->masterFd(),
+                                    Glib::IO_IN | Glib::IO_HUP | Glib::IO_ERR);
+}
+
 bool TerminalView::onPtyIo(Glib::IOCondition) {
+    bool more = false;
+    const bool alive = readSlice(&more);
+    if (alive && more) {
+        ++stats_.ptySlicesCut;
+        // Flood: the fd stays readable, and a watch at default priority would starve the redraw
+        // (priority 120) for as long as the child writes. Read on from an idle below the redraw
+        // instead; key events (default priority) get through between slices, so Ctrl+C works.
+        ptyIdle_ = Glib::signal_idle().connect(
+            [this] {
+                bool more = false;
+                const bool alive = readSlice(&more);
+                if (!alive) return false;
+                if (more) {
+                    ++stats_.ptySlicesCut;
+                    return true;
+                }
+                connectPtyWatch();
+                return false;
+            },
+            Glib::PRIORITY_DEFAULT_IDLE);
+        return false;  // disconnects io_
+    }
+    return alive;
+}
+
+bool TerminalView::readSlice(bool* more) {
     const long top0 = session_->topLine();
-    const bool alive = session_->readAvailable();
+    const bool alive = session_->readAvailable(kPtySliceUs, more);
+    if (*more) lastSliceCutMs_ = nowMs();  // flooding: content frames are capped lower
     const long pushed = session_->topLine() - top0;
+    const bool damaged = session_->takeDamage();
     if (pushed != 0 && scrollOffset_ > 0)  // keep a scrolled-back view still while output arrives
         scrollOffset_ = std::clamp(scrollOffset_ + static_cast<int>(pushed), 0,
                                    static_cast<int>(session_->scrollbackSize()));
@@ -914,7 +1080,7 @@ bool TerminalView::onPtyIo(Glib::IOCondition) {
         sel_.clear();
         scrollOffset_ = 0;
     }
-    if (session_->takeDamage()) {
+    if (damaged) {
         contentDirty_ = true;
         if (!searchQuery_.empty() && !searchRefresh_.connected())  // debounced: 250 ms after output
             searchRefresh_ = Glib::signal_timeout().connect(
@@ -924,16 +1090,25 @@ bool TerminalView::onPtyIo(Glib::IOCondition) {
                 },
                 250);
         requestFrame();
-        updateBlink();  // DECSCUSR / ?12 may have changed blinking
+        noteBlinkActivity();  // output restarts the blink timeout; DECSCUSR / ?12 may change it
         // Output overwrote the selected text (clear, an editor redraw): drop the selection. A
         // selection that merely scrolled keeps its text and stays (it is anchored to lines).
-        if (sel_.active() && !selecting_ && sel_.end().line >= session_->topLine() &&
-            sel_.text(*session_) != selSnapshot_)
+        if (sel_.active() && !selecting_ && sel_.end().line >= session_->topLine() && selectionOverwritten())
             sel_.clear();
     }
     ensureWriteWatch();  // replies (DA, DSR) that did not fit
-    if (!alive) return false;  // EOF/HUP; the child watch decides what happens to the window
-    return true;
+    return alive;  // false: EOF/HUP; the child watch decides what happens to the window
+}
+
+bool TerminalView::selectionOverwritten() {
+    const long from = std::max(sel_.start().line, session_->topLine());
+    for (long l = from; l <= sel_.end().line; ++l) {
+        const long i = l - selLinesBase_;
+        ++stats_.selLinesCompared;
+        if (i < 0 || i >= static_cast<long>(selLines_.size()) || sel_.text(*session_, l, l) != selLines_[static_cast<size_t>(i)])
+            return true;
+    }
+    return false;
 }
 
 void TerminalView::ensureWriteWatch() {
@@ -948,6 +1123,7 @@ void TerminalView::ensureWriteWatch() {
 
 void TerminalView::sendKeyInput() {
     snapToBottom();
+    noteBlinkActivity();
     if (blinkOff_) {  // typing shows the cursor immediately
         blinkOff_ = false;
         contentDirty_ = true;
@@ -1074,6 +1250,9 @@ bool TerminalView::onButtonRelease(GdkEventButton* ev) {
         selecting_ = false;
         if (sel_.active()) {
             selSnapshot_ = sel_.text(*session_);
+            selLinesBase_ = sel_.start().line;
+            selLines_.clear();
+            for (long l = sel_.start().line; l <= sel_.end().line; ++l) selLines_.push_back(sel_.text(*session_, l, l));
             if (!selSnapshot_.empty()) Gtk::Clipboard::get(GDK_SELECTION_PRIMARY)->set_text(selSnapshot_);
             else sel_.clear();  // only blanks: nothing to copy, do not leave a highlight behind
             selectionChanged();
@@ -1178,6 +1357,18 @@ bool TerminalView::onKey(GdkEventKey* ev) {
             signalChildExited.emit();
         return true;
     }
+    // The input method sees the key first (it may start or end a compose sequence, or pick a
+    // CJK candidate with Space/Return), except Ctrl/Alt chords (sent as they are) and keypad
+    // keys (application keypad mode). Synthetic events without a window skip it.
+    const bool keypad = ev->keyval >= GDK_KEY_KP_Space && ev->keyval <= GDK_KEY_KP_9;
+    if (ev->window && !(ev->state & (GDK_CONTROL_MASK | GDK_MOD1_MASK)) && !keypad) {
+        updateImCursor();
+        if (gtk_im_context_filter_keypress(im_, ev)) return true;
+    } else if (ev->window && !ev->is_modifier) {
+        // PR #6 review N3: a pending dead key or compose sequence must not survive a chord
+        // (dead acute, Ctrl+C, q sent "^C" then "´q"); drop it before the chord goes out.
+        gtk_im_context_reset(im_);
+    }
     const VTermModifier mod = modsOf(ev->state);
     VTermKey key;
     if (mapKey(ev->keyval, key)) {
@@ -1193,6 +1384,25 @@ bool TerminalView::onKey(GdkEventKey* ev) {
         return true;
     }
     return false;
+}
+
+void TerminalView::onImCommit(const char* text) {
+    if (holding_ || exited_ || !text || !*text || !g_utf8_validate(text, -1, nullptr)) return;
+    ++imCommits_;
+    for (const char* p = text; *p; p = g_utf8_next_char(p)) session_->sendChar(g_utf8_get_char(p), VTERM_MOD_NONE);
+    sendKeyInput();
+}
+
+void TerminalView::updateImCursor() {
+    Gtk::Widget* top = get_toplevel();
+    if (!top || !get_realized() || !painter_) return;
+    const int s = std::max(1, scale_);
+    const int cx = (marginX_ + cur_.cursorCol * painter_->cellWidth()) / s;
+    const int cy = (marginY_ + cur_.cursorRow * painter_->cellHeight()) / s;
+    int tx = 0, ty = 0;
+    if (!translate_coordinates(*top, cx, cy, tx, ty)) return;
+    GdkRectangle r{tx, ty, std::max(1, painter_->cellWidth() / s), std::max(1, painter_->cellHeight() / s)};
+    gtk_im_context_set_cursor_location(im_, &r);
 }
 
 // ---- M2 stage 3: search ----
@@ -1381,7 +1591,28 @@ void TerminalView::setEffectsQuality(EffectsQuality q) {
 
 void TerminalView::setScrollbackLines(long long lines) {
     opts_.scrollbackLines = lines;
-    session_->setScrollbackLimit(clampScrollbackLines(lines));
+    const size_t want = clampScrollbackLines(lines);
+    // Review item 10 / PR #6 review N2: lowering it never drops history at once (a slip of the
+    // spin button in Settings, or "100" typed for "10000", then back up, loses nothing, even in
+    // a tab that keeps printing); the trim waits for commitScrollbackLimit(), which Settings
+    // calls when its dialog is closed.
+    if (want < session_->scrollbackSize()) {
+        pendingSbLimit_ = static_cast<long long>(want);
+        return;
+    }
+    pendingSbLimit_ = -1;
+    applyScrollbackLimit(want);
+}
+
+void TerminalView::commitScrollbackLimit() {
+    if (pendingSbLimit_ < 0) return;
+    const size_t want = static_cast<size_t>(pendingSbLimit_);
+    pendingSbLimit_ = -1;
+    applyScrollbackLimit(want);
+}
+
+void TerminalView::applyScrollbackLimit(size_t want) {
+    session_->setScrollbackLimit(want);
     scrollOffset_ = std::min(scrollOffset_, static_cast<int>(session_->scrollbackSize()));
     if (sel_.active() && sel_.start().line < session_->firstLine()) sel_.clear();
     if (!searchQuery_.empty()) refreshSearch();

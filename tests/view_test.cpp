@@ -5,6 +5,7 @@
 //   (d) closing the view while a clipboard request is pending
 //   (g) the child is reaped after the view hangs up on it
 // M2 stage 3: tabs, scrollback search (view + search bar), the settings dialog.
+#include "gl_pipeline.hpp"
 #include "sanitizer.hpp"
 #include "terminal_view.hpp"
 #include "terminal_window.hpp"
@@ -137,6 +138,7 @@ static void testClipboardAfterClose() {
     pump(50);
     for (int i = 0; i < 5; ++i) {
         ViewOptions o;
+        o.profile = "plain";  // M5: the default is amber now
         o.command = {"/bin/cat"};
         o.onExit = "close";
         Win w(o);
@@ -149,6 +151,7 @@ static void testClipboardAfterClose() {
     }
     {   // Control: with the view alive the paste does arrive.
         ViewOptions o;
+        o.profile = "plain";  // M5: the default is amber now
         o.command = {"/bin/cat"};
         Win w(o);
         CHECK(w.view->start());
@@ -170,6 +173,7 @@ static void testReapAfterHangup() {
     pid_t pid;
     {
         ViewOptions o;
+        o.profile = "plain";  // M5: the default is amber now
         o.command = {"/bin/sleep", "30"};
         Win w(o);
         CHECK(w.view->start());
@@ -184,6 +188,7 @@ static void testReapAfterHangup() {
     CHECK(gone(pid));  // not left as a zombie
     {   // A child that ignores SIGHUP and exits a bit later is reaped by the GLib child watch.
         ViewOptions o;
+        o.profile = "plain";  // M5: the default is amber now
         o.command = {"/bin/sh", "-c", "trap '' HUP; sleep 0.6"};
         Win w(o);
         CHECK(w.view->start());
@@ -197,11 +202,13 @@ static void testReapAfterHangup() {
 
 static void testScrollbackClampView() {
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.command = {"/bin/true"};
     o.scrollbackLines = 1LL << 40;
     Win w(o);
     CHECK(w.view->session().scrollbackLimit() == kMaxScrollbackLines);
     ViewOptions n;
+    n.profile = "plain";  // M5: the default is amber now
     n.command = {"/bin/true"};
     n.scrollbackLines = -3;
     Win w2(n);
@@ -386,6 +393,7 @@ static int searchSync(TerminalView& v, const std::string& q, bool cs) {
 
 static void testSearchView() {
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.command = {"/bin/sh", "-c",
                  "i=0; while [ $i -lt 200 ]; do echo row $i; i=$((i+1)); done; echo 'find ME here';"
                  "i=0; while [ $i -lt 100 ]; do echo after $i; i=$((i+1)); done; echo 'ME again'; exec cat"};
@@ -453,6 +461,7 @@ static void testSearchView() {
 // short idle slices (the query is pending meanwhile), then each keystroke is a quick find().
 static void testSearchBig() {
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.scrollbackLines = 100000;
     Win w(o);
     TerminalView& v = *w.view;
@@ -499,6 +508,7 @@ static void testSearchBig() {
 
 static void testSearchBar() {
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.command = {"/bin/sh", "-c", "echo alpha; echo beta ALPHA; exec sleep 30"};
     TerminalWindow w(o);
     w.set_default_size(480, 320);
@@ -539,6 +549,7 @@ static void testSettingsDialog() {
     g_mkdir_with_parents(dir.c_str(), 0700);
     Glib::file_set_contents(ini, "# kept\n[terminal]\ncursor-shape=bar\nprofile=green\n");
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.command = {"/bin/sh", "-c", "exec sleep 30"};
     TerminalWindow w(o);
     w.settingsFile = ini;
@@ -652,37 +663,99 @@ static void testGovernor(const char* renderer) {
     CHECK(!w.view->qualityDemoted());
     CHECK(w.view->effectsQuality() == level);
     CHECK(w.view->animating());
+    // M5 item 1c: from here on (demotion, two probes, recovery) no GL program is compiled again;
+    // a quality switch only swaps the pipeline's parameters (M4 rebuilt all 7 programs each time).
+    const long programs0 = GlPipeline::programsCompiled();
     // A renderer that needs 400 ms per frame: over budget even at 1 fps -> static.
     w.view->setRenderCostForTest(400);
-    CHECK(waitFor([&] { return w.view->qualityDemoted(); }, 8000));
+    CHECK(waitFor([&] { return w.view->qualityDemoted(); }, ltermWaitMs(8000, 20000)));
     CHECK(w.view->effectsQuality() == EffectsQuality::Static);
     CHECK(!w.view->animating());
     const double demotedAt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     // M4 item 2: a probe whose first frame is far over budget (3900 ms, like GL in the TCG VM)
     // fails after that one frame, and the back-off doubles (1.5 s -> 3 s).
     w.view->setRenderCostForTest(3900);
-    CHECK(waitFor([&] { return w.view->governor().probeAborted() && w.view->qualityDemoted(); }, 6000));
+    CHECK(waitFor([&] { return w.view->governor().probeAborted() && w.view->qualityDemoted(); }, ltermWaitMs(6000, 15000)));
     CHECK(w.view->governor().probeFrames() == 1);
     CHECK(w.view->governor().probeDelayMs() == 3000);
     std::printf("governor %s: costly probe aborted after %d frame(s), retry in %.1f s\n", renderer,
                 w.view->governor().probeFrames(), w.view->governor().probeDelayMs() / 1000.0);
     // Load drops: the next probe (3 s later) brings auto back, and it stays.
     w.view->setRenderCostForTest(0);
-    CHECK(waitFor([&] { return !w.view->qualityDemoted(); }, 8000));
+    CHECK(waitFor([&] { return !w.view->qualityDemoted(); }, ltermWaitMs(8000, 20000)));
     CHECK(w.view->effectsQuality() == level);
-    CHECK(waitFor([&] { return w.view->governor().state() == EffectsGovernor::State::Normal; }, 6000));
+    // M5 item 1a: the probe needs 3 consecutive in-budget 1 s windows; under ASan+UBSan on a busy
+    // box one window over budget restarts the count, so build-san waits longer (failed 2/5
+    // serial runs with 6 s in M4). 15 s was still tight: one serial run reached Normal after
+    // 17.7 s (waitFor counts 20 ms pump steps, and slow main-loop iterations overrun them), so
+    // build-san waits up to 30 s (M5 PR #6).
+    const auto n0 = std::chrono::steady_clock::now();
+    const int normalWait = ltermWaitMs(6000, 30000);
+    CHECK(waitFor([&] { return w.view->governor().state() == EffectsGovernor::State::Normal; }, normalWait));
+    std::printf("governor %s (%s): probe reached Normal %.0f ms after auto came back (wait limit %d ms)\n",
+                renderer, ltermBuildLabel(),
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - n0).count(), normalWait);
     CHECK(!w.view->qualityDemoted());
     CHECK(w.view->animating());
     // ... and the tick speeds back up. How far depends on the real frame cost (ASan + llvmpipe with
     // other tests running can hold it above the base interval, which is the governor working), so
     // only require clear recovery from the 1 fps floor here; governor_test checks the exact steps.
-    CHECK(waitFor([&] { return w.view->tickIntervalMs() <= w.view->governor().config().maxIntervalMs / 2; }, 15000));
+    CHECK(waitFor([&] { return w.view->tickIntervalMs() <= w.view->governor().config().maxIntervalMs / 2; }, ltermWaitMs(15000, 30000)));
     waitFor([&] { return w.view->tickIntervalMs() <= w.view->governor().config().baseIntervalMs; }, 5000);
     std::printf("governor %s: demoted at %.1f s, back to %s, tick %.0f ms\n", renderer, demotedAt,
                 effectsQualityName(w.view->effectsQuality()), w.view->tickIntervalMs());
+    std::printf("governor %s: GL programs compiled during demotion + 2 probes: %ld\n", renderer,
+                GlPipeline::programsCompiled() - programs0);
+    CHECK(GlPipeline::programsCompiled() == programs0);
     // An explicit choice clears the state.
     w.view->setEffectsQuality(EffectsQuality::Full);
     CHECK(w.view->effectsQuality() == EffectsQuality::Full);
+}
+
+// M5 item 1c: a due probe waits while the window is hidden or (pause-when-unfocused) unfocused,
+// and runs once it is visible and focused again.
+static void testProbeDeferred(const char* renderer) {
+    ViewOptions o;
+    o.profile = "amber";
+    o.renderer = renderer;
+    o.pauseWhenUnfocused = true;
+    o.command = {"/bin/sh", "-c", "printf '$ '; sleep 60"};
+    Win w(o);
+    w.view->governor().configure([&] {
+        GovernorConfig c = w.view->governor().config();
+        c.firstProbeMs = 1000;
+        c.maxProbeMs = 1000;
+        return c;
+    }());
+    CHECK(w.view->start());
+    pump(300);
+    CHECK(w.view->softwareRendering());
+    w.view->setRenderCostForTest(3900);
+    CHECK(waitFor([&] { return w.view->qualityDemoted(); }, ltermWaitMs(8000, 20000)));
+    pump(300);
+    const auto checkDeferred = [&](const char* why) {
+        const long d0 = w.view->stats().probesDeferred;
+        pump(2500);  // 2.5x the probe delay
+        // M5 PR #6: under ASan+UBSan on a busy box the 1 s probe poll can miss those 2.5 s (failed
+        // once in 8 serial runs with 0 polls deferred), so build-san waits up to 7.5 s more for
+        // the first deferred poll. The release build checks right after the 2.5 s, as before.
+        waitFor([&] { return w.view->stats().probesDeferred > d0; }, ltermWaitMs(0, 7500));
+        std::printf("probe deferral %s (%s): %ld due poll(s) deferred, state %d\n", renderer, why,
+                    w.view->stats().probesDeferred - d0, static_cast<int>(w.view->governor().state()));
+        CHECK(w.view->stats().probesDeferred > d0);
+        CHECK(w.view->qualityDemoted());
+        CHECK(w.view->governor().state() == EffectsGovernor::State::Demoted);
+        CHECK(!w.view->animating());
+    };
+    w.view->setWindowActive(false);
+    checkDeferred("unfocused");
+    w.view->setWindowActive(true);
+    w.view->setWindowVisible(false);
+    checkDeferred("hidden");
+    // Visible and focused again: the due probe starts (and, at no cost, brings auto back).
+    w.view->setRenderCostForTest(0);
+    w.view->setWindowVisible(true);
+    CHECK(waitFor([&] { return !w.view->qualityDemoted(); }, ltermWaitMs(3000, 8000)));
 }
 
 // M3 item 1e: a settings.ini that is not a valid key file no longer blocks Save: the dialog
@@ -694,6 +767,7 @@ static void testCorruptSettings() {
     const std::string bad = "[terminal\nprofile=green\n\xff\xfe garbage\n";
     Glib::file_set_contents(ini, bad);
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.command = {"/bin/sh", "-c", "exec sleep 30"};
     TerminalWindow w(o);
     w.settingsFile = ini;
@@ -759,6 +833,7 @@ static char procState(pid_t pid) {  // 0: gone
 // M3 item 1c: closing tabs never blocks on the child; one that ignores SIGHUP is killed later.
 static void testTabClose() {
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.command = {"/bin/sh", "-c", "trap '' HUP; sleep 30"};  // ignores SIGHUP: needs the SIGKILL
     {
         TerminalWindow w(o);
@@ -774,12 +849,13 @@ static void testTabClose() {
             pump(5);
         }
         pump(400);
-        double worst = 0, total = 0;
+        double worst = 0, second = 0, total = 0;
         while (w.tabCount() > 1) {
             TerminalView* v = w.view(w.tabCount() - 1);
             const auto t0 = std::chrono::steady_clock::now();
             w.closeTab(v);
             const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+            second = std::max(second, std::min(worst, ms));
             worst = std::max(worst, ms);
             total += ms;
             pump(2);
@@ -793,7 +869,7 @@ static void testTabClose() {
         for (int i = 1; i < n; ++i) running += procState(pids[i]) != 0;
         // ...and are killed after the grace period and reaped: no zombies.
         const auto c0 = std::chrono::steady_clock::now();
-        CHECK(waitFor([&] { return TerminalView::pendingReaps() == 0; }, 5000));
+        CHECK(waitFor([&] { return TerminalView::pendingReaps() == 0; }, ltermWaitMs(5000, 12000)));
         const double goneMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - c0).count();
         int left = 0;
         for (int i = 1; i < n; ++i) left += procState(pids[i]) != 0;
@@ -801,11 +877,17 @@ static void testTabClose() {
         // M2 regression: >= 50 ms per tab whose child ignores SIGHUP. The release build keeps the
         // 25 ms limit and catches it; ASan+UBSan with every core busy measured 27.7 and 30.5 ms
         // (review), so build-san only checks 75 ms (a gross regression, e.g. a blocking wait).
+        // PR #6 review: one close in 19 can be hit by a box stall (27.3 ms seen once in 10 serial
+        // release runs, view_test is ASan-linked with the slow unwinder), so the limit applies to
+        // the second-worst close and the worst may reach twice the limit. The M2 regression slows
+        // every close and still fails both checks.
         const double closeLimit = ltermTimingLimitMs(25.0, 75.0);
         std::printf("tab close (%s): %d closes, worst %.2f ms, total %.2f ms; %d still running right after, "
-                    "all reaped %.0f ms later (limit %.0f ms)\n", ltermBuildLabel(), n - 1, worst, total, running, goneMs, closeLimit);
-        CHECK(worst < closeLimit);
-        CHECK(waitFor([&] { return w.trims() >= 1; }, 3000));
+                    "all reaped %.0f ms later (limit %.0f ms for the 2nd worst %.2f ms)\n", ltermBuildLabel(), n - 1, worst, total,
+                    running, goneMs, closeLimit, second);
+        CHECK(second < closeLimit);
+        CHECK(worst < 2 * closeLimit);
+        CHECK(waitFor([&] { return w.trims() >= 1; }, ltermWaitMs(3000, 8000)));
         pump(500);
         CHECK(w.trims() == 1);  // debounced: one trim for the 19 closes
         std::printf("tab close trim: %d trim(s), RSS dropped %ld kB (ASan has its own allocator: ~0 here)\n", w.trims(), w.lastTrimKb());
@@ -815,6 +897,7 @@ static void testTabClose() {
 // M3 item 1d: deferred closes use tab ids (run under ASan: a stale pointer would show).
 static void testTabIds() {
     ViewOptions o;
+    o.profile = "plain";  // M5: the default is amber now
     o.command = {"/bin/sh", "-c", "exec sleep 30"};
     {   // The close button clicked twice: one close.
         TerminalWindow w(o);
@@ -870,7 +953,7 @@ static void testTabIds() {
         w.closeButton(y)->clicked();  // pending when the window goes away
     }
     pump(100);  // the idle close must not touch the destroyed window
-    CHECK(waitFor([&] { return TerminalView::pendingReaps() == 0; }, 5000));
+    CHECK(waitFor([&] { return TerminalView::pendingReaps() == 0; }, ltermWaitMs(5000, 12000)));
 }
 
 int main(int argc, char** argv) {
@@ -898,6 +981,8 @@ int main(int argc, char** argv) {
     testTabIds();
     testGovernor("auto");
     testGovernor("cpu");
+    testProbeDeferred("auto");
+    testProbeDeferred("cpu");
     if (failures) {
         std::fprintf(stderr, "%d failure(s)\n", failures);
         return 1;

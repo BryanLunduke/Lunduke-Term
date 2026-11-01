@@ -1,0 +1,6 @@
+# 2026-11-01 12:02 CST code 38acc4e (before items 5/7), lterm-m5-idle-bench blink plain gl static 30, Xvfb :44 1024x640, llvmpipe (NOT a GPU), terminal process CPU only, REAL
+blink plain gl static: plain, no effects, window visible 1, active 1
+   0-10 s:      11 ms CPU =   0.1 % of one core, 19 content frames
+  10-20 s:      13 ms CPU =   0.1 % of one core, 19 content frames
+  20-30 s:      12 ms CPU =   0.1 % of one core, 19 content frames
+  total 36 ms CPU over 30 s = 0.1 %

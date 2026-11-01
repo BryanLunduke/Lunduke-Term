@@ -1,0 +1,28 @@
+# PR #6 review B1: the failing release view run, traced (REAL), unfixed governor (5938825 + temporary GOVTRACE + COSTSET prints)
+# Xvfb :45 1920x1200, 3 view_test runs in parallel on a shared 8-vCPU box, 2026-11-01 ~14:55 CST
+# GOVTRACE: t = view clock ms, act 0 none / 1 interval / 2 demote, tick = current interval, next = governor target, top = session topLine (seq done at 399995)
+
+GOVTRACE t=9722 act=0 tick=146 next=146 load=0.02 frame=4 state=0 top=399995
+COSTSET wall=4001 top=399995
+GOVTRACE t=9868 act=0 tick=146 next=146 load=0.02 frame=4 state=0 top=399995
+GOVTRACE t=10015 act=0 tick=146 next=146 load=0.02 frame=4 state=0 top=399995
+GOVTRACE t=10163 act=0 tick=146 next=146 load=0.02 frame=4 state=0 top=399995
+GOVTRACE t=10310 act=0 tick=146 next=146 load=0.02 frame=4 state=0 top=399995
+GOVTRACE t=10457 act=1 tick=146 next=975 load=1.59 frame=232 state=0 top=399995
+GOVTRACE t=11433 act=0 tick=975 next=975 load=1.59 frame=232 state=0 top=399995
+GOVTRACE t=12409 act=0 tick=975 next=975 load=0.41 frame=404 state=0 top=399995
+GOVTRACE t=13385 act=0 tick=975 next=975 load=0.41 frame=404 state=0 top=399995
+GOVTRACE t=14362 act=0 tick=975 next=975 load=0.41 frame=404 state=0 top=399995
+GOVTRACE t=15337 act=0 tick=975 next=975 load=0.41 frame=404 state=0 top=399995
+GOVTRACE t=16314 act=0 tick=975 next=975 load=0.41 frame=404 state=0 top=399995
+GOVTRACE t=17290 act=0 tick=975 next=975 load=0.41 frame=404 state=0 top=399995
+GOVTRACE t=18266 act=0 tick=975 next=975 load=0.41 frame=404 state=0 top=399995
+FAIL ../tests/view_test.cpp:672: waitFor([&] { return w.view->qualityDemoted(); }, ltermWaitMs(8000, 20000))
+FAIL ../tests/view_test.cpp:673: w.view->effectsQuality() == EffectsQuality::Static
+FAIL ../tests/view_test.cpp:674: !w.view->animating()
+GOVTRACE t=19243 act=0 tick=975 next=975 load=0.41 frame=404 state=0 top=399995
+GOVTRACE t=20218 act=0 tick=975 next=975 load=2.21 frame=2154 state=0 top=399995
+GOVTRACE t=21195 act=0 tick=975 next=975 load=2.21 frame=2154 state=0 top=399995
+GOVTRACE t=22172 act=0 tick=975 next=975 load=4.00 frame=3904 state=0 top=399995
+GOVTRACE t=23148 act=0 tick=975 next=975 load=4.00 frame=3904 state=0 top=399995
+GOVTRACE t=24123 act=0 tick=975 next=975 load=4.00 frame=3904 state=0 top=399995

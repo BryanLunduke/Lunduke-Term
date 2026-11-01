@@ -4,11 +4,13 @@
 // Skips (77) when no EGL/GL 3.3 context is available.
 #include "cpu_effects.hpp"
 #include "gl_effects.hpp"
+#include "gl_pipeline.hpp"
 #include "grid_painter.hpp"
 #include "profiles.hpp"
 #include "synthetic_frame.hpp"
 #include "vterm_session.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -169,6 +171,34 @@ int main(int argc, char** argv) {
                 }
             }
         }
+    }
+
+    // M5 item 1c: GlPipeline::setParams() (a governor probe switching quality) on one pipeline
+    // must match the C++ back-end at every level, compile no program and leak no texture/FBO.
+    {
+        const Profile* pr = findProfile("amber");
+        EffectParams bezel = pr ? pr->fx : m1;
+        bezel.frame = true;
+        GlEffects gs(applyEffectsQuality(bezel, EffectsQuality::Static));
+        gs.resize(W, H);
+        gs.renderNoReadback(0.0f);
+        const long prog0 = GlPipeline::programsCompiled();
+        const int t0 = gs.pipeline()->liveTextures(), f0 = gs.pipeline()->liveFramebuffers();
+        double worst = 99.0;
+        const EffectsQuality cycle[] = {EffectsQuality::Reduced, EffectsQuality::Static, EffectsQuality::Full,
+                                        EffectsQuality::Static, EffectsQuality::Reduced, EffectsQuality::Static};
+        for (EffectsQuality q : cycle) {
+            const EffectParams p = applyEffectsQuality(bezel, q);
+            gs.pipeline()->setParams(p);
+            const double ps = compare(gs, p, a, b, &mx);
+            std::printf("setParams -> amber bezel %s: PSNR %.2f dB, max diff %d\n", effectsQualityName(q), ps, mx);
+            worst = std::min(worst, ps);
+        }
+        const long progs = GlPipeline::programsCompiled() - prog0;
+        const int t1 = gs.pipeline()->liveTextures(), f1 = gs.pipeline()->liveFramebuffers();
+        std::printf("setParams x6: programs compiled %ld, textures %d -> %d, fbos %d -> %d, worst PSNR %.2f dB\n",
+                    progs, t0, t1, f0, f1, worst);
+        if (progs != 0 || t1 != t0 || f1 != f0 || worst < 40.0) ++fails;
     }
 
     // Resize loop: object counts must stay constant and the output must still match.

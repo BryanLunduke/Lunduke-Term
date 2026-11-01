@@ -8,6 +8,7 @@
 
 #include <gtkmm.h>
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -30,6 +31,12 @@ public:
 
     TerminalView* newTab(bool first = false);  // the first tab runs opts.command
     void closeTab(TerminalView* v);
+    // Review item 9: what the user closes (tab button, Ctrl+Shift+W, the window) asks first when
+    // a tab runs a foreground job. confirmHook (tests) answers instead of the dialog.
+    void requestCloseTab(TerminalView* v);
+    std::function<bool(const std::string& question)> confirmHook;
+    bool deleteEventForTest() { return on_delete_event(nullptr); }
+    std::string runningJobs() const;  // "vim, ssh" over every tab, "" if none
     int tabCount() const { return static_cast<int>(tabs_.size()); }
     TerminalView* currentView();
     TerminalView* view(int page);  // by notebook page (tabs are reorderable)
@@ -56,8 +63,10 @@ public:
 
     void showSettings();
     SettingsDialog* settingsDialog() { return settings_.get(); }
+    Gtk::MessageDialog* confirmDialog() { return confirmDialog_.get(); }  // tests
     // Applies the dialog's options to every tab and to tabs opened later.
     void applySettings(const ViewOptions& o);
+    void commitScrollbackLimits();  // Settings closed: apply pending lower limits
     const ViewOptions& options() const { return opts_; }
     std::string settingsFile;  // where "Save as default" writes (tests point it elsewhere)
 
@@ -70,7 +79,15 @@ public:
     long lastTrimKb() const { return lastTrimKb_; }  // RSS drop of the last trim (kB, may be <= 0)
     unsigned trimDelayMs = 1000;
 
+protected:
+    bool on_delete_event(GdkEventAny* ev) override;
+
 private:
+    void confirm(const std::string& question, const std::string& action, std::function<void()> yes);
+    std::unique_ptr<Gtk::MessageDialog> confirmDialog_;
+    void dropConfirmDialog();
+    void requestCloseTabById(unsigned long id);
+    bool closeConfirmed_ = false;
     struct Tab {
         std::unique_ptr<TerminalView> view;
         Gtk::Box label{Gtk::ORIENTATION_HORIZONTAL, 4};
@@ -120,6 +137,8 @@ public:
     Gtk::ComboBoxText frame;  // profile default / on / off
     Gtk::Button save{"Save as default"};
     Gtk::Label status;
+    Gtk::Label scrollbackNote;  // review item 4: memory per tab when the scrollback is full
+    void updateScrollbackNote();
 
 private:
     void changed();

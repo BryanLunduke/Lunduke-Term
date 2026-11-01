@@ -1,0 +1,5 @@
+# 2026-11-01 11:39 CST code badd3f9+item-1 fix (10 ms PTY slices), lterm-m5-flood-bench seq amber 15, Xvfb :44, llvmpipe (NOT a GPU), REAL
+mode seq, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 15.0 s wall
+10 ms timer: 1284 runs, longest gap 111 ms, p99 gap 18 ms
+content frames: 292 (19.5 per s)
+exit 0

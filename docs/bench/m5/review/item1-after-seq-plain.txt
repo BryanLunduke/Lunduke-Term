@@ -1,0 +1,5 @@
+# 2026-11-01 11:39 CST code badd3f9+item-1 fix (10 ms PTY slices), lterm-m5-flood-bench seq plain 15, Xvfb :44, llvmpipe (NOT a GPU), REAL
+mode seq, profile plain (plain, no effects), 15.0 s wall
+10 ms timer: 1319 runs, longest gap 18 ms, p99 gap 14 ms
+content frames: 485 (32.3 per s)
+exit 0

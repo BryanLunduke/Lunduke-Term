@@ -1,0 +1,5 @@
+# 2026-11-01 11:11 CST code 3bf5d97 (M4 src + 1a test change), llvmpipe on Xvfb :44, NOT a GPU; lterm-m5-probe-bench cpu 30 unfocused
+renderer amber, effects: C++ fallback (4 threads), quality reduced, unfocused, window 1024x768, software=1
+run 30.1 s: 14 probe(s) started, 14 completed; process CPU 3579 ms total (11.9 % of a core)
+idle between probes: 92.80 ms CPU per s
+per probe (net of idle): median 57.8 ms, min 44.1, max 67.9, mean 56.1 (n=14)

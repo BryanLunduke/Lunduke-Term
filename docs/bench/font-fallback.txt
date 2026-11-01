@@ -76,3 +76,27 @@ green            Green                  font: Monospace 22px (fallback) (not mon
 green-scanlines  Green scanlines        font: Monospace 22px (fallback) (not monospaced!)
 ibm-dos          IBM DOS (colour)       font: Monospace 22px (fallback) (not monospaced!)
 ibm-3278         IBM 3278 (static)      font: Monospace 22px (fallback) (not monospaced!)
+
+# M5 item 2 (2026-11-01 11:32 CST, build of m5-core): the pixel-font profiles
+=== FONTCONFIG_FILE=fonts-all.conf (system fonts + all 12 Debian packages unpacked)
+fc-match '"Atari800"'     -> "Atari800" (AtariSmall.otf)
+fc-match 'Atari'          -> Atari (atarist-normal.otf)
+fc-match 'Amiga'          -> Amiga (Amiga-Regular.ttf)
+fc-match 'Hermit'         -> Hermit (Hermit-medium.otf)
+fc-match 'ProggyTinyTT'   -> ProggyTinyTT (ProggyTiny.ttf)
+--- lunduke-terminal --list-profiles (new profiles)
+pixel-8bit       Pixel 8-bit (blue)     font: "Atari800" 32px
+pixel-hires-mono Pixel hi-res mono      font: Atari 32px
+pixel-16bit      Pixel 16-bit           font: Amiga 32px
+modern           Modern (mint)          font: Hermit 20px
+=== FONTCONFIG_FILE=fonts-min.conf (DejaVu only)
+fc-match '"Atari800"'     -> DejaVu Sans (DejaVuSans.ttf)
+fc-match 'Atari'          -> DejaVu Sans (DejaVuSans.ttf)
+fc-match 'Amiga'          -> DejaVu Sans (DejaVuSans.ttf)
+fc-match 'Hermit'         -> DejaVu Sans (DejaVuSans.ttf)
+fc-match 'ProggyTinyTT'   -> DejaVu Sans (DejaVuSans.ttf)
+--- lunduke-terminal --list-profiles (new profiles)
+pixel-8bit       Pixel 8-bit (blue)     font: DejaVu Sans Mono 22px (fallback)
+pixel-hires-mono Pixel hi-res mono      font: DejaVu Sans Mono 22px (fallback)
+pixel-16bit      Pixel 16-bit           font: DejaVu Sans Mono 22px (fallback)
+modern           Modern (mint)          font: DejaVu Sans Mono 22px (fallback)

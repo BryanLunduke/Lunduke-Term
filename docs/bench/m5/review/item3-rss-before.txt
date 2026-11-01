@@ -1,0 +1,10 @@
+# 2026-11-01 12:16 CST code 38acc4e (before items 3/5/7), lterm-m5-idle-bench rss, Xvfb :44, 1280x800 window, llvmpipe (NOT a GPU), effects quality static, REAL
+rss plain gl 1 tabs: plain, no effects; VmRSS 53324 kB, VmHWM 53324 kB, threads 5, our GL textures 0.0 MB (all tabs)
+rss plain gl 4 tabs: plain, no effects; VmRSS 71992 kB, VmHWM 71992 kB, threads 5, our GL textures 0.0 MB (all tabs)
+rss plain gl 8 tabs: plain, no effects; VmRSS 91724 kB, VmHWM 91724 kB, threads 4, our GL textures 0.0 MB (all tabs)
+rss amber gl 1 tabs: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering); VmRSS 230184 kB, VmHWM 230184 kB, threads 22, our GL textures 58.7 MB (all tabs)
+rss amber gl 4 tabs: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering); VmRSS 468456 kB, VmHWM 470816 kB, threads 22, our GL textures 224.5 MB (all tabs)
+rss amber gl 8 tabs: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering); VmRSS 783792 kB, VmHWM 785824 kB, threads 21, our GL textures 449.1 MB (all tabs)
+rss amber cpu 1 tabs: amber, effects: C++ fallback (4 threads), quality static; VmRSS 124872 kB, VmHWM 124872 kB, threads 8, our GL textures 0.0 MB (all tabs)
+rss amber cpu 4 tabs: amber, effects: C++ fallback (4 threads), quality static; VmRSS 333512 kB, VmHWM 333512 kB, threads 17, our GL textures 0.0 MB (all tabs)
+rss amber cpu 8 tabs: amber, effects: C++ fallback (4 threads), quality static; VmRSS 610456 kB, VmHWM 610456 kB, threads 28, our GL textures 0.0 MB (all tabs)

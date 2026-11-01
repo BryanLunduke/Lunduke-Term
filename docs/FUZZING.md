@@ -115,7 +115,12 @@ Regenerate them with `tools/fuzz/make-seeds.py`.
   small driver that answers DA/DSR/CPR (not in the repo).
 - `regress-F2`, `F3`, `F5`, `F7`, `F8`, `F9`, `F10`, `F11`: the inputs that found the bugs below. Each now runs clean.
 - `regress-F12-*` … `regress-F16-*`: the review and differential-check findings (raw byte streams).
+  **Replay-only, and not all of them replay** (M5, REAL): no meson test reads seed files, and the
+  harness reads a raw stream as a program, so the short ones feed nothing. In the fuzz build,
+  F12-csi/osc, F14 and F16 fail without their fix and run clean with it. F12-rep, F13-* and F15
+  run clean either way. Per-seed manifest: [`tools/fuzz/seeds/README.md`](../tools/fuzz/seeds/README.md).
 - `regress-F17-alt-reflow`: the minimized F17 input (559 bytes, libFuzzer format; crashes the fuzz build without the fix).
+  This is the only evidence for F17: the meson case cannot observe it with the system libvterm0.
 
 `tests/fuzz_regress_test.cpp` (meson test `fuzz-regress`) has a small, readable case for every
 finding, so the normal test runs cover them without the fuzzer.
@@ -167,6 +172,7 @@ reported upstream or to Debian (project rule).
 | m | same code (F17 not yet fixed) | 16 225 | 77 | 210 s wall (REAL, 00:35:56–00:39:26 EDT) | F17 again; also a 65 s `slow-unit` that re-runs in 10/16 ms (a stall, not a finding) |
 | n | final code c0323c9 (+ F17), `-timeout=60` | 66 473 | 110 | 601 s wall (REAL, 00:47:15–00:57:16 EDT) | clean `Done 66473 runs in 601 second(s)`, slowest unit 0 s |
 | o | final code c0323c9, `-timeout=60` | 65 035 | 108 | 601 s wall (REAL, 00:57:16–01:07:17 EDT) | clean `Done 65035 runs in 601 second(s)`, slowest unit 0 s |
+| p | M5 head caaa69a (fuzzed sources identical to the final M5 head, `git diff` empty), `-timeout=60`, differential check on | 79 461 | 120 | 661 s wall (REAL, 12:28:16–12:39:17 CST 2026-11-01) | clean `Done 79461 runs in 661 second(s)`, slowest unit 0 s, 947 new units, no crash/leak/mismatch |
 
 Totals: 361 062 execs (REAL) over runs a–o. Runs i–k (the M4 code before the review) are
 described below. Runs l–o ran with the differential check on. On the final head c0323c9 (runs n
@@ -176,6 +182,11 @@ Coverage reached cov 3417 (run o). Before runs n/o the corpus (seeds + corpus + 
 inputs) was also replayed once with `-runs=0` after the F15/F16 fixes: 5 084 inputs, clean in 42 s
 (REAL). The box was shared with other agents' work during all runs (one other process at ~100 %
 of a core during n/o).
+
+M5 (run p): `src/vterm_session.cpp` changed (review item 4: the scrollback maximum and the
+size estimate; item 1: the read time budget), so the fuzzer was re-run on the M5 code. It
+started from the 7 759-file corpus (INITED at cov 3419) and ended cleanly after 661 s
+(REAL). Totals over runs a–p: 440 523 execs (DERIVED sum).
 
 The three timeouts on the pre-review code (runs i–k: `timeout-74696bbf…`, `timeout-d5592b5c…`,
 `timeout-b038575d…`, plus a `slow-unit` of 25 s) re-run in 6–418 ms each (REAL, with the same
@@ -191,4 +202,4 @@ about 275 s of fuzzing (DERIVED) before its stall.
   not fuzzed; the view tests and vttest cover those.
 - libvterm's own bugs are mitigated in front of it, not fixed in it. A program linking the system
   libvterm0 directly still has F1, F3, F7, F8, F9, F10, F15 and F17 (F12, F13, F14 and F16 are guard bugs; the libvterm behaviour behind them is F1/F7 and the OSC-number overflow).
-- The run lengths are short: about 20 minutes of fuzzing on the final head, at about 110 exec/s with ASan+UBSan. Longer runs could well find more.
+- The run lengths are short: about 20 minutes on the M4 head and 11 minutes on the M5 head, at about 110 exec/s with ASan+UBSan. Longer runs could well find more.

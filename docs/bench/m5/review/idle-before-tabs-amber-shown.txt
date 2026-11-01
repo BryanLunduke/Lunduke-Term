@@ -1,0 +1,7 @@
+# 2026-11-01 12:04 CST code 38acc4e (before items 5/7), lterm-m5-idle-bench tabs amber shown 20, Xvfb :44 1024x640, llvmpipe (NOT a GPU), terminal process CPU only, REAL
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+tabs amber shown: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering), window visible 1, active 1
+   0-10 s:   19128 ms CPU = 191.3 % of one core, 297 content frames
+  10-20 s:   18266 ms CPU = 182.7 % of one core, 306 content frames
+  total 37394 ms CPU over 20 s = 187.0 %

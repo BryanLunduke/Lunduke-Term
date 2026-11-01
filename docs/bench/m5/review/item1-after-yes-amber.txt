@@ -1,0 +1,6 @@
+# 2026-11-01 11:40 CST code badd3f9+item-1 fix (10 ms PTY slices), lterm-m5-flood-bench yes amber 10 (child exit via signalExitStatus), Xvfb :44, llvmpipe (NOT a GPU), REAL
+mode yes, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 2.2 s wall
+10 ms timer: 175 runs, longest gap 103 ms, p99 gap 20 ms
+content frames: 7 (3.2 per s)
+ctrl+c: sent at 2013 ms (due 2000), child exited 3 ms later
+exit 0

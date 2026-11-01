@@ -135,7 +135,7 @@ int main(int argc, char** argv) {
         else if (a == "--list-profiles") {
             for (const auto& p : lterm::builtinProfiles()) {
                 const auto f = lterm::profileFont(p);
-                std::printf("%-16s %-22s font: %s %dpx%s%s\n", p.id.c_str(), (p.label + (p.effects ? "" : " [default]")).c_str(),
+                std::printf("%-16s %-22s font: %s %dpx%s%s\n", p.id.c_str(), (p.label + (p.id == lterm::kDefaultProfile ? " [default]" : "")).c_str(),
                             f.family.c_str(), f.px, f.fallback ? " (fallback)" : "", f.monospace ? "" : " (not monospaced!)");
             }
             return 0;

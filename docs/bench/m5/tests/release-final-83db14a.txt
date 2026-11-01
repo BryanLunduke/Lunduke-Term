@@ -1,0 +1,28 @@
+# meson test -C build --num-processes 2, release, code 83db14a, Xvfb :44, llvmpipe, Nov 01 2026 16:04 CST. REAL.
+ninja: Entering directory `/workspace/lunduke-term-m5/build'
+ninja: no work to do.
+ 1/16 desktop-file OK               0.01s
+ 2/16 metainfo     OK               0.04s
+ 3/16 governor     OK               0.00s
+ 4/16 profiles     OK               0.00s
+ 5/16 painter      OK               0.11s
+ 6/16 fonts        OK               0.04s
+ 7/16 vterm        OK               0.00s
+ 8/16 effects      OK               0.23s
+ 9/16 session      OK               0.08s
+10/16 fixes        OK               0.39s
+11/16 fuzz-regress OK               0.01s
+12/16 unicode      OK               0.00s
+13/16 search       OK               0.83s
+14/16 gl-match     OK              11.96s
+15/16 view         OK              99.95s
+16/16 review       OK              38.61s
+
+Ok:                 16  
+Expected Fail:      0   
+Fail:               0   
+Unexpected Pass:    0   
+Skipped:            0   
+Timeout:            0   
+
+Full log written to /workspace/lunduke-term-m5/build/meson-logs/testlog.txt

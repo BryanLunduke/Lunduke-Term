@@ -1,0 +1,23 @@
+# lterm-m5-flood-bench on head c3e3164 (item 1 re-measure after N1). REAL, llvmpipe, Xvfb :44. CST.
+== 15:16:27 yes plain
+mode yes, profile plain (plain, no effects), 2.2 s wall
+10 ms timer: 165 runs, longest gap 20 ms, p99 gap 16 ms
+content frames: 2 (0.9 per s)
+ctrl+c: sent at 2008 ms (due 2000), child exited 4 ms later
+exit 0
+== 15:16:29 yes amber
+mode yes, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 2.2 s wall
+10 ms timer: 182 runs, longest gap 102 ms, p99 gap 20 ms
+content frames: 3 (1.4 per s)
+ctrl+c: sent at 2008 ms (due 2000), child exited 3 ms later
+exit 0
+== 15:16:32 seq plain
+mode seq, profile plain (plain, no effects), 10.0 s wall
+10 ms timer: 872 runs, longest gap 18 ms, p99 gap 14 ms
+content frames: 437 (43.7 per s)
+exit 0
+== 15:16:42 seq amber
+mode seq, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 10.0 s wall
+10 ms timer: 898 runs, longest gap 79 ms, p99 gap 18 ms
+content frames: 67 (6.7 per s)
+exit 0

@@ -3,6 +3,7 @@
 #include "profiles.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cerrno>
 #include <csignal>
 #include <cstdlib>
@@ -263,12 +264,21 @@ bool VtermSession::spawn(const SpawnOptions& opts) {
     return true;
 }
 
-bool VtermSession::readAvailable() {
-    char buf[65536];
+bool VtermSession::readAvailable(int64_t budgetUs, bool* more) {
+    if (more) *more = false;
+    // 16 KB reads keep one slice of a flood short; libvterm's cost per byte dominates anyway.
+    char buf[16384];
+    using Clock = std::chrono::steady_clock;
+    const bool timed = budgetUs > 0;
+    const Clock::time_point deadline = Clock::now() + std::chrono::microseconds(timed ? budgetUs : 0);
     for (;;) {
         ssize_t n = read(fd_, buf, sizeof buf);
         if (n > 0) {
             feed(buf, static_cast<size_t>(n));
+            if (timed && Clock::now() >= deadline) {
+                if (more) *more = true;
+                return true;
+            }
             continue;
         }
         if (n < 0 && errno == EINTR) continue;
@@ -1243,6 +1253,10 @@ void VtermSession::cbOutput(const char* bytes, size_t len, void* user) {
     auto* s = static_cast<VtermSession*>(user);
     if (s->capture_) s->capture_->append(bytes, len);
     else s->sendBytes(bytes, len);
+}
+
+size_t VtermSession::scrollbackBytesFull(size_t lines, int cols) {
+    return lines * (sizeof(SbLine) + static_cast<size_t>(std::max(cols, 0)) * sizeof(VTermScreenCell));
 }
 
 size_t VtermSession::scrollbackBytes() const {
