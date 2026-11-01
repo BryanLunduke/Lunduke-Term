@@ -4,6 +4,7 @@
 //   1  an output flood does not freeze the main loop, and Ctrl+C reaches the child
 //   5  cursor blink stops after the blink timeout, restarts on a key
 //   7  a hidden tab does not paint; showing it paints once
+//   9  closing a tab/window with a foreground job asks first
 //   8  output compares only the on-screen part of a selection with its snapshot
 //   14 frame-time samples only with --stats
 //   12 the retro look (amber) is the default profile; plain stays selectable
@@ -249,6 +250,54 @@ static void testHiddenTab() {
     std::printf("hidden tab: %ld frame requests skipped in 1 s, 0 painted\n", busy->stats().framesHidden - h0);
 }
 
+// ---- item 9: confirm closing a running job ----
+static void testConfirmClose() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-i"};
+    TerminalWindow w(o);
+    w.settingsFile = "/dev/null";
+    w.set_default_size(480, 320);
+    w.show();
+    TerminalView* busy = w.newTab(true);
+    TerminalView* idle = w.newTab();
+    CHECK(busy && idle);
+    if (!busy || !idle) return;
+    std::vector<std::string> asked;
+    bool answer = false;
+    w.confirmHook = [&](const std::string& q) {
+        asked.push_back(q);
+        return answer;
+    };
+    pump(500);
+    CHECK(busy->foregroundJob().empty() && idle->foregroundJob().empty());  // shells at a prompt
+    const std::string cmd = "sleep 30\n";
+    busy->session().sendBytes(cmd.data(), cmd.size());
+    CHECK(waitFor([&] { return busy->foregroundJob() == "sleep"; }, ltermWaitMs(3000, 10000)));
+    CHECK(w.runningJobs() == "sleep");
+    // An idle shell closes without a question.
+    w.requestCloseTab(idle);
+    CHECK(w.tabCount() == 1 && asked.empty());
+    // Ctrl+Shift+W on the busy tab asks; "Cancel" keeps it.
+    w.setCurrent(0);
+    GdkEventKey e = keyEv(GDK_KEY_W, GDK_CONTROL_MASK | GDK_SHIFT_MASK);
+    CHECK(w.handleKey(&e));
+    pump(100);
+    CHECK(asked.size() == 1 && w.tabCount() == 1);
+    CHECK(!asked.empty() && asked.back().find("sleep") != std::string::npos);
+    // The window's close button too.
+    CHECK(w.deleteEventForTest() == true);  // kept
+    CHECK(asked.size() == 2);
+    answer = true;
+    CHECK(w.deleteEventForTest() == false);  // confirmed: GTK may destroy it
+    // "Close Tab" closes it.
+    w.requestCloseTab(busy);
+    pump(200);
+    CHECK(asked.size() == 4 && w.tabCount() == 0);
+    CHECK(waitFor([&] { return TerminalView::pendingReaps() == 0; }, ltermWaitMs(5000, 12000)));
+    std::printf("confirm close: asked %zu times (\"%s\")\n", asked.size(), asked.empty() ? "" : asked.front().c_str());
+}
+
 // ---- item 14: no frame statistics unless --stats ----
 static void testStatsOff(bool stats) {
     ViewOptions o;
@@ -307,6 +356,7 @@ int main(int argc, char** argv) {
     testDefaultProfile();
     testBlinkTimeout();
     testHiddenTab();
+    testConfirmClose();
     testSelectionCompare();
     testStatsOff(false);
     testStatsOff(true);

@@ -11,6 +11,8 @@
 #include <cstring>
 #include <ctime>
 #include <sys/wait.h>
+#include <termios.h>
+#include <unistd.h>
 #include <csignal>
 
 namespace lterm {
@@ -932,6 +934,21 @@ bool TerminalView::onTick() {
     const bool replaced = governTick();  // new rate (new timer) or animation stopped
     stats_.finalTickIntervalMs = tickIntervalMs_;
     return !replaced;
+}
+
+std::string TerminalView::foregroundJob() const {
+    const pid_t child = session_->childPid();
+    const int fd = session_->masterFd();
+    if (exited_ || child <= 0 || fd < 0) return "";
+    const pid_t fg = tcgetpgrp(fd);
+    if (fg <= 0 || fg == getpgid(child)) return "";
+    std::string name;
+    try {
+        name = Glib::file_get_contents("/proc/" + std::to_string(fg) + "/comm");
+    } catch (const Glib::Error&) {
+    }
+    while (!name.empty() && (name.back() == '\n' || name.back() == ' ')) name.pop_back();
+    return name.empty() ? "a program" : name;
 }
 
 void TerminalView::setWindowActive(bool active) {

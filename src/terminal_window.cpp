@@ -285,7 +285,11 @@ TerminalView* TerminalWindow::newTab(bool first) {
     tab->label.pack_start(tab->close, false, false);
     tab->label.show_all();
     // Deferred: the button lives in the tab that is closed.
-    tab->close.signal_clicked().connect([this, id] { closeTabLater(id); });
+    tab->close.signal_clicked().connect([this, id] {
+        Glib::signal_idle().connect_once([this, id] {
+            if (Tab* t = tabById(id)) requestCloseTab(t->view.get());
+        });
+    });
 
     v->signalTitle.connect([this, v](const std::string& t) {
         const int i = indexOf(v);
@@ -330,6 +334,62 @@ TerminalView* TerminalWindow::newTab(bool first) {
     updateVisibility();
     v->grabTerminalFocus();
     return v;
+}
+
+std::string TerminalWindow::runningJobs() const {
+    std::string out;
+    for (const auto& t : tabs_) {
+        const std::string j = t->view->foregroundJob();
+        if (j.empty()) continue;
+        if (!out.empty()) out += ", ";
+        out += j;
+    }
+    return out;
+}
+
+void TerminalWindow::confirm(const std::string& question, const std::string& action, std::function<void()> yes) {
+    if (confirmHook) {
+        if (confirmHook(question)) yes();
+        return;
+    }
+    confirmDialog_ = std::make_unique<Gtk::MessageDialog>(*this, question, false, Gtk::MESSAGE_QUESTION,
+                                                          Gtk::BUTTONS_NONE, true);
+    confirmDialog_->set_secondary_text("Closing ends it.");
+    confirmDialog_->add_button("_Cancel", Gtk::RESPONSE_CANCEL);
+    confirmDialog_->add_button(action, Gtk::RESPONSE_ACCEPT);
+    confirmDialog_->set_default_response(Gtk::RESPONSE_CANCEL);
+    confirmDialog_->signal_response().connect([this, yes](int r) {
+        confirmDialog_->hide();
+        Glib::signal_idle().connect_once([this] { confirmDialog_.reset(); });
+        if (r == Gtk::RESPONSE_ACCEPT) yes();
+    });
+    confirmDialog_->show();
+}
+
+void TerminalWindow::requestCloseTab(TerminalView* v) {
+    if (indexOf(v) < 0) return;
+    const std::string job = v->foregroundJob();
+    if (job.empty()) {
+        closeTab(v);
+        return;
+    }
+    const unsigned long id = tabId(v);
+    confirm("Close this tab? \"" + job + "\" is still running.", "Close _Tab", [this, id] {
+        if (Tab* t = tabById(id)) closeTab(t->view.get());
+    });
+}
+
+bool TerminalWindow::on_delete_event(GdkEventAny* ev) {
+    if (closeConfirmed_) return ev ? Gtk::Window::on_delete_event(ev) : false;
+    const std::string jobs = runningJobs();
+    if (jobs.empty()) return ev ? Gtk::Window::on_delete_event(ev) : false;
+    confirm("Close this window? Still running: " + jobs + ".", "Close _Window", [this] {
+        closeConfirmed_ = true;
+        if (confirmHook) return;  // tests: the delete event's caller sees "go ahead"
+        close();
+    });
+    if (confirmHook && closeConfirmed_) return false;
+    return true;  // keep the window (the dialog decides)
 }
 
 void TerminalWindow::closeTab(TerminalView* v) {
@@ -433,7 +493,7 @@ bool TerminalWindow::handleKey(GdkEventKey* ev) {
         switch (k) {
         case GDK_KEY_t: newTab(); return true;
         case GDK_KEY_w:
-            if (auto* v = currentView()) closeTab(v);
+            if (auto* v = currentView()) requestCloseTab(v);
             return true;
         case GDK_KEY_f: showSearch(); return true;
         case GDK_KEY_s: showSettings(); return true;

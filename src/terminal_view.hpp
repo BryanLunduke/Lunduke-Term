@@ -142,6 +142,9 @@ public:
     void setScrollbackLines(long long lines);
     void setFrame(int frame);  // -1 profile default, 0 off, 1 on (only profiles with a bezel option)
     pid_t childPid() const { return session_->childPid(); }
+    // Review item 9: the PTY's foreground process group is not the child's own (a shell runs a
+    // job: ssh, an editor, a build). Returns the job's name ("" if none).
+    std::string foregroundJob() const;
     void grabTerminalFocus();
     // Test hooks: the last composed grid (what is painted), the pause state.
     const Grid& shownGrid() const { return cur_; }
