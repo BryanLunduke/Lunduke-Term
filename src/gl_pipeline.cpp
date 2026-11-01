@@ -9,6 +9,11 @@
 
 namespace lterm {
 
+// Review item 3: the float textures (frame-sized ones and the noise) are half floats (8 B per texel, was 16). Every
+// value is a colour in 0..~4 (bloom sums) or a burn-in level; the gl-match test checks the
+// result against the C++ reference (PSNR).
+static constexpr GLenum kSizedFmt = GL_RGBA16F;
+
 GlPipeline::GlPipeline(const EffectParams& params)
     : p_(params), d_(derive(params)), weights_(bloomWeights(params.bloomRadiusHalfRes)) {
     weights_.resize(65, 0.0f);
@@ -22,7 +27,7 @@ GlPipeline::GlPipeline(const EffectParams& params)
     progFrameComp_ = compile(glsl::kFrameComposite);
     ok_ = progDown_ && progBlur_ && progBurn_ && progStatic_ && progDyn_ && progFrame_ && progFrameComp_;
     if (!ok_) return;
-    texNoise_ = makeTex(kNoiseSize, kNoiseSize, GL_RGBA32F, true, true);
+    texNoise_ = makeTex(kNoiseSize, kNoiseSize, kSizedFmt, true, true);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, kNoiseSize, kNoiseSize, GL_RGBA, GL_FLOAT, noiseTexture().data());
 }
 
@@ -143,6 +148,11 @@ unsigned GlPipeline::makeFbo(unsigned tex) {
     return f;
 }
 
+void GlPipeline::releaseSized() {
+    freeSized();
+    w_ = h_ = 0;
+}
+
 void GlPipeline::freeSized() {
     for (unsigned* f : {&fboDown_, &fboBloomA_, &fboBloomB_, &fboBurn_[0], &fboBurn_[1], &fboStatic_, &fboOut_,
                         &fboFrameBase_, &fboFrameRefl_, &fboFrame_}) {
@@ -168,12 +178,12 @@ void GlPipeline::resize(int width, int height) {
     hh_ = std::max(1, h_ / 2);
     bw_ = p_.burnInHalfRes ? hw_ : w_;
     bh_ = p_.burnInHalfRes ? hh_ : h_;
-    texSrc_ = makeTex(w_, h_, GL_RGBA32F, true, false);
-    texDown_ = makeTex(hw_, hh_, GL_RGBA32F, true, false);
-    texBloomA_ = makeTex(hw_, hh_, GL_RGBA32F, true, false);
-    texBloomB_ = makeTex(hw_, hh_, GL_RGBA32F, true, false);
-    for (int i = 0; i < 2; ++i) texBurn_[i] = makeTex(bw_, bh_, GL_RGBA32F, true, false);
-    texStatic_ = makeTex(w_, h_, GL_RGBA32F, true, false);
+    texSrc_ = makeTex(w_, h_, kSizedFmt, true, false);
+    texDown_ = makeTex(hw_, hh_, kSizedFmt, true, false);
+    texBloomA_ = makeTex(hw_, hh_, kSizedFmt, true, false);
+    texBloomB_ = makeTex(hw_, hh_, kSizedFmt, true, false);
+    for (int i = 0; i < 2; ++i) texBurn_[i] = makeTex(bw_, bh_, kSizedFmt, true, false);
+    texStatic_ = makeTex(w_, h_, kSizedFmt, true, false);
     texOut_ = makeTex(w_, h_, GL_RGBA8, false, false);
     fboDown_ = makeFbo(texDown_);
     fboBloomA_ = makeFbo(texBloomA_);
@@ -184,9 +194,9 @@ void GlPipeline::resize(int width, int height) {
     haveBurn_ = false;
     geom_ = frameGeometry(p_, w_, h_);
     if (p_.frame) {
-        texFrameBase_ = makeTex(w_, h_, GL_RGBA32F, false, false);
-        texFrameRefl_ = makeTex(w_, h_, GL_RGBA32F, false, false);
-        texFrame_ = makeTex(w_, h_, GL_RGBA32F, false, false);
+        texFrameBase_ = makeTex(w_, h_, kSizedFmt, false, false);
+        texFrameRefl_ = makeTex(w_, h_, kSizedFmt, false, false);
+        texFrame_ = makeTex(w_, h_, kSizedFmt, false, false);
         fboFrameBase_ = makeFbo(texFrameBase_);
         fboFrameRefl_ = makeFbo(texFrameRefl_);
         fboFrame_ = makeFbo(texFrame_);

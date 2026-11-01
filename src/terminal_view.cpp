@@ -204,6 +204,7 @@ TerminalView::~TerminalView() {
     io_.disconnect();
     ptyIdle_.disconnect();
     tick_.disconnect();
+    freeHidden_.disconnect();
     frameTimer_.disconnect();
     if (opts_.stats) {
         auto med = [](std::vector<double> v) {
@@ -986,9 +987,46 @@ void TerminalView::setWindowActive(bool active) {
 void TerminalView::setWindowVisible(bool visible) {
     if (visible == visible_) return;
     visible_ = visible;
+    freeHidden_.disconnect();
+    if (!visible && opts_.effectsFreeHiddenMs >= 0)
+        freeHidden_ = Glib::signal_timeout().connect(
+            [this] {
+                freeHiddenEffects();
+                return false;
+            },
+            static_cast<unsigned>(opts_.effectsFreeHiddenMs));
+    if (visible && effectsFreed_) {
+        effectsFreed_ = false;
+        if (mode_ == Mode::Cpu && !cpu_) {
+            cpu_.reset(new CpuEffects(fx_, opts_.threads));
+            if (w_ > 0) cpu_->resize(w_, h_);
+            cpuOutValid_ = false;
+        }
+        fullRepaint_ = contentDirty_ = effectsSourceStale_ = true;  // GL: resized on the next render
+        updateContent();
+    }
     if (visible) requestFrame();
     updateAnimation();
     updateBlink();
+}
+
+void TerminalView::freeHiddenEffects() {
+    if (visible_ || effectsFreed_) return;
+    bool freed = false;
+    if (cpu_) {
+        cpu_.reset();
+        freed = true;
+    }
+    if (glPipe_ && gl_.get_realized()) {
+        gl_.make_current();
+        if (!gl_.has_error() && gdk_gl_context_get_current()) {
+            glPipe_->releaseSized();
+            freed = true;
+        }
+    }
+    if (!freed) return;
+    effectsFreed_ = true;
+    ++stats_.effectsFreed;
 }
 
 void TerminalView::connectPtyWatch() {

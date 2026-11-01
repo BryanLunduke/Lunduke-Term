@@ -46,6 +46,9 @@ struct ViewOptions {
     // Review item 5: blinking stops (cursor solid) this long after the last key, output or
     // focus-in, like GTK entries; -1: the desktop's gtk-cursor-blink-timeout (default 10 s).
     int cursorBlinkTimeoutMs = -1;
+    // Review item 3: a tab hidden this long frees its effects buffers (GL textures or the C++
+    // path's float buffers); showing it rebuilds them. -1: never.
+    int effectsFreeHiddenMs = 3000;
     std::string wordChars = Selection::defaultWordChars();
     // M2 item 5: bezel / RGB shift overrides of the profile (see profiles.hpp).
     TubeOverrides tube;
@@ -58,6 +61,7 @@ struct ViewStats {
     long selLinesCompared = 0;  // selected lines re-read to see whether output overwrote them
     long framesHidden = 0;      // frame requests skipped because the tab/window was hidden
     long blinkToggles = 0;      // cursor blink phases shown
+    long effectsFreed = 0;      // times a hidden tab freed its effects buffers
     std::vector<double> paintMs, effectsSourceMs, tickMs;
     double finalTickIntervalMs = 0;  // governor state on exit
     long probesDeferred = 0;         // M5: due probe polls skipped while hidden/unfocused
@@ -297,6 +301,9 @@ private:
     bool inverseShown_ = false;  // margins currently painted for reverse video
     bool blinkOff_ = false;
     long imCommits_ = 0;
+    sigc::connection freeHidden_;  // review item 3
+    bool effectsFreed_ = false;
+    void freeHiddenEffects();
     long long pendingSbLimit_ = -1;  // review item 10
     bool blinkExpired_ = false;  // blinked for the timeout without activity: solid until then
     double blinkSinceMs_ = 0;    // last key, output or focus-in

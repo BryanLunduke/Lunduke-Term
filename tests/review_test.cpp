@@ -8,6 +8,7 @@
 //   10 lowering the scrollback drops history only when new output arrives
 //   4  scrollback maximum 100,000; Settings shows the memory it can take
 //   2  input method: dead key and Compose sequences reach the PTY as UTF-8 (gtk-im-context-simple)
+//   3  a hidden tab frees its effects buffers after a delay and rebuilds them on show
 //   8  output compares only the on-screen part of a selection with its snapshot
 //   14 frame-time samples only with --stats
 //   12 the retro look (amber) is the default profile; plain stays selectable
@@ -396,6 +397,47 @@ static void testInputMethod() {
     std::printf("input method: dead_acute e, Compose o c, x -> c3 a9 c2 a9 78 (%ld commits)\n", v.imCommits());
 }
 
+// ---- item 3: hidden tabs free their effects buffers ----
+static void testHiddenFrees(const char* renderer) {
+    ViewOptions o;
+    o.profile = "amber";
+    o.renderer = renderer;
+    parseEffectsQuality("static", o.effectsQuality);
+    o.effectsFreeHiddenMs = 500;
+    o.command = {"/bin/sh", "-c", "printf 'tab ready'; exec sleep 30"};
+    TerminalWindow w(o);
+    w.settingsFile = "/dev/null";
+    w.set_default_size(480, 320);
+    w.show();
+    TerminalView* a = w.newTab(true);
+    TerminalView* b = w.newTab();
+    CHECK(a && b);
+    if (!a || !b) return;
+    w.setCurrent(0);
+    CHECK(waitFor([&] { return screenText(a->shownGrid()).find("tab ready") != std::string::npos; },
+                  ltermWaitMs(3000, 10000)));
+    pump(300);
+    const bool gl = a->memory().textureBytes > 0;
+    const size_t tex0 = a->memory().textureBytes;
+    w.setCurrent(1);
+    pump(200);
+    w.setCurrent(0);  // back within the delay: nothing freed
+    pump(700);
+    CHECK(a->stats().effectsFreed == 0);
+    w.setCurrent(1);
+    CHECK(waitFor([&] { return a->stats().effectsFreed == 1; }, ltermWaitMs(2000, 6000)));
+    if (gl) CHECK(a->memory().textures == 1 && a->memory().textureBytes < tex0);  // the noise texture stays
+    const size_t hiddenTex = a->memory().textureBytes;
+    const long f0 = a->stats().contentFrames;
+    w.setCurrent(0);
+    CHECK(waitFor([&] { return a->stats().contentFrames > f0; }, ltermWaitMs(2000, 6000)));
+    pump(300);
+    if (gl) CHECK(a->memory().textureBytes == tex0);
+    CHECK(screenText(a->shownGrid()).find("tab ready") != std::string::npos);
+    std::printf("hidden tab frees (%s, %s): textures %.1f MB shown -> %.1f MB after 0.5 s hidden -> %.1f MB again\n",
+                renderer, a->backendName().c_str(), tex0 / 1048576.0, hiddenTex / 1048576.0, a->memory().textureBytes / 1048576.0);
+}
+
 // ---- item 14: no frame statistics unless --stats ----
 static void testStatsOff(bool stats) {
     ViewOptions o;
@@ -459,6 +501,8 @@ int main(int argc, char** argv) {
     testScrollbackLazyTrim();
     testScrollbackMax();
     testInputMethod();
+    testHiddenFrees("gl");
+    testHiddenFrees("cpu");
     testSelectionCompare();
     testStatsOff(false);
     testStatsOff(true);

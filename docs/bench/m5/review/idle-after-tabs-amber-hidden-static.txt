@@ -1,0 +1,7 @@
+# 2026-11-01 12:21 CST code working tree (items 2/3/4/5/7/9/10), lterm-m5-idle-bench tabs amber hidden 20 static, Xvfb :44 1024x640, llvmpipe (NOT a GPU), terminal process CPU only, REAL
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+tabs amber hidden: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering), window visible 0, active 0
+   0-10 s:      76 ms CPU =   0.8 % of one core, 0 content frames
+  10-20 s:      78 ms CPU =   0.8 % of one core, 0 content frames
+  total 154 ms CPU over 20 s = 0.8 %

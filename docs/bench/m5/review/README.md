@@ -55,7 +55,43 @@ Content frames are tab 0's.
 
 The amber "hidden" rows include the shown idle amber tab's own reduced-quality animation
 (~17.7 %, see item 5); the hidden tab's share is DERIVED as ~3.9 % before vs ~1.8 % after
-(parsing only). The static-quality rows under item 3 isolate it better. A hidden view now only
+(parsing only). Static quality isolates it (no animation on the shown tab): amber, tab 0 hidden, static:
+3.6 %, 476 frames painted while hidden (before) vs 0.8 %, 0 frames (after); shown, static:
+161 % vs 170 % (noise of this shared box). Raw: `idle-{before,after}-tabs-amber-*-static.txt`
+(written by the item 3 run). A hidden view now only
 parses; its changed rows are painted once when it is shown again (test `review`:
 testHiddenTab). Shown-tab numbers vary by ±10 % between runs on this shared box. Raw:
 `idle-{before,after}-tabs-*.txt`.
+
+## Item 3: effects memory of hidden tabs (`lterm-m5-idle-bench rss`)
+
+1280x800 window, quality static, N amber (or plain) tabs; each tab is shown 1.5 s, then tab 0
+for 6 s; then VmRSS/VmHWM of the process (REAL). "GL textures" is what our pipelines allocated
+(all tabs). Before: 38acc4e. After: hidden for 3 s (`ViewOptions::effectsFreeHiddenMs`), a tab
+frees its GL frame-sized textures (programs stay; burn-in history restarts on show) or the C++
+path's float buffers and worker threads; showing it rebuilds them. All float textures are
+RGBA16F instead of RGBA32F (gl-match against the C++ reference: min PSNR 60.68 dB, threshold 40).
+
+| Profile | 1 tab | 4 tabs | 8 tabs | Per extra tab (DERIVED, (8-1)/7) | GL textures 1 / 8 tabs |
+|---|---|---|---|---|---|
+| plain, before | 53.3 MB | 72.0 MB | 91.7 MB | 5.5 MB | 0 |
+| plain, after | 53.5 MB | 71.8 MB | 91.7 MB | 5.5 MB | 0 |
+| amber GL, before | 230.2 MB | 468.5 MB | 783.8 MB | **79.1 MB** | 58.7 / 449.1 MB |
+| amber GL, after | 202.4 MB | 304.3 MB | 497.9 MB | **42.2 MB** | 31.3 / 43.9 MB |
+| amber C++ path, before | 124.9 MB | 333.5 MB | 610.5 MB | **69.4 MB** (28 threads) | 0 |
+| amber C++ path, after | 124.8 MB | 272.6 MB | 365.5 MB | **34.4 MB** (7 threads) | 0 |
+
+The review measured ~77 MB per amber tab (GL); this box gives 79.1 MB before and 42.2 MB after
+(-47 %). Limits:
+- The remaining ~37 MB per hidden amber GL tab over plain is mostly the GtkGLArea's own GL
+  context and llvmpipe's per-context memory, plus each hidden tab's 2 MB noise texture; freeing
+  the context itself (unrealizing the GLArea) was not done.
+- The *shown* tab is not lighter except for RGBA16F (1 tab: 230 -> 202 MB); it still needs
+  its full buffers.
+- VmHWM stays higher than VmRSS (e.g. 585 MB at 8 C++-path tabs): the peak is while tabs are
+  shown in turn before they are freed. RSS only falls where glibc returns the memory.
+- The C++ path's buffers are freed when hidden, not made lighter (still float RGBA).
+- llvmpipe, not a GPU: a GPU driver keeps textures in VRAM, so RSS there will differ (not
+  measured).
+Raw: `item3-rss-{before,after}.txt`. Test: `review` testHiddenFrees (gl: 5.9 MB -> 2.0 MB hidden
+-> 5.9 MB shown; cpu: buffers freed and rebuilt).
