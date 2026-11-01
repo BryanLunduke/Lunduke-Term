@@ -56,3 +56,14 @@ regress-F17-alt-reflow bb7684e rc=1 ERROR: AddressSanitizer: heap-use-after-free
 regress-F17-alt-reflow 32fb07c rc=1 ERROR: AddressSanitizer: heap-use-after-free
 regress-F17-alt-reflow 5105912 rc=1 ERROR: AddressSanitizer: heap-use-after-free
 regress-F17-alt-reflow 27a9d46 rc=0 clean
+# 2026-11-01 12:42 CST REAL. M5 head: vterm_fuzz built at caaa69a (fuzzed sources identical to the final M5 head), same command.
+regress-F12-csi caaa69a rc=0 clean
+regress-F12-osc caaa69a rc=0 clean
+regress-F12-rep caaa69a rc=0 clean
+regress-F13-decaln caaa69a rc=0 clean
+regress-F13-s7c1t caaa69a rc=0 clean
+regress-F13-scs-high caaa69a rc=0 clean
+regress-F14-osc-number caaa69a rc=0 clean
+regress-F15-string-esc-c0 caaa69a rc=0 clean
+regress-F16-string-esc-bel caaa69a rc=0 clean
+regress-F17-alt-reflow caaa69a rc=0 clean
