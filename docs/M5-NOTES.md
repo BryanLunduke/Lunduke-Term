@@ -115,10 +115,13 @@ the rest of 15 (uniform lookups, full-frame bloom) is not. Item 4 is a stopgap o
 
 ## Tests (REAL)
 
+PR #6 changed no fuzzed code: `src/vterm_session.cpp` is untouched, and only `src/profiles.cpp` and tests changed. So the fuzzer was not re-run.
+
 See `bench/m5/tests/`:
 - `release.txt`
 - `asan-serial-load.txt`, `asan-serial-noload.txt`
 - `asan-parallel.txt`
+- PR #6: `release-pr6.txt`, `asan-pr6-serial.txt`, `asan-pr6-parallel.txt`
 - the fuzz run (FUZZING.md, run p)
 
 | Suite | Runs | Result |
@@ -128,16 +131,19 @@ See `bench/m5/tests/`:
 | ASan+UBSan+leaks, serial, no load of mine | 3 | **2/3 runs 16/16 OK**; run 1: 14/16 (view, review failed) |
 | ASan+UBSan+leaks, `--num-processes 2` | 2 | **2/2 runs 16/16 OK** |
 | Fuzzer run p (caaa69a, ASan+UBSan) | 661 s | 79 461 execs, 0 crashes; F1-F16 seeds replay clean |
+| **PR #6 re-run** (pixel-40col + scaled waits, code 9de3b75): release `build/`, `--num-processes 2` (`release-pr6.txt`) | 1 | **16/16 OK** |
+| PR #6: ASan+UBSan+leaks, serial (`asan-pr6-serial.txt`) | 2 | **2/2 runs 16/16 OK** (Normal after 3.0-6.2 s; 7-10 polls deferred per case) |
+| PR #6: ASan+UBSan+leaks, `--num-processes 2` (`asan-pr6-parallel.txt`) | 1 | **1/1 run 16/16 OK** |
 
-So: 7 of 8 sanitizer runs passed completely, which is 126 of 128 test results (DERIVED).
-Leak checking: meson's `ASAN_OPTIONS` (detect_leaks=1) plus `tests/lsan.supp`; no leak reports in any run.
+So, before PR #6: 7 of 8 sanitizer runs passed completely, which is 126 of 128 test results (DERIVED).
+Leak checking: meson's `ASAN_OPTIONS` (detect_leaks=1) plus `tests/lsan.supp`; no leak reports in any run (PR #6 runs included).
 Serial-load run 1 used review_test from 8505761 (before 6b5b2d2 relinked it); the other runs are on the final test code.
 
 **The failed run, honestly:** serial no-load run 1 (12:46 CST, head 375f3d1) failed
 `view_test.cpp:739` (`probesDeferred > d0`; 0 probes deferred in the hidden C++-path case) and
 `review_test.cpp:227` (blink-restart wait). The run took 11.4 min against ~4.8 min for the others,
 and review took 452 s against ~48 s, so I suspect the box or process stalled. That is NOT proven.
-Neither failure came back in the 7 later runs.
+Neither failure came back in the 10 later sanitizer runs (7 before PR #6, 3 after).
 
 ## Limits and caveats
 

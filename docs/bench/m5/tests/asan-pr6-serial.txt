@@ -1,0 +1,58 @@
+# head b13fd51, build-san (-Db_sanitize=address,undefined, leak checking on: meson's ASAN_OPTIONS detect_leaks=1 + tests/lsan.supp), meson test --num-processes 1 --timeout-multiplier 4, LD_LIBRARY_PATH=lterm-tools (metainfo), Xvfb :44, llvmpipe (NOT a GPU), REAL
+# load: none of mine besides this run; other agents on the shared box
+## run 1 start 2026-11-01 13:33:23 CST
+   loadavg at start: 1.18 1.15 1.22, nproc 8
+ 1/16 desktop-file OK               0.00s
+ 2/16 metainfo     OK               0.01s
+ 3/16 effects      OK               1.53s
+ 4/16 governor     OK               0.01s
+ 5/16 profiles     OK               0.01s
+ 6/16 painter      OK               0.29s
+ 7/16 fonts        OK               0.06s
+ 8/16 vterm        OK               0.02s
+ 9/16 gl-match     OK              87.87s
+10/16 session      OK               0.11s
+11/16 fixes        OK               0.45s
+12/16 fuzz-regress OK               0.03s
+13/16 unicode      OK               0.02s
+14/16 search       OK              20.69s
+15/16 view         OK             124.84s
+16/16 review       OK              47.87s
+Ok:                 16  
+Fail:               0   
+Timeout:            0   
+governor auto (ASan+UBSan build): probe reached Normal 3034 ms after auto came back (wait limit 30000 ms)
+governor cpu (ASan+UBSan build): probe reached Normal 6235 ms after auto came back (wait limit 30000 ms)
+probe deferral auto (unfocused): 8 due poll(s) deferred, state 1
+probe deferral auto (hidden): 10 due poll(s) deferred, state 1
+probe deferral cpu (unfocused): 8 due poll(s) deferred, state 1
+probe deferral cpu (hidden): 10 due poll(s) deferred, state 1
+## run 2 start 2026-11-01 13:38:07 CST
+   loadavg at start: 1.78 1.51 1.36, nproc 8
+ 1/16 desktop-file OK               0.00s
+ 2/16 metainfo     OK               0.01s
+ 3/16 effects      OK               1.59s
+ 4/16 governor     OK               0.01s
+ 5/16 profiles     OK               0.01s
+ 6/16 painter      OK               0.30s
+ 7/16 fonts        OK               0.06s
+ 8/16 vterm        OK               0.02s
+ 9/16 gl-match     OK              87.26s
+10/16 session      OK               0.11s
+11/16 fixes        OK               0.44s
+12/16 fuzz-regress OK               0.03s
+13/16 unicode      OK               0.02s
+14/16 search       OK              20.41s
+15/16 view         OK             110.69s
+16/16 review       OK              47.75s
+Ok:                 16  
+Fail:               0   
+Timeout:            0   
+governor auto (ASan+UBSan build): probe reached Normal 3011 ms after auto came back (wait limit 30000 ms)
+governor cpu (ASan+UBSan build): probe reached Normal 3031 ms after auto came back (wait limit 30000 ms)
+probe deferral auto (unfocused): 7 due poll(s) deferred, state 1
+probe deferral auto (hidden): 10 due poll(s) deferred, state 1
+probe deferral cpu (unfocused): 8 due poll(s) deferred, state 1
+probe deferral cpu (hidden): 10 due poll(s) deferred, state 1
+## end 2026-11-01 13:42:36 CST
+SANDONE
