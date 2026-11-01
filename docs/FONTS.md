@@ -91,14 +91,50 @@ at integer multiples of their design size.
 | ibm-dos | `Px IBM VGA8` **32 px** (fonts-pc): exactly 2× the 8×16 VGA glyphs, about 80×25 at 1280×800 | `Px437 IBM VGA8` and `PxPlus IBM VGA8` at 32 px (int10h originals, if the user installed them), then the Terminus chain at 22 px | Recommends: fonts-pc |
 | ibm-3278 | `IBM 3270` 22 px (fonts-3270) | `3270`, then the Terminus chain | Recommends: fonts-3270 |
 
-**Proposed for M2.** These families are licence-clean but have no profile yet:
+## M5: retro-font profiles (licence-clean only)
 
-| Future profile | Font (package) | Size hint |
-|---|---|---|
-| amiga | `Amiga` (fonts-amiga) | multiples of 8 px |
-| atari-800 | `"Atari800"` (fonts-atarismall) | multiples of 8 px |
-| atari-st | `Atari` (fonts-atarist) | 16 px |
-| modern | `Hermit` (fonts-hermit) / `ProggyTinyTT` (fonts-proggy) | 16–22 px / 16 px |
+Re-checked on 2026-11-01 (CST): every `.deb` was downloaded again from deb.debian.org, its SHA-256
+matched trixie's `Packages.xz` and [`bench/fonts-SHA256SUMS`](bench/fonts-SHA256SUMS) (now with
+fonts-dejavu-core too), it was unpacked with `dpkg-deb -x` (nothing installed), and
+`usr/share/doc/<pkg>/copyright` plus the font's own name table (`fc-scan`, fontTools for the
+copyright/licence strings) were read. Quotes below are from those files (REAL).
+
+| Package | `debian/copyright` (the line that decides) | Font name table | Qualifies? | Profile |
+|---|---|---|---|---|
+| fonts-pc 1.0-2 | `Files: *` `Copyright: 2015-2016 VileR` `License: CC-BY-SA-4.0-Int` | Px IBM VGA8: "(c) 2015 VileR", "Creative Commons Attribution-ShareAlike 4.0 International" | **yes** | `ibm-dos` (already, M1) |
+| fonts-3270 3.0.1-1 | `Copyright: 2011-2016, Ricardo Banffy` `License: BSD3\|SIL` ("SIL Open Font License v1.1 with no Reserved Font Name") | `IBM 3270`, "Copyright 2011-2021 The 3270font Project Authors", OFL 1.1 | **yes** | `ibm-3278` (already, M1) |
+| fonts-terminus-otb 4.48-3.1 | "Terminus Font is licensed under the SIL Open Font License, Version 1.1. Copyright (c) 2010-2014 Dimitar Toshkov Zhekov, with Reserved Font Name "Terminus Font"." | `Terminus`, "Copyright (C) 2019 Dimitar Toshkov Zhekov" | **yes** | fallback chain of every tube profile (already) |
+| fonts-terminus 1.2.0+ds2-4 | **gap:** stanzas only for `*` (GPL-3, Scognamiglio), modern-hermit, fixedsys, inconsolata, pro-font, proggy, debian; none for `TerminusTTF-4.46.0.ttf` | `Terminus (TTF)`, "Copyright (C) 2016 Dimitar Toshkov Zhekov; Copyright (C) 2017 Tilman Blumenbach; Licensed under the SIL Open Font License, Version 1.1" | **yes, with the copyright-file gap noted** (the font says OFL-1.1; the Debian file formally puts it under GPL-3; we only depend on the package, ship nothing; not reported to Debian, project rule) | first choice of the tube profiles (already) |
+| fonts-atarist 0+git20230822+ds-2 | `Copyright: 2015 ntwk` / `2017 Andrew Goncharov` (Cyrillic) `License: BSD-3-clause` | `Atari` style `ST`, copyright string empty | **yes** | **new `pixel-hires-mono`** (`Atari` 32 px = 2x 8x16) |
+| fonts-atarismall 2.3-3 | `Copyright: 1999 Thomas A. Fine` / `2015-2016 ntwk` / `2007,2023 Alex Myczko` `License: atari800-license`: "License to copy, modify, and distribute for both commercial and non-commercial use is herby granted, provided this notice is preserved." | `"Atari800"` (quotes are part of the name), "Copyright 1999, 2015 Atari800 authors" | **yes (permissive), non-SPDX licence: one legal read recommended** before LCOS depends on it | **new `pixel-8bit`** (`"Atari800"` 32 px = 4x 8 px) |
+| fonts-amiga 1.0-3 | `Files: *` `Copyright: 2019 The Homecomputer Fonts Project Authors` / `2019 Jens Kutilek` `License: OFL-1.1` | `Amiga`, copyright string empty | **yes** (a redrawing; trademark note) | **new `pixel-16bit`** (`Amiga` 32 px) |
+| fonts-sixtyfour 1.0-3 | same as fonts-amiga: `Files: *` `Copyright: 2019 The Homecomputer Fonts Project Authors` / `2019 Jens Kutilek` `License: OFL-1.1` | `C-64`, copyright string empty | **licence: yes** (OFL-1.1 redrawing, not the Kreative/Style64 fonts). **Profile: not added, flagged for the editor** (see below) | none |
+| fonts-hermit 1.2.0+ds2-4 | stanza `app/qml/fonts/modern-hermit/*` `Copyright: 2013 Pablo Caro` … "with Reserved Font Name Hermit." `License: OFL-1.1` | `Hermit`, OFL 1.1 | **yes** | **new `modern`** (`Hermit` 20 px) |
+| fonts-proggy 1.2.0+ds2-4 | stanza `modern-proggy-tiny/*` `Copyright: 2004, 2005 Tristan Grimmer` `License: MIT` | `ProggyTinyTT`, "by Tristan Grimmer" | **yes** | `modern`'s 2nd choice (`ProggyTinyTT` 32 px = 2x 16 px) |
+| Apple II PrintChar21/PRNumber3, PetMe (Kreative), C64 Pro Mono (Style64), AtariClassic | not in Debian (`Files-Excluded` of cool-retro-term's copyright) | — | **no** (non-free, see below) | none, and `profiles_test` forbids them |
+
+**What the new profiles are.** Four mono tubes on amber's values (amber's phosphor palette) with
+their own phosphor colour, each naming one Debian family first at a whole multiple of its design
+size and then the Terminus chain (`Terminus (TTF)`, `Terminus`, `DejaVu Sans Mono`, `Monospace`).
+Nothing is shipped. Without the font the profile falls back to DejaVu Sans Mono 22 px
+(`tests/fonts_test.cpp`, and [`bench/font-fallback.txt`](bench/font-fallback.txt) "M5" section).
+
+**Naming (editor, please check).** The ids and labels are neutral (`pixel-8bit`,
+`pixel-hires-mono`, `pixel-16bit`, `modern`); `profiles_test` checks that no id or label contains
+Atari or Amiga and no id contains Commodore, C64, Apple or PET. The M1 proposal used `amiga` / `atari-800` /
+`atari-st`; I did not use those because Atari and Amiga are trademarks like Commodore. Only the
+font *family* names (the packages' own) carry the marks. The existing `ibm-dos`/`ibm-3278` ids
+are unchanged (out of scope).
+
+**fonts-sixtyfour: flagged, not decided.** The licence qualifies (OFL-1.1, an original
+redrawing; it is not the Style64/Kreative ROM-copy fonts). A neutral profile (e.g. id
+`pixel-40col`, label "Pixel 40-column", family `C-64` 32 px, light-blue phosphor) would therefore
+be licence-clean, but `profiles_test` currently forbids the family string `c-64` (M2's rule
+"no C64 fonts"), and the visual is unmistakably the C64 screen. Adding it needs the editor's yes
+and a change to that test.
+
+Screenshots (fonts from the unpacked `.deb`s via `FONTCONFIG_FILE`, Xvfb, llvmpipe):
+`/workspace/lcos-app-reviews/terminal-m5/f-{pixel-8bit,pixel-hires-mono,pixel-16bit,modern}.png`.
 
 **LCOS 1.0 ISO** (lcos-live-100-01 package list).
 - Already shipped: fonts-pc, fonts-pc-extra, fonts-3270, fonts-amiga, fonts-atarismall,

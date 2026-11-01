@@ -88,11 +88,14 @@ int main() {
         CHECK(std::min({w->fx.fontColor.r, w->fx.fontColor.g, w->fx.fontColor.b}) > 0.8f);
     }
     // Every profile has its own palette (no two effect profiles share one), except the documented
-    // amber family (green, green-scanlines, ibm-3278 reuse amber's phosphor Tango palette).
+    // amber family (green, green-scanlines, ibm-3278 and the M5 font profiles pixel-8bit,
+    // pixel-hires-mono, pixel-16bit and modern reuse amber's phosphor Tango palette).
     {
         std::set<std::string> seen;
         for (const auto& p : all) {
-            if (p.id == "plain" || p.id == "green" || p.id == "green-scanlines" || p.id == "ibm-3278") continue;
+            if (p.id == "plain" || p.id == "green" || p.id == "green-scanlines" || p.id == "ibm-3278" ||
+                p.id.rfind("pixel-", 0) == 0 || p.id == "modern")  // M5 font profiles: amber's palette
+                continue;
             std::string key;
             for (const auto& c : p.palette) key += std::to_string(c.r) + "," + std::to_string(c.g) + "," + std::to_string(c.b) + ";";
             if (!seen.insert(key).second) {
@@ -119,6 +122,14 @@ int main() {
         }
     }
     CHECK(findProfile("c64") == nullptr);
+    // M5 item 2: neutral profile names (no Atari/Amiga/Commodore marks in id or label); fonts-sixtyfour
+    // ("C-64") has no profile yet (an editor decision, docs/FONTS.md).
+    for (const char* id : {"pixel-8bit", "pixel-hires-mono", "pixel-16bit", "modern"}) CHECK(findProfile(id) != nullptr);
+    for (const auto& p : all) {
+        std::string s = p.id + " " + p.label;
+        std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+        CHECK(s.find("atari") == std::string::npos && s.find("amiga") == std::string::npos);
+    }
     if (failures == 0) std::printf("profiles_test: OK\n");
     return failures ? 1 : 0;
 }
