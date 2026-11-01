@@ -449,6 +449,33 @@ static void testInputMethod() {
     std::printf("input method: dead_acute e, Compose o c, x -> c3 a9 c2 a9 78 (%ld commits)\n", v.imCommits());
 }
 
+// ---- PR #6 review N3: a pending dead key does not survive a Ctrl chord ----
+static void testDeadKeyChord() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-c", "stty raw -echo; dd bs=1 count=3 2>/dev/null | od -An -tx1; exec sleep 30"};
+    Win w(o);
+    TerminalView& v = *w.view;
+    CHECK(v.start());
+    w.view->grabTerminalFocus();
+    pump(400);
+    auto key = [&](guint kv, guint state) {
+        GdkEventKey e = keyEv(kv, state);
+        e.window = w.win.get_window()->gobj();
+        v.testKey(&e);
+    };
+    key(GDK_KEY_dead_acute, 0);         // pending dead key
+    key(GDK_KEY_c, GDK_CONTROL_MASK);   // Ctrl+C: 03, and the dead key is dropped
+    key(GDK_KEY_q, 0);                  // plain q: 71 (not "´q" = c2 b4 71)
+    key(GDK_KEY_x, 0);                  // 78
+    const bool ok = waitFor([&] { return screenText(v.shownGrid()).find(" 03 ") != std::string::npos; },
+                            ltermWaitMs(3000, 10000));
+    const std::string scr = screenText(v.shownGrid());
+    CHECK(ok && scr.find("03 71 78") != std::string::npos);
+    std::printf("dead key + Ctrl chord: dead_acute, Ctrl+C, q, x -> %s\n",
+                scr.find("03 71 78") != std::string::npos ? "03 71 78" : scr.substr(0, 80).c_str());
+}
+
 // ---- item 3: hidden tabs free their effects buffers ----
 static void testHiddenFrees(const char* renderer) {
     ViewOptions o;
@@ -554,6 +581,7 @@ int main(int argc, char** argv) {
     testScrollbackSettingsSlip();
     testScrollbackMax();
     testInputMethod();
+    testDeadKeyChord();
     testHiddenFrees("gl");
     testHiddenFrees("cpu");
     testSelectionCompare();

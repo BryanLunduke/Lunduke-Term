@@ -1359,6 +1359,10 @@ bool TerminalView::onKey(GdkEventKey* ev) {
     if (ev->window && !(ev->state & (GDK_CONTROL_MASK | GDK_MOD1_MASK)) && !keypad) {
         updateImCursor();
         if (gtk_im_context_filter_keypress(im_, ev)) return true;
+    } else if (ev->window && !ev->is_modifier) {
+        // PR #6 review N3: a pending dead key or compose sequence must not survive a chord
+        // (dead acute, Ctrl+C, q sent "^C" then "´q"); drop it before the chord goes out.
+        gtk_im_context_reset(im_);
     }
     const VTermModifier mod = modsOf(ev->state);
     VTermKey key;
