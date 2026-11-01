@@ -1,0 +1,127 @@
+# PR #6 review N1: flood throughput, master 27a9d46 vs branch a007299 (REAL)
+# tool: tools/m5_throughput_bench.cpp (same source built against both trees), release builds,
+# Xvfb :44 1280x800, window 1280x800, Mesa llvmpipe (no GPU), shared 8-vCPU box, run sequentially
+# 2026-11-01 14:56-15:03 CST. 'on screen' = sentinel printed after the output is visible.
+# flood6.txt = seq 1 900000 (6,188,895 bytes). ctrlc: Ctrl+C sent from a 10 ms timer at >= 2 s.
+
+== 14:56:57 MASTER(27a9d46) seq amber 3000000 (rep 1)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 7.04 s
+10 ms timer: 4 runs, longest gap 4546 ms, p99 4546 ms; content frames 2 (0.3/s)
+exit 0
+== 14:57:04 MASTER(27a9d46) seq plain 3000000 (rep 1)
+seq 3000000, profile plain (plain, no effects), 1280x800
+on screen after 12.63 s
+10 ms timer: 2 runs, longest gap 12618 ms, p99 12618 ms; content frames 1 (0.1/s)
+exit 0
+== 14:57:17 MASTER(27a9d46) cat amber /workspace/m5-work/flood6.txt (rep 1)
+cat /workspace/m5-work/flood6.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 2.18 s, 2.84 MB/s
+10 ms timer: 3 runs, longest gap 2155 ms, p99 2155 ms; content frames 1 (0.5/s)
+exit 0
+== 14:57:19 MASTER(27a9d46) seq amber 3000000 ctrlc (rep 1)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+ctrl+c: sent at 7014 ms, child gone 3 ms later
+10 ms timer: 21 runs, longest gap 7011 ms, p99 7011 ms; content frames 2 (0.3/s)
+exit 0
+== 14:57:27 BRANCH(a007299) seq amber 3000000 (rep 1)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 13.67 s
+10 ms timer: 1019 runs, longest gap 87 ms, p99 22 ms; content frames 354 (25.9/s)
+exit 0
+== 14:57:40 BRANCH(a007299) seq plain 3000000 (rep 1)
+seq 3000000, profile plain (plain, no effects), 1280x800
+on screen after 13.53 s
+10 ms timer: 1129 runs, longest gap 20 ms, p99 14 ms; content frames 567 (41.9/s)
+exit 0
+== 14:57:54 BRANCH(a007299) cat amber /workspace/m5-work/flood6.txt (rep 1)
+cat /workspace/m5-work/flood6.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 4.21 s, 1.47 MB/s
+10 ms timer: 303 runs, longest gap 89 ms, p99 36 ms; content frames 103 (24.5/s)
+exit 0
+== 14:57:58 BRANCH(a007299) seq amber 3000000 ctrlc (rep 1)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+ctrl+c: sent at 2006 ms, child gone 22 ms later
+10 ms timer: 163 runs, longest gap 88 ms, p99 23 ms; content frames 50 (22.4/s)
+exit 0
+== 14:58:01 MASTER(27a9d46) seq amber 3000000 (rep 2)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 6.98 s
+10 ms timer: 3 runs, longest gap 6958 ms, p99 6958 ms; content frames 1 (0.1/s)
+exit 0
+== 14:58:08 MASTER(27a9d46) seq plain 3000000 (rep 2)
+seq 3000000, profile plain (plain, no effects), 1280x800
+on screen after 12.72 s
+10 ms timer: 2 runs, longest gap 12709 ms, p99 12709 ms; content frames 1 (0.1/s)
+exit 0
+== 14:58:21 MASTER(27a9d46) cat amber /workspace/m5-work/flood6.txt (rep 2)
+cat /workspace/m5-work/flood6.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 2.18 s, 2.84 MB/s
+10 ms timer: 3 runs, longest gap 2157 ms, p99 2157 ms; content frames 1 (0.5/s)
+exit 0
+== 14:58:23 MASTER(27a9d46) seq amber 3000000 ctrlc (rep 2)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+ctrl+c: sent at 6843 ms, child gone 3 ms later
+10 ms timer: 21 runs, longest gap 6841 ms, p99 6841 ms; content frames 2 (0.3/s)
+exit 0
+== 14:58:30 BRANCH(a007299) seq amber 3000000 (rep 2)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 13.15 s
+10 ms timer: 998 runs, longest gap 86 ms, p99 21 ms; content frames 332 (25.2/s)
+exit 0
+== 14:58:43 BRANCH(a007299) seq plain 3000000 (rep 2)
+seq 3000000, profile plain (plain, no effects), 1280x800
+on screen after 14.03 s
+10 ms timer: 1161 runs, longest gap 18 ms, p99 15 ms; content frames 582 (41.5/s)
+exit 0
+== 14:58:58 BRANCH(a007299) cat amber /workspace/m5-work/flood6.txt (rep 2)
+cat /workspace/m5-work/flood6.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 4.27 s, 1.45 MB/s
+10 ms timer: 299 runs, longest gap 90 ms, p99 62 ms; content frames 100 (23.4/s)
+exit 0
+== 14:59:02 BRANCH(a007299) seq amber 3000000 ctrlc (rep 2)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+ctrl+c: sent at 2010 ms, child gone 19 ms later
+10 ms timer: 160 runs, longest gap 93 ms, p99 38 ms; content frames 50 (22.4/s)
+exit 0
+== 14:59:04 MASTER(27a9d46) seq amber 3000000 (rep 3)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 6.94 s
+10 ms timer: 3 runs, longest gap 6911 ms, p99 6911 ms; content frames 1 (0.1/s)
+exit 0
+== 14:59:11 MASTER(27a9d46) seq plain 3000000 (rep 3)
+seq 3000000, profile plain (plain, no effects), 1280x800
+on screen after 12.30 s
+10 ms timer: 2 runs, longest gap 12286 ms, p99 12286 ms; content frames 1 (0.1/s)
+exit 0
+== 14:59:24 MASTER(27a9d46) cat amber /workspace/m5-work/flood6.txt (rep 3)
+cat /workspace/m5-work/flood6.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 2.15 s, 2.88 MB/s
+10 ms timer: 3 runs, longest gap 2125 ms, p99 2125 ms; content frames 1 (0.5/s)
+exit 0
+== 14:59:26 MASTER(27a9d46) seq amber 3000000 ctrlc (rep 3)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+ctrl+c: sent at 6999 ms, child gone 3 ms later
+10 ms timer: 21 runs, longest gap 6996 ms, p99 6996 ms; content frames 2 (0.3/s)
+exit 0
+== 14:59:33 BRANCH(a007299) seq amber 3000000 (rep 3)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 14.02 s
+10 ms timer: 1010 runs, longest gap 88 ms, p99 32 ms; content frames 349 (24.9/s)
+exit 0
+== 14:59:48 BRANCH(a007299) seq plain 3000000 (rep 3)
+seq 3000000, profile plain (plain, no effects), 1280x800
+on screen after 14.26 s
+10 ms timer: 1159 runs, longest gap 35 ms, p99 20 ms; content frames 586 (41.1/s)
+exit 0
+== 15:00:02 BRANCH(a007299) cat amber /workspace/m5-work/flood6.txt (rep 3)
+cat /workspace/m5-work/flood6.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 4.18 s, 1.48 MB/s
+10 ms timer: 305 runs, longest gap 91 ms, p99 27 ms; content frames 105 (25.1/s)
+exit 0
+== 15:00:06 BRANCH(a007299) seq amber 3000000 ctrlc (rep 3)
+seq 3000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+ctrl+c: sent at 2010 ms, child gone 18 ms later
+10 ms timer: 166 runs, longest gap 97 ms, p99 25 ms; content frames 51 (22.8/s)
+exit 0
+TPDONE
