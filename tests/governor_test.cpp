@@ -166,6 +166,25 @@ int main() {
         g.addFrame(350);
         CHECK(g.evaluate(40002, iv) == EffectsGovernor::Action::Demote && g.probeAborted());
     }
+    {   // PR #6 review B1: a step that lands within 5 % below the 1 fps cap (146 ms tick, one
+        // window of 232 ms frames -> 974 ms) used to stay there (the 5 % hysteresis swallowed the
+        // last step to 1000), and demotion needs the cap: it never demoted. The cap and the base
+        // are now always reached.
+        Sim s = make();
+        s.interval = 146;
+        s.g.restart(0);
+        s.run(1100, 232);
+        CHECK(s.interval > 950 && s.interval <= 1000);
+        s.run(5000, 404);  // over budget even at 1 fps
+        CHECK(s.demotions == 1);
+        std::printf("governor: 146 ms tick, 232 then 404 ms frames: %d demotion(s), tick %.0f ms\n", s.demotions,
+                    s.interval);
+        Sim b = make();  // and down: 104 ms (within 5 % of the base) returns to the base
+        b.interval = 104;
+        b.g.restart(0);
+        b.run(3000, 1);
+        CHECK(b.interval == 100);
+    }
     {   // the M3 simulation with 3900 ms frames: each failed probe now costs one frame
         Sim s = make();
         s.run(15000, 3900);

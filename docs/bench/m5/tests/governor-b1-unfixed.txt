@@ -1,0 +1,9 @@
+# PR #6 review B1: governor_test with the new stuck-below-cap case, UNFIXED governor (REAL), 2026-11-01 14:56 CST
+../tests/governor_test.cpp:179: CHECK(s.demotions == 1)
+../tests/governor_test.cpp:186: CHECK(b.interval == 100)
+2 failure(s)
+slow-down then recover: interval 100 ms
+demote/probe/recover: 5 demotions
+governor: 146 ms tick, 232 then 404 ms frames: 0 demotion(s), tick 974 ms
+costly probe: 5 demotions, last probe 1 frame(s), next in 80 s
+exit 1
