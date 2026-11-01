@@ -115,7 +115,12 @@ Regenerate them with `tools/fuzz/make-seeds.py`.
   small driver that answers DA/DSR/CPR (not in the repo).
 - `regress-F2`, `F3`, `F5`, `F7`, `F8`, `F9`, `F10`, `F11`: the inputs that found the bugs below. Each now runs clean.
 - `regress-F12-*` … `regress-F16-*`: the review and differential-check findings (raw byte streams).
+  **Replay-only, and not all of them replay** (M5, REAL): no meson test reads seed files, and the
+  harness reads a raw stream as a program, so the short ones feed nothing. In the fuzz build,
+  F12-csi/osc, F14 and F16 fail without their fix and run clean with it. F12-rep, F13-* and F15
+  run clean either way. Per-seed manifest: [`tools/fuzz/seeds/README.md`](../tools/fuzz/seeds/README.md).
 - `regress-F17-alt-reflow`: the minimized F17 input (559 bytes, libFuzzer format; crashes the fuzz build without the fix).
+  This is the only evidence for F17: the meson case cannot observe it with the system libvterm0.
 
 `tests/fuzz_regress_test.cpp` (meson test `fuzz-regress`) has a small, readable case for every
 finding, so the normal test runs cover them without the fuzzer.
