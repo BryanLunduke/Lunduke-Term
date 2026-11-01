@@ -1,0 +1,36 @@
+# PR #6 review N2/N3/N4 reproduction on the UNFIXED code (REAL)
+# tree: 5938825 + the new tests/review_test.cpp + test-only accessor TerminalWindow::confirmDialog()
+# + a no-op stub TerminalView::commitScrollbackLimit() (the unfixed code has no commit step)
+# release build, Xvfb, llvmpipe; 2026-11-01 14:33 CST
+
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: plain, no effects
+FAIL ../tests/review_test.cpp:285: now == first && q2 == q1 && q2.find("sleep") != std::string::npos
+FAIL ../tests/review_test.cpp:288: w.tabCount() == 1 && w.view(0) == b
+FAIL ../tests/review_test.cpp:370: v.session().scrollbackSize() >= full && v.pendingScrollbackLimit() == 50
+FAIL ../tests/review_test.cpp:410: during >= before && after >= before
+FAIL ../tests/review_test.cpp:415: v->session().scrollbackSize() > 50
+FAIL ../tests/review_test.cpp:511: ok && scr.find("03 71 78") != std::string::npos
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+flood plain (release build): longest main-loop gap 17 ms, 126 slices cut, 48 content frames, Ctrl+C -> exit 20 ms
+flood amber (release build): longest main-loop gap 19 ms, 114 slices cut, 33 content frames, Ctrl+C -> exit 21 ms
+blink: stopped after the timeout, restarted by a key
+hidden tab: 48 frame requests skipped in 1 s, 0 painted
+confirm close: asked 5 times ("Close this tab? "sleep" is still running.")
+confirm: second request kept "Close this tab? "cat" is still running."; accept closed the WRONG tab
+scrollback: 281 lines kept through new output, 50 after commit
+scrollback slip with output: 1019 lines before, 50 during the 0.6 s at 50, 84 after
+scrollback: lowered to 50 on dialog close: 50 lines
+settings: "Up to 2.4 MB per tab when full (63 columns)." / "Warning: up to 243 MB per tab when full (63 columns). Every tab keeps its own."
+input method: dead_acute e, Compose o c, x -> c3 a9 c2 a9 78 (3 commits)
+dead key + Ctrl chord: dead_acute, Ctrl+C, q, x ->  03 c2 b4                                                      
+                
+hidden tab frees (gl, amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)): textures 5.9 MB shown -> 2.0 MB after 0.5 s hidden -> 5.9 MB again
+hidden tab frees (cpu, amber, effects: C++ fallback (4 threads), quality static): textures 0.0 MB shown -> 0.0 MB after 0.5 s hidden -> 0.0 MB again
+selection of 1019 lines: 80 lines compared over the ticks (screen 20 rows)
+stats off: 12 content frames, 0 samples kept
+stats on: 12 content frames, 29 samples kept
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=12 full-repaints=1 rows-painted=35 ticks=5 median paint 0.18 ms, median effects-source 4.19 ms, median tick 0.94 ms, glyphs cached 10
+stats: quality=reduced software=1 tick-interval 100.0 ms
+6 failure(s)
