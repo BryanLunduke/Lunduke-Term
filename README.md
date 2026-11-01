@@ -6,7 +6,7 @@ Work in progress, not part of LCOS 1.0.
 
 License: GPL-3.0-or-later (see `LICENSE`).
 
-## Status: M4 in progress (branch `m4-core`; M3 on `m3-core`, M2 on `m2-core`)
+## Status: M5 in progress (branch `m5-core`; M4 merged as PR #5)
 
 M0 (the spike, PR #1) answered the feasibility questions; see
 [`docs/M0-RECOMMENDATION.md`](docs/M0-RECOMMENDATION.md). M1 checkpoint A: the GLSL effects run on a
@@ -39,6 +39,14 @@ what libvterm 0.3.3 cannot do: no ZWJ sequences, flags, variation-selector width
 libFuzzer harness (`tools/fuzz/`, [`docs/FUZZING.md`](docs/FUZZING.md)) whose findings in front
 of libvterm are fixed with regression tests (`tests/fuzz_regress_test.cpp`). No GPU on the build
 box: every GL number so far is llvmpipe; real-GPU numbers are not measured.
+
+M5 (see [`docs/M5-NOTES.md`](docs/M5-NOTES.md)): amber is the default profile; four
+retro-font profiles on licence-clean Debian fonts (`pixel-8bit`, `pixel-hires-mono`,
+`pixel-16bit`, `modern`); fixes from the code review: an output flood no longer freezes the
+window (Ctrl+C gets through), input methods (dead keys, Compose, ibus/fcitx), hidden tabs neither
+paint nor keep their effects buffers, the cursor stops blinking after the blink timeout, closing
+a tab or window that runs a program asks first, and the scrollback maximum is 100,000 lines
+(Settings shows what that can cost; lowering it trims only when new output arrives).
 
 | Part | Where |
 |---|---|
@@ -96,7 +104,7 @@ glass clamps to the edge cells.
 Keys: Ctrl+Shift+E toggles effects, Ctrl+Shift+P cycles profiles, Ctrl+Shift+C/V copy/paste,
 Shift+PgUp/PgDn/Home/End scroll back, Shift+Insert or middle-click pastes PRIMARY, Shift bypasses
 mouse reporting. Tabs: Ctrl+Shift+T opens a tab (in the current tab's working directory),
-Ctrl+Shift+W closes it, Ctrl+PgUp/PgDn switch (wrapping); the tab bar shows only with two or more
+Ctrl+Shift+W closes it (asking first if a program other than the shell runs in it), Ctrl+PgUp/PgDn switch (wrapping); the tab bar shows only with two or more
 tabs, and hidden tabs do not animate. Search: Ctrl+Shift+F opens the search bar over the scrollback
 (matches highlighted, current one in orange, "N of M"); Enter goes to the next older match,
 Shift+Enter to the newer one, Escape closes. Settings: Ctrl+Shift+S opens a dialog for profile,
