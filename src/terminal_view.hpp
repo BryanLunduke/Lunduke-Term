@@ -51,6 +51,7 @@ struct ViewOptions {
 // Frame statistics (ms), kept for --stats and the benchmarks in docs/.
 struct ViewStats {
     long contentFrames = 0, ticks = 0, rowsPainted = 0, fullRepaints = 0;
+    long ptySlicesCut = 0;  // PTY reads stopped at the time budget (output flood)
     std::vector<double> paintMs, effectsSourceMs, tickMs;
     double finalTickIntervalMs = 0;  // governor state on exit
     long probesDeferred = 0;         // M5: due probe polls skipped while hidden/unfocused
@@ -99,6 +100,7 @@ public:
     // Test hooks: pointer events at logical coordinates, as GTK would deliver them.
     void testButton(bool press, int button, double x, double y, guint state = 0);
     void testMotion(double x, double y, guint state);
+    bool testKey(GdkEventKey* ev) { return onKey(ev); }  // a key press as GTK would deliver it
     bool bezelActive() const { return frameActive(); }
     int marginX() const { return marginX_; }
     int marginY() const { return marginY_; }
@@ -174,6 +176,9 @@ private:
     void sendKeyInput();       // common handling for anything typed
     void ensureWriteWatch();
     bool onPtyIo(Glib::IOCondition cond);
+    void connectPtyWatch();
+    bool readSlice(bool* more);  // one time-boxed PTY read + the view updates; false on EOF/HUP
+    static constexpr int64_t kPtySliceUs = 10000;  // review item 1: at most ~10 ms per slice
     bool onDraw(const Cairo::RefPtr<Cairo::Context>& cr);
     bool onGlRender(const Glib::RefPtr<Gdk::GLContext>& ctx);
     void onGlRealize();
@@ -247,7 +252,7 @@ private:
     double lastContentMs_ = -1e9;
     double lastFrameMs_ = -1e9;
     bool active_ = true, visible_ = true;
-    sigc::connection io_, tick_, frameTimer_;
+    sigc::connection io_, ptyIdle_, tick_, frameTimer_;
     gint64 t0_ = 0;
     // Checkpoint B state
     int scrollOffset_ = 0;

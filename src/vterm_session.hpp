@@ -8,6 +8,7 @@
 #include <vterm.h>
 
 #include <array>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <string>
@@ -68,7 +69,9 @@ public:
     void markExited() { pid_ = -1; }
 
     // Reads whatever is available on the PTY and feeds libvterm. Returns false on EOF/HUP.
-    bool readAvailable();
+    // With budgetUs > 0 it stops after that much time even if more is waiting (an output flood)
+    // and sets *more; the caller lets the main loop run (redraw, keys) before reading on.
+    bool readAvailable(int64_t budgetUs = 0, bool* more = nullptr);
     // Feeds bytes directly (tests, local messages; no PTY needed).
     void feed(const char* bytes, size_t len);
     void feed(const std::string& s) { feed(s.data(), s.size()); }

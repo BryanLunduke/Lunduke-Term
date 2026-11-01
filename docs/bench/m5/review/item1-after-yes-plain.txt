@@ -1,0 +1,6 @@
+# 2026-11-01 11:40 CST code badd3f9+item-1 fix (10 ms PTY slices), lterm-m5-flood-bench yes plain 10 (child exit via signalExitStatus), Xvfb :44, llvmpipe (NOT a GPU), REAL
+mode yes, profile plain (plain, no effects), 2.2 s wall
+10 ms timer: 174 runs, longest gap 19 ms, p99 gap 16 ms
+content frames: 2 (0.9 per s)
+ctrl+c: sent at 2009 ms (due 2000), child exited 4 ms later
+exit 0

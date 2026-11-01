@@ -179,6 +179,7 @@ TerminalView::~TerminalView() {
     bellTimer_.disconnect();
     blink_.disconnect();
     io_.disconnect();
+    ptyIdle_.disconnect();
     tick_.disconnect();
     frameTimer_.disconnect();
     if (opts_.stats) {
@@ -247,8 +248,7 @@ std::string TerminalView::backendName() const {
 
 bool TerminalView::start() {
     if (!session_->spawn(SpawnOptions{opts_.command, opts_.loginShell, opts_.cwd})) return false;
-    io_ = Glib::signal_io().connect(sigc::mem_fun(*this, &TerminalView::onPtyIo), session_->masterFd(),
-                                    Glib::IO_IN | Glib::IO_HUP | Glib::IO_ERR);
+    connectPtyWatch();
     // GLib reaps the child (SIGCHLD) and reports the wait status on the main loop.
     childWatch_ = g_child_watch_add(
         session_->childPid(),
@@ -263,9 +263,10 @@ void TerminalView::onChildExit(int status) {
     childWatch_ = 0;
     exited_ = true;
     session_->markExited();
-    if (io_.connected()) {  // drain what the child wrote last
+    if (io_.connected() || ptyIdle_.connected()) {  // drain what the child wrote last
         session_->readAvailable();
         io_.disconnect();
+        ptyIdle_.disconnect();
     }
     signalExitStatus.emit(status);
     const bool ok = WIFEXITED(status) && WEXITSTATUS(status) == 0;
@@ -916,9 +917,40 @@ void TerminalView::setWindowVisible(bool visible) {
     updateBlink();
 }
 
+void TerminalView::connectPtyWatch() {
+    io_ = Glib::signal_io().connect(sigc::mem_fun(*this, &TerminalView::onPtyIo), session_->masterFd(),
+                                    Glib::IO_IN | Glib::IO_HUP | Glib::IO_ERR);
+}
+
 bool TerminalView::onPtyIo(Glib::IOCondition) {
+    bool more = false;
+    const bool alive = readSlice(&more);
+    if (alive && more) {
+        ++stats_.ptySlicesCut;
+        // Flood: the fd stays readable, and a watch at default priority would starve the redraw
+        // (priority 120) for as long as the child writes. Read on from an idle below the redraw
+        // instead; key events (default priority) get through between slices, so Ctrl+C works.
+        ptyIdle_ = Glib::signal_idle().connect(
+            [this] {
+                bool more = false;
+                const bool alive = readSlice(&more);
+                if (!alive) return false;
+                if (more) {
+                    ++stats_.ptySlicesCut;
+                    return true;
+                }
+                connectPtyWatch();
+                return false;
+            },
+            Glib::PRIORITY_DEFAULT_IDLE);
+        return false;  // disconnects io_
+    }
+    return alive;
+}
+
+bool TerminalView::readSlice(bool* more) {
     const long top0 = session_->topLine();
-    const bool alive = session_->readAvailable();
+    const bool alive = session_->readAvailable(kPtySliceUs, more);
     const long pushed = session_->topLine() - top0;
     if (pushed != 0 && scrollOffset_ > 0)  // keep a scrolled-back view still while output arrives
         scrollOffset_ = std::clamp(scrollOffset_ + static_cast<int>(pushed), 0,
@@ -948,8 +980,7 @@ bool TerminalView::onPtyIo(Glib::IOCondition) {
             sel_.clear();
     }
     ensureWriteWatch();  // replies (DA, DSR) that did not fit
-    if (!alive) return false;  // EOF/HUP; the child watch decides what happens to the window
-    return true;
+    return alive;  // false: EOF/HUP; the child watch decides what happens to the window
 }
 
 void TerminalView::ensureWriteWatch() {
