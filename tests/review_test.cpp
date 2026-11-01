@@ -2,6 +2,7 @@
 // M5 review fixes (docs/M5-NOTES.md, numbering from the 2026-11-01 code review). Needs an X
 // display; skipped without one.
 //   1  an output flood does not freeze the main loop, and Ctrl+C reaches the child
+//   14 frame-time samples only with --stats
 //   12 the retro look (amber) is the default profile; plain stays selectable
 #include "sanitizer.hpp"
 #include "terminal_view.hpp"
@@ -133,6 +134,24 @@ static void testFloodEnds() {
     CHECK(waitFor([&] { return screenHas("after-pause"); }, ltermWaitMs(5000, 15000)));
 }
 
+// ---- item 14: no frame statistics unless --stats ----
+static void testStatsOff(bool stats) {
+    ViewOptions o;
+    o.profile = "amber";
+    o.stats = stats;
+    o.command = {"/bin/sh", "-c", "i=0; while [ $i -lt 30 ]; do echo $i; sleep 0.05; i=$((i+1)); done; exec sleep 30"};
+    Win w(o);
+    CHECK(w.view->start());
+    CHECK(waitFor([&] { return w.view->stats().contentFrames > 5; }, ltermWaitMs(5000, 15000)));
+    pump(300);
+    const ViewStats& st = w.view->stats();
+    const size_t samples = st.paintMs.size() + st.effectsSourceMs.size() + st.tickMs.size();
+    CHECK(w.view->memory().statSamples == samples);
+    if (stats) CHECK(st.paintMs.size() > 5);
+    else CHECK(samples == 0);
+    std::printf("stats %s: %ld content frames, %zu samples kept\n", stats ? "on" : "off", st.contentFrames, samples);
+}
+
 // ---- item 12: the retro look is the default profile ----
 static void testDefaultProfile() {
     CHECK(ViewOptions{}.profile == "amber");
@@ -171,6 +190,8 @@ int main(int argc, char** argv) {
     testFlood("amber");
     testFloodEnds();
     testDefaultProfile();
+    testStatsOff(false);
+    testStatsOff(true);
     if (failures) {
         std::fprintf(stderr, "%d failure(s)\n", failures);
         return 1;

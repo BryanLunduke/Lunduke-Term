@@ -496,7 +496,7 @@ bool TerminalView::onGlRender(const Glib::RefPtr<Gdk::GLContext>&) {
                               PixelOrder::BGRA, static_cast<float>(t), y0, y1);
         if (opts_.stats) glFinish();
         if (frameCpu0_ >= 0) uploadCpuMs_ += processCpuMs() - u0;
-        stats_.effectsSourceMs.push_back(
+        recordStat(stats_.effectsSourceMs, 
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - e0).count());
         effectsSourceStale_ = false;
         srcDirtyY0_ = srcDirtyY1_ = 0;
@@ -506,7 +506,7 @@ bool TerminalView::onGlRender(const Glib::RefPtr<Gdk::GLContext>&) {
     if (opts_.stats) glFinish();
     if (!content) {
         ++stats_.ticks;
-        stats_.tickMs.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - r0).count());
+        recordStat(stats_.tickMs, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - r0).count());
     }
     lastFrameMs_ = t;
     return true;
@@ -525,7 +525,7 @@ bool TerminalView::onDraw(const Cairo::RefPtr<Cairo::Context>& cr) {
             cpu_->updateSource(cairo_image_surface_get_data(src_), cairo_image_surface_get_stride(src_),
                                PixelOrder::BGRA, static_cast<float>(t), y0, y1);
             if (frameCpu0_ >= 0) uploadCpuMs_ += processCpuMs() - u0;
-            stats_.effectsSourceMs.push_back(
+            recordStat(stats_.effectsSourceMs, 
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - e0).count());
             effectsSourceStale_ = false;
             srcDirtyY0_ = srcDirtyY1_ = 0;
@@ -544,7 +544,7 @@ bool TerminalView::onDraw(const Cairo::RefPtr<Cairo::Context>& cr) {
         }
         if (!content && rerender) {
             ++stats_.ticks;
-            stats_.tickMs.push_back(
+            recordStat(stats_.tickMs, 
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - r0).count());
         }
         lastFrameMs_ = t;
@@ -716,7 +716,7 @@ bool TerminalView::updateContent() {
     ++stats_.contentFrames;
     stats_.rowsPainted += n;
     if (full) ++stats_.fullRepaints;
-    stats_.paintMs.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
+    recordStat(stats_.paintMs, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
     lastContentMs_ = nowMs();
     if (mode_ == Mode::Plain) {
         const int ly0 = y0 / scale_, ly1 = (y1 + scale_ - 1) / scale_;  // logical

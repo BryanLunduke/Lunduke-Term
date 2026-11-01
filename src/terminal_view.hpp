@@ -177,7 +177,12 @@ private:
     void ensureWriteWatch();
     bool onPtyIo(Glib::IOCondition cond);
     void connectPtyWatch();
-    bool readSlice(bool* more);  // one time-boxed PTY read + the view updates; false on EOF/HUP
+    bool readSlice(bool* more);
+    // Review item 14: the per-frame timing samples (ViewStats vectors) are kept only with --stats;
+    // without it they grew by one double per frame for the whole session.
+    void recordStat(std::vector<double>& v, double ms) {
+        if (opts_.stats) v.push_back(ms);
+    }  // one time-boxed PTY read + the view updates; false on EOF/HUP
     static constexpr int64_t kPtySliceUs = 10000;  // review item 1: at most ~10 ms per slice
     bool onDraw(const Cairo::RefPtr<Cairo::Context>& cr);
     bool onGlRender(const Glib::RefPtr<Gdk::GLContext>& ctx);
