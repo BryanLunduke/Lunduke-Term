@@ -10,7 +10,7 @@ Times are CST.
 
 | Item | What changed | Evidence |
 |---|---|---|
-| 1a governor wait flaky under ASan | `tests/view_test.cpp`: the wait for the probe to bring the governor back to Normal is 15 s under ASan/UBSan, 6 s in release (`ltermWaitMs()` in `tests/sanitizer.hpp`). Neighbouring wall-clock waits (demotion, probe abort, recovery, tick speed-up, child reaping, malloc_trim) are scaled the same way. The time to Normal is printed. | Serial ASan runs with and without load: `bench/m5/tests/asan-serial-*.txt` (pass counts below) |
+| 1a governor wait flaky under ASan | `tests/view_test.cpp`: the wait for the probe to bring the governor back to Normal is 30 s under ASan/UBSan (15 s until PR #6), 6 s in release (`ltermWaitMs()` in `tests/sanitizer.hpp`). Neighbouring wall-clock waits (demotion, probe abort, recovery, tick speed-up, child reaping, malloc_trim) are scaled the same way. The time to Normal is printed. | Serial ASan runs with and without load: `bench/m5/tests/asan-serial-*.txt` (pass counts below) |
 | 1b replay-only seeds | `docs/FUZZING.md` and `tools/fuzz/seeds/README.md` list each F12–F17 seed: its finding, what it replays, and whether the meson test can see the bug without the fix. No meson test reads seed files. In the fuzz build, F12-csi/osc, F14 and F16 fail without their fix and run clean with it. F12-rep, F13-* and F15 run clean either way, so they replay nothing (said so). F17 is evidenced only by the fuzz build. | `bench/m5/item1b/seed-replay.txt`, `seed-trace.txt` (REAL) |
 | 1c GL probe CPU cost | How I read the M4 note: the probe's cost was the 7 GL programs recompiled on every probe and re-demotion, plus probes running while nobody can see the window. Fix: `GlPipeline::setParams()` swaps uniforms and sized objects and keeps the programs; due probes wait while the window is hidden or (pause-when-unfocused) unfocused. | `bench/m5/item1c/` (REAL, llvmpipe, a 3.9 s frame cost injected like the TCG VM). Focused: 62.1 → 53.0 ms CPU per probe (median), 11.4 → 10.0 % of a core. Unfocused: 13.1 → 2.0 % (0 probes). Mesa shader cache off: 25.5–27.0 % → 9.8–10.2 %. Tests: view_test (no program compiled over demotion + 2 probes; deferral), gl_match (setParams matches the C++ path). |
 | 2 retro fonts | Five profiles with neutral names on licence-clean Debian fonts: `pixel-8bit` (`"Atari800"` 32 px), `pixel-hires-mono` (`Atari` ST 32 px), `pixel-16bit` (`Amiga` 32 px), `pixel-40col` (`C-64` 32 px, added on the editor's decision in PR #6), `modern` (`Hermit` 20 px, then `ProggyTinyTT`). Each falls back to the Terminus chain and DejaVu Sans Mono. No font files shipped. | Table below; `docs/FONTS.md` "M5"; `bench/fonts-SHA256SUMS`; tests `fonts` (fallback) and `profiles` (no trademark names); screenshots `f-*.png` |
@@ -159,11 +159,15 @@ Neither failure came back in the 7 later runs.
   `-e cmd`, the command is the child itself, so closing does not ask.
 - **Item 4** is a stopgap. Scrollback storage is unchanged, and the shown size is an upper bound.
 - **Item 1** caps reads, not rendering. One amber effects frame on llvmpipe can still take ~100 ms.
-- **Test timing under ASan.** Two waits are still tight. (a) testProbeDeferred pumps a fixed
-  2.5 s, so it does not use a sanitizer-scaled wait (that was the run-1 failure). (b) In serial
-  no-load run 3, "probe reached Normal" took 17 694 ms against the 15 s limit. The test still
-  passed: waitFor checks the condition after its last main-loop iteration, and that iteration ran
-  past the limit. Making both sanitizer-scaled (e.g. 20 s) is a small follow-up, not done here.
+- **Test timing under ASan (scaled in PR #6).** Two waits were tight in the first M5 runs:
+  (a) testProbeDeferred pumped a fixed 2.5 s (serial no-load run 1 failed with 0 polls
+  deferred); (b) in serial no-load run 3, "probe reached Normal" took 17 694 ms against the 15 s
+  limit and still passed. It passed because `waitFor()` counts 20 ms pump steps, not wall-clock
+  time, and slow main-loop iterations overrun those steps. Now build-san waits up to 7.5 s more
+  for the first deferred poll (release unchanged: it still checks right after 2.5 s), and up to
+  30 s for Normal (release still 6 s), both through `ltermWaitMs()`. `waitFor()` itself still
+  counts steps (unchanged). The review_test:227 blink-restart failure of that same run was not
+  changed, and it has not come back.
 - **Process note.** During earlier work I ran `pkill -u <me> -x yes` once to stop a flood
   benchmark. It is scoped to my user, but in principle it could have hit another agent's `yes`
   under the same uid. Since then I kill by PID only.
