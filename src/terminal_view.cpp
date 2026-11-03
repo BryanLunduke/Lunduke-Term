@@ -1269,7 +1269,7 @@ bool TerminalView::onButtonPress(GdkEventButton* ev) {
 }
 
 void TerminalView::showContextMenu(GdkEventButton* ev) {
-    menuCopy_.set_sensitive(!sel_.text(*session_).empty());  // Copy needs a selection
+    menuCopy_.set_sensitive(sel_.hasText(*session_));  // Copy needs a selection (no text built)
     menuPaste_.set_sensitive(!holding_ && !exited_);
     menu_.popup_at_pointer(reinterpret_cast<GdkEvent*>(ev));
 }
@@ -1358,11 +1358,8 @@ bool TerminalView::onKey(GdkEventKey* ev) {
             setEffects(!effectsOn_);
             return true;
         }
-        if (k == GDK_KEY_p) {  // next built-in profile
-            const auto& all = builtinProfiles();
-            size_t i = 0;
-            while (i < all.size() && all[i].id != profile_.id) ++i;
-            setProfile(all[(i + 1) % all.size()].id);
+        if (k == GDK_KEY_p) {  // next profile: the built-ins, then the custom ones (PR #7 review)
+            setProfile(nextProfileId(profile_.id));
             return true;
         }
         if (k == GDK_KEY_c) {
