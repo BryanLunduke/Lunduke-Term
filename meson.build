@@ -212,12 +212,17 @@ test('libvterm-pristine', find_program('sha256sum'),
 if get_option('libvterm') == 'bundled'
   # libvterm's own t/ suite (upstream `make test`), on the patched library and on stock.
   lv_t_suite = files('tools/libvterm_t_suite.sh')
+  # Same as test_env, plus a suppression for a stock libvterm leak only the t/ harness reaches.
+  lv_t_env = environment()
+  lv_t_env.set('ASAN_OPTIONS', 'detect_leaks=1:abort_on_error=1')
+  lv_t_env.set('LSAN_OPTIONS', 'suppressions=' + (meson.current_source_dir() / 'tests' / 'lsan-libvterm-t.supp') + ':print_suppressions=0')
+  lv_t_env.set('UBSAN_OPTIONS', 'print_stacktrace=1:halt_on_error=1')
   foreach v : [['patched', lv_lib], ['stock', lv_stock_lib]]
     test('libvterm-t-' + v[0], lv_t_suite,
       args : [executable('libvterm_harness_' + v[0], lv_dir / 't/harness.c', include_directories : lv_inc,
                          link_with : v[1], override_options : lv_c_opts),
               meson.current_source_dir() / lv_dir],
-      timeout : 120, env : test_env)
+      timeout : 120, env : lv_t_env)
   endforeach
   # Differential test: tests/libvterm_diff.c logs every screen callback and dumps the whole
   # screen for random escape-sequence streams; the patched build must print byte for byte what
