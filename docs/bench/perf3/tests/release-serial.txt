@@ -1,0 +1,38 @@
+ 1/27 desktop-file         OK                0.01s
+ 2/27 metainfo             OK                0.05s
+ 3/27 effects              OK                0.20s
+ 4/27 governor             OK                0.01s
+ 5/27 profiles             OK                0.01s
+ 6/27 custom-profiles      OK                0.09s
+ 7/27 painter              OK                0.11s
+ 8/27 fonts                OK                0.04s
+ 9/27 vterm                OK                0.01s
+10/27 gl-match             OK               10.75s
+11/27 session              OK                0.15s
+12/27 fixes                OK                0.40s
+13/27 fuzz-regress         OK                0.01s
+14/27 libvterm-rep         OK                0.01s
+15/27 unicode              OK                0.01s
+16/27 search               OK                0.68s
+17/27 view                 OK               97.66s
+18/27 review               FAIL             38.32s   exit status 1
+>>> UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MALLOC_PERTURB_=238 MESON_TEST_ITERATION=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:fast_unwind_on_malloc=0 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 /workspace/lunduke-term-perf3/build/review_test
+
+19/27 ux                   OK               21.99s
+20/27 scrollback-default   OK               10.10s
+21/27 cli                  OK                0.14s
+22/27 libvterm-pristine    OK                0.01s
+23/27 libvterm-t-patched   OK                0.92s
+24/27 libvterm-t-stock     OK                0.85s
+25/27 libvterm-diff        OK                9.22s
+26/27 libvterm-diff-repfix OK                9.49s
+27/27 libvterm-feed-diff   OK               33.06s
+
+Ok:                 26  
+Expected Fail:      0   
+Fail:               1   
+Unexpected Pass:    0   
+Skipped:            0   
+Timeout:            0   
+
+Full log written to /workspace/lunduke-term-perf3/build/meson-logs/testlog.txt

@@ -74,3 +74,31 @@ the formats above, which already fail.
 None of these lossy variants is in the branch, not even as an option. If a lower-memory mode
 that is not bit-identical is wanted, gl6 (2 MB less) and cpu2 (6.1 MB less at 1280x800) have
 the smallest PSNR cost. That is an editor's call.
+
+## Item 1 (R11F_G11F_B10F / smaller GL formats): not applied, and why
+
+The static and bloom textures do not need alpha (only burn-in keeps alpha), so alpha was not
+the blocker. The blocker is precision. R11F_G11F_B10F has 6-, 6- and 5-bit mantissas, and with
+it the GL-vs-CPU minimum fell to 48.54-53.77 dB (gl1-gl3). RGB10_A2 fell to 53.58-58.66 dB
+(gl4-gl7, gl9). The bar is master's 58.81 dB. The only GL memory saving that holds the bar is
+dropping the third half-res texture (gl8): 2 MB at 1280x800.
+
+## Screenshots
+
+See screenshots/README.md. The window captures (plain, amber GL, amber CPU) at 1280x800 and the
+offline renders are pixel-identical before and after. No visible change, so there is nothing to
+make optional.
+
+## Window measurements
+
+See measure/README.md (12 runs, xfwm4 alive in all of them, none discarded). Medians of 3
+(REAL): Private_Dirty after output, amber GL 88640 -> 86432 kB, amber CPU 74824 -> 48700 kB.
+Idle CPU is within noise. CPU-renderer frame time is about 9% worse (median tick 9.86 -> 10.71 ms).
+
+## Not measured
+
+GPU drivers (no GPU). Other window sizes. Profiles other than amber. Full and static quality
+in the window (llvmpipe picks reduced). Peak memory during resize. Texture bytes from the app's
+own counter (measure.sh-style runs do not read it; the GL figure above is DERIVED from sizes).
+A profile of where the extra CPU frame time goes. Bloom in 16-bit fixed point (not tried,
+because the static variant already failed the bar).
