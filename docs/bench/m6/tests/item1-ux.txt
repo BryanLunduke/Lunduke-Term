@@ -1,0 +1,15 @@
+
+(ux_test:1939173): dbind-WARNING **: 20:55:58.631: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: plain, no effects
+lunduke-terminal: plain, no effects
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+plain render (gl; amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): bright pixels of 256000: amber 16854, Ctrl+Shift+E off 13945, profile plain 6419
+plain render (cpu; amber, effects: C++ fallback (4 threads), quality reduced): bright pixels of 256000: amber 16987, Ctrl+Shift+E off 13945, profile plain 6419
+settings font size: amber uses 22 px, field 22; plain uses 16 px, field 16
+settings font size: override 30, then amber: field 22, override 0
+context menu: selection 'READY'
+context menu: Copy put 'READY' on the clipboard
+context menu: mouse reporting takes the plain right-click; Shift+right-click menu; Settings opened the dialog
+ux_test: all passed

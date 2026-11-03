@@ -1,0 +1,18 @@
+# ux_test WITHOUT the PR #7 review fixes (disk check disabled, Ctrl+Shift+P built-ins only, no settings.ini reset, no folder removal), new tests kept. Xvfb :47, llvmpipe, REAL, 2026-11-02 21:36 CST
+FAIL ../tests/ux_test.cpp:393: seen[1] == "custom:Cycle A" && seen[2] == "custom:Cycle B" && seen[3] == b.front().id
+FAIL ../tests/ux_test.cpp:394: seen.back() == b.back().id
+FAIL ../tests/ux_test.cpp:438: !validateProfileName("badcolor", &err, "", dir) && err.find("could not be loaded") != std::string::npos
+FAIL ../tests/ux_test.cpp:443: d->status.get_text().find("Profile not saved") != Glib::ustring::npos && d->status.get_text().find("badcolor.ini") != Glib::ustring::npos
+FAIL ../tests/ux_test.cpp:448: d->status.get_text().find("broken.ini") != Glib::ustring::npos
+FAIL ../tests/ux_test.cpp:449: customProfiles().empty()
+FAIL ../tests/ux_test.cpp:462: fileText(badColor) == badText && fileText(broken) == brokenText
+FAIL ../tests/ux_test.cpp:466: customProfiles().empty()
+FAIL ../tests/ux_test.cpp:467: fileText(badColor) == badText && fileText(broken) == brokenText
+FAIL ../tests/ux_test.cpp:521: after.find("profile=amber") != std::string::npos && after.find("custom:Saved") == std::string::npos
+FAIL ../tests/ux_test.cpp:709: !left
+selection hasText: 8000 random cases agree with !text().empty() (0 mismatches); 5000x80 selection: hasText read 1 cell(s), text() 400000
+profile cycle: modern > plain > amber > green > green-scanlines > ibm-dos > ibm-3278 > vintage > futuristic > paper-white > pixel-8bit > pixel-hires-mono > pixel-16bit > pixel-40col > modern > plain > amber
+broken profile file: rename status 'Not renamed: A custom profile has this name'
+delete saved default: settings.ini profile line now '?'
+ux_test: config folder /tmp/lterm-ux-test-2170824 LEFT BEHIND
+11 failure(s)

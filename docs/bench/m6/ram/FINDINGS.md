@@ -1,10 +1,13 @@
 # M6 item 6: where Lunduke Terminal's memory goes (findings)
 
 Box: Debian 13 VM, Xvfb, **no GPU**, so every GL number is Mesa llvmpipe. One tab, window
-1280x800 (the default) unless noted, empty config (scrollback 10000). kB from
+1280x800 (the default) unless noted, empty config. **Scrollback: every number in this file was
+measured with the old default of 10,000 lines**, except the section "New default: 5000 lines" at
+the end (the default changed in PR #8 review; see there). kB from
 `/proc/PID/smaps_rollup`. "fresh" = t=8 s, before output. "after" = t=30 s, after ~25k lines
 (`seq 1 20000` + `cat src/*.cpp`). REAL = read from a file in this directory. DERIVED = computed
-from REAL numbers. Raw files: `raw/` (master dc3b544), `raw-diag/`, `raw-fixed/` (after fixes).
+from REAL numbers. Raw files: `raw/` (master dc3b544), `raw-diag/`, `raw-fixed/` (after fixes),
+`raw-fix34/` (final), `raw-bezel-master/` (master with the bezel).
 Private_Dirty equals Anonymous in every run here, so only Private_Dirty is shown. It is also the
 most stable column. Rss and Pss move with page-cache pressure and with what other processes
 share. In raw-fixed `plain-sb0 after`, for example, the kernel reclaimed ~17 MB of clean file
@@ -80,13 +83,17 @@ of plain that grows. What we control:
 
 ## Fixes on m6-ram
 
-All four fixes keep the output the same. None of them changes timing or governor code.
+The C++ path output is bit-identical to master; the GL path differs from it by at most 2/255 (fix 1).
+None of the fixes changes timing or governor code. Commit ids are after the rebase onto 6f22466
+(old ids in brackets).
 
-1. **1481dd7, GL path: 8-bit `texSrc_`** (was RGBA16F). The Cairo source is 8-bit, so RGBA8 holds
-   it exactly. This saves 4 B/px (4.1 MB at 1280x800). `texture-bytes` went from 32,817,152 to
-   28,721,152 (REAL). The minimum PSNR in the gl-match test went from 60.68 to 58.81 dB (threshold
-   40). The largest pixel difference is 2/255.
-2. **dabebdf, scrollback: 16-byte packed cells** instead of libvterm's 40-byte `VTermScreenCell`:
+1. **75df3f2 (was 1481dd7), GL path: 8-bit `texSrc_`** (was RGBA16F). The Cairo source is 8-bit,
+   so RGBA8 holds it exactly. This saves 4 B/px (4.1 MB at 1280x800). `texture-bytes` went from
+   32,817,152 to 28,721,152 (REAL). The GL output is not bit-identical: against the C++ path, the
+   largest pixel difference is 2/255 and the lowest gl-match PSNR is 58.81 dB (REAL, paper-white
+   with bezel, static scale 1; it was 60.68 dB on master; threshold 40). The C++ path itself is
+   bit-identical to master (fixes 3 and 4).
+2. **453d12d (was dabebdf), scrollback: 16-byte packed cells** instead of libvterm's 40-byte `VTermScreenCell`:
    - Each cell keeps the codepoint, the 18 attribute bits, the width, and fg/bg.
    - The rare extra combining characters go in a per-line side array.
    - `sb-bytes` for 10,000 lines went from 11,415,200 to 5,032,848 (REAL).
@@ -100,20 +107,28 @@ All four fixes keep the output the same. None of them changes timing or governor
      restore DECDWL/DECDHL or the colours of a wide character's right half.
    - A mutation run that dropped the font bits and the extra flag made the test fail 3 times (REAL).
    - Fuzz: 601 s, 75,659 runs, no crash or leak. The log is `fuzz/fuzz-dabebdf.txt`.
-3. **5f95c13, C++ path: byte `src_`** (was float RGBA, 16 B/px, now 4 B/px). Reads convert
+   - Follow-up (5665d67): `unpackCell` looked up a cell's extra combining characters with a linear
+     scan of the line's side array, so a 200-column line where every cell has marks cost O(n^2)
+     on redraw. It is now a binary search (`sbExtraFind`; the array is in column order).
+     `combining/result.txt` (REAL, 50x200, scrolled back 500 lines, every cell combining, median
+     ms per `fillGrid`, 3 rounds): master 0.218, linear 0.725–0.736, binary search 0.280–0.284.
+     ASCII-only lines: 0.19–0.21 ms in all three. `session_test` `testScrollbackCombiningLookup`
+     checks the search against the linear lookup on 3000 random side arrays and round-trips 300
+     random 200-column lines (33,209 combining cells) through history.
+3. **cf7f81f (was 5f95c13), C++ path: byte `src_`** (was float RGBA, 16 B/px, now 4 B/px). Reads convert
    with the same `k * (1/255)`, so the output is bit-identical. `exact/` shows identical output
    hashes for 6 parameter sets x 4 frames (bezel, rgbShift, full-res burn-in, bloom off).
-4. **5f95c13, C++ path with the bezel**: no more full copy of the bezel layer (`base_`). The
+4. **cf7f81f (was 5f95c13), C++ path with the bezel**: no more full copy of the bezel layer (`base_`). The
    three base floats of each reflecting pixel now live in its `Refl` entry. This is bit-identical
    too (same `exact/` run).
 
 ## Before / after (REAL, kB, Private_Dirty fresh / after, 1280x800, one tab)
 
-| profile | master dc3b544 | final (5f95c13 source) | change (DERIVED) |
+| profile | master dc3b544 | final (cf7f81f / 5f95c13 source) | change (DERIVED) |
 |---|---|---|---|
 | amber, effects on, GL (llvmpipe) | 93,328 / 103,944 | 89,356 / 93,656 | -4.0 / -10.3 MB |
 | amber, effects on, C++ path | 82,532 / 94,104 | 70,532 / 75,940 | -12.0 / -18.2 MB |
-| amber C++ path + bezel (`--frame`) | 117,168 / 122,556 * | 91,004 / 96,384 | -26.2 / -26.2 MB |
+| amber C++ path + bezel (`--frame`) | 117,176 / 130,372 * | 91,004 / 96,384 | -26.2 / -34.0 MB |
 | plain | 10,652 / 22,600 | 10,664 / 16,316 | 0 / -6.3 MB |
 
 | profile | Rss master | Rss final | Pss master | Pss final |
@@ -122,10 +137,13 @@ All four fixes keep the output the same. None of them changes timing or governor
 | amber C++ | 125,184 / 136,820 | 112,660 / 118,068 | 108,125 / 119,745 | 86,720 / 92,132 |
 | plain | 53,176 / 65,124 | 52,652 / 58,368 | 33,145 / 45,054 | 27,542 / 33,197 |
 
-`*` The bezel "before" was run at 094697e. That commit already has fixes 1 and 2, but its C++ path
-code is the same as master's, so its "after" column already includes the scrollback saving. The
-final numbers are from `raw-fix34/` (one run each for GL and plain; the C++ path ran twice, 70,532
-both times). The master numbers are run 1 of `raw/`.
+`*` The bezel master numbers are the median of 3 runs of master dc3b544 (`raw-bezel-master/`,
+`summary-bezel-master.txt`): fresh 125,856 / 117,176 / 117,164, after 139,044 / 130,372 / 130,356
+(REAL). Run 1 is ~8.7 MB higher than the other two. An earlier version of this table used a run at
+094697e (117,168 / 122,556; that commit already has the scrollback fix, so its "after" was too
+low and the saving after output was understated as -26.2 MB). The final numbers are from
+`raw-fix34/` (one run each for GL, plain and the bezel; the C++ path ran twice, 70,532 both
+times). The other master numbers are run 1 of `raw/`.
 
 Rss and Pss for GL did not improve, although Private_Dirty did. That is because they mostly
 track shared, clean pages of libLLVM and Mesa, and those vary with other processes and page-cache
@@ -138,7 +156,8 @@ pressure.
   - The remaining Rss is mostly shared libraries and the fontconfig cache: about 31 MB of
     GTK/glib/Pango/Cairo/other libraries, and the 8 MB fontconfig mmap.
   - Private_Dirty is 10.7 MB fresh. It is mostly the heap (8 MB), plus one 4 MB Cairo surface.
-  - Growth after output is now 5.6 MB for 10,000 lines of history.
+  - Growth after output is now 5.6 MB for 10,000 lines of history (4.2 MB with the new 5000
+    default, last section).
 - **Amber GL here**: llvmpipe's own cost dominates (libLLVM, JIT shaders, and textures held in
   process memory). About 150 MB of Rss is fixed (DERIVED). This box cannot say what a GPU driver
   would cost.
@@ -147,9 +166,31 @@ pressure.
     burn textures are RGBA16F at half resolution, 2 MB each.
   - C++ path: `static_`, `warp_` and the full-res burn buffer are float, 16.4 MB each at
     1280x800 (DERIVED). `down_`, `bloomA_` and `bloomB_` are 4.1 MB each.
-  - Scrollback default of 10,000 lines. This is a setting; it was not changed.
+  - Scrollback default: 10,000 lines when these numbers were taken. It is now 5000 (editor's
+    order in the PR #8 review); see the last section.
 - **Not a lever**:
   - `malloc_trim`: heap-free is about 3 MB and releasable 35 kB.
   - `M_ARENA_MAX`: `LP_NUM_THREADS=1` made no difference.
   - Glyph cache: under 60 KB.
   - Pixbuf copies: none found.
+
+## New default: 5000 lines (PR #8 review, editor's order via Ted)
+
+The default scrollback is now 5000 lines (`kDefaultScrollbackLines`; was 10,000). A
+`scrollback-lines` value already in settings.ini, `--scrollback N`, and the Settings spin
+button work as before; nothing is migrated. Profiles carry no scrollback setting. Re-measured
+on the head (REAL, Private_Dirty kB fresh / after, one run each; `raw-sb5000/`,
+`summary-sb5000.txt`):
+
+| profile | final, scrollback 10,000 | head, scrollback 5000 | change (DERIVED) |
+|---|---|---|---|
+| amber, effects on, GL | 89,356 / 93,656 | 89,448 / 91,948 | 0 / -1.7 MB |
+| amber, effects on, C++ path | 70,532 / 75,940 | 70,544 / 74,084 | 0 / -1.9 MB |
+| amber C++ path + bezel | 91,012 / 96,984 and 91,008 / 97,028 ** | 91,008 / 94,496 | 0 / -2.5 MB |
+| plain | 10,664 / 16,316 | 10,668 / 14,868 | 0 / -1.4 MB |
+
+`**` Re-run on the head with `--scrollback 10000` (2 runs); the raw-fix34 run was 91,004 / 96,384.
+Against master dc3b544 (which has the 10,000 default), the head with its new default is
+-3.9 / -12.0 MB (GL), -12.0 / -20.0 MB (C++ path), -26.2 / -35.9 MB (C++ + bezel, master
+median), 0 / -7.7 MB (plain), all DERIVED. Fresh numbers do not move because there is no history
+yet.

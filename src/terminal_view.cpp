@@ -133,6 +133,14 @@ TerminalView::TerminalView(const ViewOptions& opts)
     });
     signal_unrealize().connect([this] { disconnectAfterPaint(); }, false);
     area_.signal_draw().connect(sigc::mem_fun(*this, &TerminalView::onDraw));
+    for (Gtk::MenuItem* m : {&menuCopy_, &menuPaste_}) menu_.append(*m);
+    menu_.append(*Gtk::manage(new Gtk::SeparatorMenuItem));
+    menu_.append(menuSettings_);
+    menu_.show_all();
+    menu_.attach_to_widget(*this);
+    menuCopy_.signal_activate().connect([this] { copyClipboard(); });
+    menuPaste_.signal_activate().connect([this] { pasteClipboard(false); });
+    menuSettings_.signal_activate().connect([this] { signalSettingsRequested.emit(); });
     gl_.set_required_version(3, 3);
     gl_.set_has_alpha(false);
     gl_.set_has_depth_buffer(false);
@@ -409,6 +417,7 @@ void TerminalView::applyProfile() {
     }
     if (!pick.monospace)
         std::fprintf(stderr, "lunduke-terminal: font '%s' is not monospaced\n", pick.family.c_str());
+    autoFontPx_ = pick.px;
     const int px = opts_.fontPx > 0 ? opts_.fontPx : pick.px;
     painter_.reset(new GridPainter(pick.family, px, scale_));  // px stays logical
     applyColors();
@@ -609,6 +618,12 @@ bool TerminalView::onDraw(const Cairo::RefPtr<Cairo::Context>& cr) {
     cairo_pattern_set_filter(cairo_get_source(c), CAIRO_FILTER_NEAREST);
     cairo_paint(c);
     cairo_restore(c);
+    // Once a GtkGLArea has been realized in this toplevel, GDK composites every later frame
+    // through GL, reading the cairo paint surface back with GLX_EXT_texture_from_pixmap
+    // without flushing it first. cairo-xlib may still hold this blit (an image-surface
+    // upload) unsubmitted, so the frame shows only the theme background (M6 item 2:
+    // Plain profile / Ctrl+Shift+E blank after GL). Flush it to the X server here.
+    cairo_surface_flush(cairo_get_target(c));
     return true;
 }
 
@@ -1175,6 +1190,15 @@ void TerminalView::testButton(bool press, int button, double x, double y, guint 
     ev.x = x;
     ev.y = y;
     ev.state = state;
+    // As from GTK: on the drawing widget's window, from the pointer (menus pop up from these).
+    Gtk::Widget& target = mode_ == Mode::Gl ? static_cast<Gtk::Widget&>(gl_) : static_cast<Gtk::Widget&>(area_);
+    if (auto win = target.get_window()) {
+        ev.window = win->gobj();
+        ev.x_root = x;
+        ev.y_root = y;
+        if (GdkSeat* seat = gdk_display_get_default_seat(win->get_display()->gobj()))
+            ev.device = gdk_seat_get_pointer(seat);
+    }
     if (press) onButtonPress(&ev);
     else onButtonRelease(&ev);
 }
@@ -1209,7 +1233,10 @@ bool TerminalView::onButtonPress(GdkEventButton* ev) {
     const bool inside = cellAt(ev->x, ev->y, row, col);
     // A press on the bezel (or the glass's rounded corners) is not on the terminal: it neither
     // starts a selection nor reaches a mouse-reporting application. Middle-click paste still works.
-    if (!inside && frameActive() && ev->button != 2) return true;
+    if (!inside && frameActive() && ev->button != 2) {
+        if (ev->button == 3 && ev->type == GDK_BUTTON_PRESS) showContextMenu(ev);
+        return true;
+    }
     const VTermModifier mod = modsOf(ev->state);
     if (mouseReporting(ev->state)) {
         if (ev->type != GDK_BUTTON_PRESS) return true;  // GTK's extra 2/3-click events
@@ -1234,7 +1261,17 @@ bool TerminalView::onButtonPress(GdkEventButton* ev) {
         pasteClipboard(true);
         return true;
     }
+    if (ev->button == 3 && ev->type == GDK_BUTTON_PRESS) {
+        showContextMenu(ev);
+        return true;
+    }
     return false;
+}
+
+void TerminalView::showContextMenu(GdkEventButton* ev) {
+    menuCopy_.set_sensitive(sel_.hasText(*session_));  // Copy needs a selection (no text built)
+    menuPaste_.set_sensitive(!holding_ && !exited_);
+    menu_.popup_at_pointer(reinterpret_cast<GdkEvent*>(ev));
 }
 
 bool TerminalView::onButtonRelease(GdkEventButton* ev) {
@@ -1321,11 +1358,8 @@ bool TerminalView::onKey(GdkEventKey* ev) {
             setEffects(!effectsOn_);
             return true;
         }
-        if (k == GDK_KEY_p) {  // next built-in profile
-            const auto& all = builtinProfiles();
-            size_t i = 0;
-            while (i < all.size() && all[i].id != profile_.id) ++i;
-            setProfile(all[(i + 1) % all.size()].id);
+        if (k == GDK_KEY_p) {  // next profile: the built-ins, then the custom ones (PR #7 review)
+            setProfile(nextProfileId(profile_.id));
             return true;
         }
         if (k == GDK_KEY_c) {

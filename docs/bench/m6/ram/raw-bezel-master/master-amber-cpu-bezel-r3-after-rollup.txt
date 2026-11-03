@@ -1,0 +1,24 @@
+# master-amber-cpu-bezel-r3 after pid 2250614 2026-11-02 22:31:32 CST
+55749fc9c000-7ffd41d35000 ---p 00000000 00:00 0                          [rollup]
+Rss:              172752 kB
+Pss:              147402 kB
+Pss_Dirty:        132356 kB
+Pss_Anon:         130356 kB
+Pss_File:          15046 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      29156 kB
+Shared_Dirty:       4000 kB
+Private_Clean:      9240 kB
+Private_Dirty:    130356 kB
+Referenced:       172752 kB
+Anonymous:        130356 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

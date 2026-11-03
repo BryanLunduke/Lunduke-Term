@@ -4,6 +4,7 @@
 // shown are told so (setWindowVisible(false)), so their effects never animate in the background.
 #pragma once
 
+#include "profile_editor.hpp"
 #include "terminal_view.hpp"
 
 #include <gtkmm.h>
@@ -21,6 +22,10 @@ std::string settingsPath();  // $XDG_CONFIG_HOME/lunduke-terminal/settings.ini
 // and *warning says so. False on error.
 bool saveSettings(const ViewOptions& o, const std::string& path, std::string* error = nullptr,
                   std::string* warning = nullptr);
+
+// PR #7 review: when settings.ini's [terminal] profile is `deletedId` (a custom profile that was
+// just deleted), sets it to the default (amber), keeping every other key. True if it changed.
+bool resetDeletedDefaultProfile(const std::string& path, const std::string& deletedId, std::string* error = nullptr);
 
 class SettingsDialog;
 
@@ -67,6 +72,9 @@ public:
     // Applies the dialog's options to every tab and to tabs opened later.
     void applySettings(const ViewOptions& o);
     void commitScrollbackLimits();  // Settings closed: apply pending lower limits
+    // M6 item 4: a custom profile was saved (oldId == newId), renamed or deleted (newId = the
+    // default): tabs that use oldId get newId again, so they show the stored values.
+    void profilesChanged(const std::string& oldId, const std::string& newId);
     const ViewOptions& options() const { return opts_; }
     std::string settingsFile;  // where "Save as default" writes (tests point it elsewhere)
 
@@ -139,13 +147,34 @@ public:
     Gtk::Label status;
     Gtk::Label scrollbackNote;  // review item 4: memory per tab when the scrollback is full
     void updateScrollbackNote();
+    // M6 item 4: custom profiles. Built-ins are read-only: Edit, Rename and Delete work on
+    // custom profiles only; "Copy to custom profile" starts one from any profile.
+    Gtk::Button newProfile{"New..."}, copyProfile{"Copy to custom profile..."}, editProfile{"Edit..."},
+        renameProfile{"Rename..."}, deleteProfile{"Delete"};
+    Gtk::Label profileNote;
+    std::unique_ptr<ProfileEditor> editor;  // the open editor (tests)
+    // Tests answer instead of the dialogs: the name ("" = cancel), and the delete question.
+    std::function<std::string(const std::string& title, const std::string& suggested)> askNameHook;
+    std::function<bool(const std::string& question)> confirmDeleteHook;
+    void fillProfiles(const std::string& activeId);
+    void createProfile(bool copyCurrent);  // New / Copy to custom profile
+    void editCurrentProfile();
+    void renameCurrentProfile();
+    void deleteCurrentProfile();
 
 private:
     void changed();
     void updateFrameSensitivity();
+    // M6 item 3: with no size override the field shows the size the profile (and font) uses;
+    // a profile change drops the override and shows the new profile's size.
+    void syncFontPx(int overridePx);
+    void updateProfileButtons();
+    std::string askName(const std::string& title, const std::string& suggested, const std::string& renaming);
     TerminalWindow& win_;
     ViewOptions base_;
     bool loading_ = false;
+    int autoPx_ = 0;           // the size shown when there is no override
+    std::string lastProfile_;  // profile the controls were last applied with
 };
 
 }  // namespace lterm

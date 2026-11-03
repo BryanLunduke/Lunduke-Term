@@ -19,6 +19,7 @@ xvfb-run -a -s "-screen 0 1280x1024x24" meson test -C build --print-errorlogs
 | `gl-match` | GLSL pipeline vs CPU fallback, PSNR ≥ 40 dB per quality level (EGL + llvmpipe, `LIBGL_ALWAYS_SOFTWARE=1`) | no (EGL surfaceless) |
 | `view` | GTK `TerminalView` lifetime, built with AddressSanitizer; skips without `$DISPLAY` | yes |
 | `review` | M5 code-review fixes: output flood + Ctrl+C, input method (gtk-im-context-simple), hidden-tab memory and painting, cursor blink timeout, confirm close, scrollback maximum/lazy trim, selection compare, `--stats`, default profile; not parallel; skips without `$DISPLAY` | yes |
+| `scrollback-default` | runs `lunduke-terminal`: default scrollback is 5000 lines; a `scrollback-lines` saved in settings.ini (10000, 7000) is used as is and the file is not rewritten; not parallel; skips without `$DISPLAY` | yes |
 
 Sanitizer build (what the CI `sanitizers` job runs):
 

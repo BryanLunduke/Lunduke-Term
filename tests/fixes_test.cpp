@@ -55,6 +55,9 @@ static void testScrollbackClamp() {
     CHECK(clampScrollbackLines(LLONG_MAX) == kMaxScrollbackLines);
     CHECK(clampScrollbackLines(static_cast<long long>(kMaxScrollbackLines) + 1) == kMaxScrollbackLines);
     VtermSession s(2, 10);
+    // Default (M6, editor order): 5000 lines, was 10,000.
+    CHECK(kDefaultScrollbackLines == 5000);
+    CHECK(s.scrollbackLimit() == 5000);
     s.setScrollbackLimit(static_cast<size_t>(-1));
     CHECK(s.scrollbackLimit() == kMaxScrollbackLines);
     s.setScrollbackLimit(7);

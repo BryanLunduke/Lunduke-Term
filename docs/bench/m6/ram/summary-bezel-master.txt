@@ -1,0 +1,12 @@
+label                        snap        Rss      Pss Priv_Dirty  Shared_Cl
+master-amber-cpu-bezel-r1    after    224720   166436     139044      71888
+master-amber-cpu-bezel-r1    fresh    211528   153247     125856      71884
+master-amber-cpu-bezel-r2    after    172548   147342     130372      28940
+master-amber-cpu-bezel-r2    fresh    159352   134104     117176      28940
+master-amber-cpu-bezel-r3    after    172752   147402     130356      29156
+master-amber-cpu-bezel-r3    fresh    159496   134209     117164      29092
+
+# master dc3b544 (wt-master build), measured 2026-11-02 22:29-22:32 CST, scrollback 10,000 (old default). REAL.
+# r1 is ~8.7 MB higher than r2/r3 on Private_Dirty (and ~43 MB higher on Shared_Clean); median of 3 is used: 117,176 fresh / 130,372 after.
+# vs final (raw-fix34 after-amber-cpu-bezel, 91,004 / 96,384): -26.2 / -34.0 MB (DERIVED, decimal MB).
+# vs r1 alone: -34.9 / -42.7 MB; vs r2/r3: -26.2 / -34.0 MB (DERIVED).

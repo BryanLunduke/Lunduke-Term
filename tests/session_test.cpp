@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <poll.h>
+#include <random>
 #include <string>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -584,10 +585,78 @@ static void testScrollbackCells() {
                 VtermSession::scrollbackBytesFull(1, 100));
 }
 
+// M6 review: unpackCell found a cell's extra combining characters by scanning the line's whole
+// side array (quadratic in the line width). sbExtraFind is a binary search; it must return what
+// the linear scan returned, and random lines full of combining marks must come back unchanged.
+static size_t sbExtraFindLinear(const uint32_t* extra, size_t records, uint32_t col) {
+    for (size_t r = 0; r < records; ++r)
+        if (extra[r * VTERM_MAX_CHARS_PER_CELL] == col) return r;
+    return records;
+}
+
+static void testScrollbackCombiningLookup() {
+    std::mt19937 rng(20261102);
+    int mismatches = 0;
+    for (int trial = 0; trial < 3000; ++trial) {
+        std::vector<uint32_t> extra;
+        size_t records = 0;
+        for (uint32_t col = 0; col < 300; ++col) {
+            if (rng() % 4 != 0) continue;
+            extra.push_back(col);
+            for (int k = 1; k < VTERM_MAX_CHARS_PER_CELL; ++k) extra.push_back(rng());
+            ++records;
+        }
+        for (uint32_t col = 0; col <= 301; ++col)
+            mismatches += sbExtraFind(extra.data(), records, col) != sbExtraFindLinear(extra.data(), records, col);
+    }
+    CHECK_EQ(mismatches, 0);
+
+    const int rows = 6, cols = 200, lines = 300;
+    VtermSession s(rows, cols);
+    static const char* marks[] = {"\xcc\x81", "\xcc\x80", "\xcc\x82", "\xcc\x83", "\xcc\x88", "\xcd\xa3"};
+    std::vector<std::vector<std::string>> want;  // cellText: base + every combining character
+    long combining = 0;
+    for (int i = 0; i < lines; ++i) {
+        std::string line;
+        int width = 0;
+        while (width < cols - 10) {
+            const unsigned k = rng() % 10;
+            if (k == 0) line += "\x1b[" + std::to_string(31 + rng() % 7) + "m";
+            if (k == 1) {
+                line += "\xe6\xbc\xa2";  // wide
+                width += 2;
+                continue;
+            }
+            line += static_cast<char>('a' + rng() % 26);
+            const unsigned n = rng() % 7;  // 0..6 marks; libvterm keeps up to 5
+            for (unsigned m = 0; m < n; ++m) line += marks[rng() % 6];
+            ++width;
+        }
+        s.feed(line + "\x1b[0m");
+        std::vector<std::string> row(static_cast<size_t>(cols));
+        for (int c = 0; c < cols; ++c) {
+            row[static_cast<size_t>(c)] = s.cellText(i, c);
+            combining += row[static_cast<size_t>(c)].size() > 3;  // a 1-3 byte base plus at least one mark
+        }
+        want.push_back(row);
+        s.feed("\r\n");
+    }
+    for (int i = 0; i < rows; ++i) s.feed("\r\n");
+    CHECK(s.firstLine() <= 0 && s.topLine() >= lines);
+    int bad = 0;
+    for (int i = 0; i < lines; ++i)
+        for (int c = 0; c < cols; ++c) bad += s.cellText(i, c) != want[static_cast<size_t>(i)][static_cast<size_t>(c)];
+    CHECK_EQ(bad, 0);
+    CHECK(combining > lines * 50);  // the streams really are full of combining cells
+    std::printf("scrollback combining lookup: 3000 random side arrays match the linear scan; %d lines, %ld combining cells round-tripped\n",
+                lines, combining);
+}
+
 int main() {
     testReports();
     testScrollback();
     testScrollbackCells();
+    testScrollbackCombiningLookup();
     testSelection();
     testPointToCell();
     testScale2Mapping();

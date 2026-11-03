@@ -1,0 +1,11 @@
+# Fuzz finding, PR #8 follow-up (2026-11-02 23:05 CST). REAL. Not fixed in this PR.
+# Input: crash-46ca723d-libvterm-rep.bin (631 bytes; wide CJK text, SGR, CSI 1 b = REP, CUP, ICH).
+# UBSan: libvterm-0.3.3/src/screen.c:190:46: member access within null pointer of type 'ScreenCell'
+#   #0 putglyph screen.c:190   (marks the right half of a wide glyph: getcell(row, col+1) is NULL)
+#   #1 putglyph state.c:25
+#   #2 on_csi state.c:1238     (REP repeating the last, wide, character)
+#   #3 vterm_input_write parser.c:254
+#   #4 lterm::VtermSession::feed vterm_session.cpp:329
+# Same report with the harness built from master 6f22466 (tools/fuzz/build.sh in a worktree) and
+# from this branch's head, so it is pre-existing and not caused by sbExtraFind or the scrollback
+# default. Left for a separate fix (the session's REP guard would be the place), per "leave other nits".

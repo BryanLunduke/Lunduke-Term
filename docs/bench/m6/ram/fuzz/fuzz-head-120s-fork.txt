@@ -1,0 +1,11 @@
+# Second run on 2e8c4b0: same options plus -fork=1 -ignore_crashes=1 (so the known libvterm REP finding does not stop it), -max_total_time=120; box clock CST:
+Mon Nov  2 23:06:27 CST 2026
+INFO: -fork=1: fuzzing in separate process(s)
+INFO: -fork=1: 1740 seed inputs, starting to fuzz in /tmp/libFuzzerTemp.FuzzWithFork2287602.dir
+#184: cov: 3411 ft: 20036 corp: 1740 exec/s: 92 oom/timeout/crash: 0/0/0 time: 26s job: 1 dft_time: 0
+#8145: cov: 3413 ft: 20186 corp: 1797 exec/s: 77 oom/timeout/crash: 0/0/0 time: 104s job: 11 dft_time: 0
+INFO: fuzzed for 132 seconds, wrapping up soon
+INFO: exiting: 0 time: 132s
+#10806: cov: 3413 ft: 20260 corp: 1821 exec/s: 78 oom/timeout/crash: 0/0/0 time: 131s job: 13 dft_time: 0
+exit 0
+Mon Nov  2 23:08:39 CST 2026

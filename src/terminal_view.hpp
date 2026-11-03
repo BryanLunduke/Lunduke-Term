@@ -36,7 +36,7 @@ struct ViewOptions {
     std::vector<std::string> command;
     bool stats = false;             // print frame statistics on exit
     // Checkpoint B
-    long long scrollbackLines = 10000;  // clamped to 0..kMaxScrollbackLines
+    long long scrollbackLines = static_cast<long long>(kDefaultScrollbackLines);  // clamped to 0..kMaxScrollbackLines
     bool loginShell = false;
     std::string cwd;
     std::string onExit = "hold-on-error";  // close | hold | hold-on-error
@@ -103,6 +103,9 @@ public:
     bool softwareRendering() const { return software_; }
     double tickIntervalMs() const { return tickIntervalMs_; }
     int scaleFactor() const { return scale_; }
+    // Font size (logical px) the profile and font family give without a --font-px override;
+    // the Settings dialog shows it while there is no override (M6 item 3).
+    int autoFontPx() const { return autoFontPx_; }
     int deviceWidth() const { return w_; }
     int deviceHeight() const { return h_; }
     // Test hook: the cell under a pointer position in logical (event) coordinates.
@@ -133,6 +136,13 @@ public:
     int searchIndex() const { return matchIndex_; }  // -1: none
     const std::vector<SearchMatch>& searchMatches() const { return matches_; }
     sigc::signal<void> signalSearchChanged;  // matches or the current match changed
+    // M6 item 1: right-click menu (Copy, Paste, Settings). Shift+right-click opens it while an
+    // application reports the mouse. "Settings" asks the window to show its dialog.
+    sigc::signal<void> signalSettingsRequested;
+    Gtk::Menu& contextMenu() { return menu_; }  // tests
+    Gtk::MenuItem& contextCopy() { return menuCopy_; }
+    Gtk::MenuItem& contextPaste() { return menuPaste_; }
+    Gtk::MenuItem& contextSettings() { return menuSettings_; }
     // M3: the search runs on a cache (SearchIndex) that is built in <= 4 ms idle slices; a query
     // typed before the cache is complete is pending (searchPending(), count 0) and finishes from
     // the idle worker. prepareSearch() starts building it ahead (the search bar opened).
@@ -174,6 +184,7 @@ protected:
 
 private:
     std::string fontWarned_;  // the --font value already warned about
+    int autoFontPx_ = 0;
     enum class Mode { Plain, Cpu, Gl };
     bool onKey(GdkEventKey* ev);
     // Review item 2: input methods (dead keys, Compose, ibus/fcitx for CJK). The IM shows its
@@ -239,6 +250,9 @@ private:
     std::unique_ptr<VtermSession> session_;
     Gtk::DrawingArea area_;
     Gtk::GLArea gl_;
+    Gtk::Menu menu_;
+    Gtk::MenuItem menuCopy_{"_Copy", true}, menuPaste_{"_Paste", true}, menuSettings_{"_Settings", true};
+    void showContextMenu(GdkEventButton* ev);
     Mode mode_ = Mode::Plain;
     bool effectsOn_ = false;
     bool glFailed_ = false;

@@ -1,0 +1,24 @@
+# head-sb10000-amber-cpu-bezel-r2 fresh pid 2256898 2026-11-02 22:33:42 CST
+5650040fb000-7ffea6ead000 ---p 00000000 00:00 0                          [rollup]
+Rss:              133592 kB
+Pss:              108276 kB
+Pss_Dirty:         93008 kB
+Pss_Anon:          91008 kB
+Pss_File:          15268 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      29120 kB
+Shared_Dirty:       4000 kB
+Private_Clean:      9464 kB
+Private_Dirty:     91008 kB
+Referenced:       133592 kB
+Anonymous:         91008 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

@@ -886,16 +886,29 @@ void VtermSession::packCell(const VTermScreenCell& c, int col, SbLine& line) {
     line.cells.push_back(s);
 }
 
+// packCell() is called for columns 0, 1, 2, ... of a line, so the records are in column order
+// (M6 review: the linear scan made a scrolled-back redraw quadratic in the line width).
+size_t sbExtraFind(const uint32_t* extra, size_t records, uint32_t col) {
+    size_t lo = 0, hi = records;
+    while (lo < hi) {
+        const size_t mid = lo + (hi - lo) / 2;
+        if (extra[mid * kSbExtra] < col) lo = mid + 1;
+        else hi = mid;
+    }
+    return lo < records && extra[lo * kSbExtra] == col ? lo : records;
+}
+
 void VtermSession::unpackCell(const SbLine& line, int col, VTermScreenCell& out) {
     const SbCell& s = line.cells[static_cast<size_t>(col)];
     const uint32_t b = s.bits;
     out = VTermScreenCell{};
     out.chars[0] = s.ch;
     if (b >> 26 & 1) {
-        for (size_t i = 0; i + kSbExtra <= line.extra.size(); i += kSbExtra) {
-            if (line.extra[i] != static_cast<uint32_t>(col)) continue;
+        const size_t n = line.extra.size() / kSbExtra;
+        const size_t r = sbExtraFind(line.extra.data(), n, static_cast<uint32_t>(col));
+        if (r < n) {
+            const size_t i = r * kSbExtra;
             for (int k = 1; k < VTERM_MAX_CHARS_PER_CELL; ++k) out.chars[k] = line.extra[i + static_cast<size_t>(k)];
-            break;
         }
     }
     out.width = static_cast<char>(static_cast<int8_t>(b >> 18 & 0xff));

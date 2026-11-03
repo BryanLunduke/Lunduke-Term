@@ -37,6 +37,7 @@ std::string sanitizePaste(const std::string& text);
 // Limits against hostile or runaway input.
 constexpr size_t kMaxTitleBytes = 4096;            // OSC 0/2 window title
 constexpr size_t kMaxScrollbackLines = 100000;     // scrollback-lines setting / --scrollback (M5 stopgap: was 1,000,000)
+constexpr size_t kDefaultScrollbackLines = 5000;   // when settings.ini and --scrollback give none (M6: was 10,000)
 // Negative -> 0, above kMaxScrollbackLines -> kMaxScrollbackLines.
 size_t clampScrollbackLines(long long requested);
 // Child side of spawn(): closes every fd >= 3 (close_range, or close() up to maxFd).
@@ -49,6 +50,11 @@ int libvtermWidth(uint32_t cp);
 // True when libvterm 0.3.3 prints the code point with width 0 (a combining mark or other
 // zero-width character on its own). Probed and cached like libvtermWidth.
 bool libvtermZeroWidth(uint32_t cp);
+
+// Scrollback side array: records of VTERM_MAX_CHARS_PER_CELL uint32s (column, chars[1..5]),
+// stored in increasing column order. Binary search; returns the record index of `col`, or
+// `records` when the column has none. Declared here for the tests.
+size_t sbExtraFind(const uint32_t* extra, size_t records, uint32_t col);
 
 class VtermSession : public LineSource {
 public:
@@ -160,7 +166,7 @@ private:
     };
     struct SbLine {
         std::vector<SbCell> cells;    // trailing blank cells trimmed
-        std::vector<uint32_t> extra;  // per combining cell: column, chars[1..5]
+        std::vector<uint32_t> extra;  // per combining cell, in column order: column, chars[1..5]
         bool wrapped = false;         // continues on the next line
     };
     static void packCell(const VTermScreenCell& c, int col, SbLine& line);
@@ -260,7 +266,7 @@ private:
     bool havePalette_ = false;
     float minFgGrey_ = 0.0f;
     std::deque<SbLine> sb_;
-    size_t sbLimit_ = 10000;
+    size_t sbLimit_ = kDefaultScrollbackLines;
     long pushed_ = 0;  // lines ever pushed to the scrollback (minus popped)
     unsigned long epoch_ = 0;  // bumped when scrollback lines are popped/cleared or on resize
 };

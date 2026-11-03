@@ -1,0 +1,27 @@
+# head f01c307, build-san (address,undefined, detect_leaks=1 + tests/lsan.supp), meson test --num-processes 2 --timeout-multiplier 4 (non-parallel GUI tests are serialized by meson), Xvfb :44, llvmpipe (NOT a GPU), REAL
+## run 1 start 2026-11-02 21:21:30 EST
+   loadavg at start: 1.89 2.38 1.88, nproc 8
+ 1/18 desktop-file    OK               0.01s
+ 2/18 metainfo        OK               0.02s
+ 3/18 governor        OK               0.01s
+ 4/18 profiles        OK               0.02s
+ 5/18 custom-profiles OK               0.05s
+ 6/18 painter         OK               0.33s
+ 7/18 fonts           OK               0.06s
+ 8/18 vterm           OK               0.02s
+ 9/18 effects         OK               1.64s
+10/18 session         OK               0.13s
+11/18 fixes           OK               0.46s
+12/18 fuzz-regress    OK               0.03s
+13/18 unicode         OK               0.02s
+14/18 search          OK              21.26s
+15/18 gl-match        OK              91.04s
+16/18 view            OK             108.09s
+17/18 review          OK              69.17s
+18/18 ux              OK              24.16s
+Ok:                 18  
+Expected Fail:      0   
+Fail:               0   
+Unexpected Pass:    0   
+Skipped:            0   
+Timeout:            0   

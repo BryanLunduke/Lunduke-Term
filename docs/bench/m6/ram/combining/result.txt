@@ -1,0 +1,14 @@
+# sb_combining_bench (build-bench.sh), REAL, box clock 2026-11-02 22:28 CST, load ~2.3; 3 alternating rounds, each line = median of 15 batches x 200 fillGrid calls
+# master = dc3b544 (full VTermScreenCell scrollback); linear = 03aa975 (packed cells, linear extra scan); bsearch = this commit
+round  master  linear  bsearch   (combining-every-cell, ms per fillGrid 50x200)
+1      0.218   0.725   0.284
+2      0.218   0.732   0.280
+3      0.218   0.736   0.282
+ascii-only lines: master 0.193-0.195, linear 0.199-0.207, bsearch 0.203-0.209
+earlier pair (same binaries, 3 rounds before the fix): master 0.217-0.223, linear 0.738-0.776
+
+# mutation (binary search '<' -> '<='), session_test failures (first 4 lines):
+FAIL ../tests/session_test.cpp:566: gHist.at(r, c) == gBefore.at(r, c)
+FAIL ../tests/session_test.cpp:566: gHist.at(r, c) == gBefore.at(r, c)
+FAIL ../tests/session_test.cpp:581: bad == 0
+FAIL ../tests/session_test.cpp:612: mismatches == 0

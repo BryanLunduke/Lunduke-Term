@@ -1,0 +1,7 @@
+
+(bin-sb5000:2263164): dbind-WARNING **: 22:39:45.626: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+stats-mem t=6 tabs=1 heap-arena=4235264 heap-mmap=66412544 heap-mmap-n=13 heap-inuse=69791024 heap-free=856784 heap-releasable=46768 sb-lines=0 sb-bytes=0 glyphs=0 glyph-bytes=0 textures=0 texture-bytes=0 surface-bytes=8192000 stat-samples=0
+stats-mem t=11 tabs=1 heap-arena=7479296 heap-mmap=66818048 heap-mmap-n=15 heap-inuse=73647120 heap-free=650224 heap-releasable=75008 sb-lines=5000 sb-bytes=3179216 glyphs=50 glyph-bytes=37800 textures=0 texture-bytes=0 surface-bytes=8192000 stat-samples=0
+stats-mem t=16 tabs=1 heap-arena=7479296 heap-mmap=66818048 heap-mmap-n=15 heap-inuse=73644736 heap-free=652608 heap-releasable=74512 sb-lines=5000 sb-bytes=3179216 glyphs=50 glyph-bytes=37800 textures=0 texture-bytes=0 surface-bytes=8192000 stat-samples=0
+stats-mem t=21 tabs=1 heap-arena=7479296 heap-mmap=66818048 heap-mmap-n=15 heap-inuse=73648192 heap-free=649152 heap-releasable=74080 sb-lines=5000 sb-bytes=3179216 glyphs=50 glyph-bytes=37800 textures=0 texture-bytes=0 surface-bytes=8192000 stat-samples=0
+stats-mem t=26 tabs=1 heap-arena=7479296 heap-mmap=66818048 heap-mmap-n=15 heap-inuse=73644736 heap-free=652608 heap-releasable=73600 sb-lines=5000 sb-bytes=3179216 glyphs=50 glyph-bytes=37800 textures=0 texture-bytes=0 surface-bytes=8192000 stat-samples=0

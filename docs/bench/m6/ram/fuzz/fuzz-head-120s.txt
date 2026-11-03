@@ -1,0 +1,22 @@
+# Fuzz run on 2e8c4b0 (sbExtraFind/unpackCell + 5000 default), tools/fuzz/build.sh, differential check built in (docs/FUZZING.md), -max_len=8192 -timeout=10 -max_total_time=120; started/ended (box clock, CST):
+# Stopped after ~60 s (23:05:31) on a pre-existing libvterm REP finding (finding-libvterm-rep.txt, same on master 6f22466); the -fork run in fuzz-head-120s-fork.txt continued past it.
+Mon Nov  2 23:04:28 CST 2026
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 671891034
+INFO: Loaded 1 modules   (10340 inline 8-bit counters): 10340 [0x562ccbffc450, 0x562ccbffecb4), 
+INFO: Loaded 1 PC tables (10340 PCs): 10340 [0x562ccbffecb8,0x562ccc0272f8), 
+INFO:     2353 files found in /workspace/m6-work/fuzz/corpus
+INFO:       53 files found in tools/fuzz/seeds
+INFO: seed corpus: files: 2406 min: 2b max: 6004b total: 5655611b rss: 40Mb
+#2447	INITED cov: 3402 ft: 19970 corp: 1725/3271Kb exec/s: 90 rss: 426Mb
+/workspace/lterm-tools/src/libvterm-0.3.3/src/screen.c:190:46: runtime error: member access within null pointer of type 'ScreenCell'
+SUMMARY: UndefinedBehaviorSanitizer: undefined-behavior /workspace/lterm-tools/src/libvterm-0.3.3/src/screen.c:190:46 
+MS: 1 CMP- DE: "   \033[1b\033[58d    "-; base unit: 96bb9c6d8ef964472642de085b4e2f446809e96b
+artifact_prefix='/workspace/m6-work/fuzz/crashes/'; Test unit written to /workspace/m6-work/fuzz/crashes/crash-46ca723d2c65bf9550465af40541a4276361282a
+stat::number_of_executed_units: 7167
+stat::average_exec_per_sec:     115
+stat::new_units_added:          98
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              491
+exit 1
+Mon Nov  2 23:05:31 CST 2026

@@ -1,0 +1,28 @@
+# head fa48262, release ux_test (ASan-linked, leaks on), Xvfb :44, llvmpipe, REAL
+
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: plain, no effects
+lunduke-terminal: plain, no effects
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: custom:Mine, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+
+(ux_test:1971850): Gtk-WARNING **: 21:27:22.966: Could not load a pixbuf from /org/gtk/libgtk/theme/Adwaita/assets/check-symbolic.svg.
+This may indicate that pixbuf loaders or the mime database could not be found.
+lunduke-terminal: custom:Mine, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: custom:Mine, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: custom:Renamed, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: custom:My profile, no effects
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+plain render (gl; amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): bright pixels of 256000: amber 17194, Ctrl+Shift+E off 13945, profile plain 6419
+plain render (cpu; amber, effects: C++ fallback (4 threads), quality reduced): bright pixels of 256000: amber 16833, Ctrl+Shift+E off 13945, profile plain 6419
+settings font size: amber uses 22 px, field 22; plain uses 16 px, field 16
+settings font size: override 30, then amber: field 22, override 0
+context menu: selection 'READY'
+context menu: Copy put 'READY' on the clipboard
+context menu: mouse reporting takes the plain right-click; Shift+right-click menu; Settings opened the dialog
+custom profile saved: bloom 0.00 jitter 0.90 rgb-shift 0.40 scanlines 1 font DejaVu Sans Mono:18 frame 1
+ux_test: all passed
+exit 0

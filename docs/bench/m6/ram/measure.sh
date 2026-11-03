@@ -14,7 +14,7 @@ snap() {
   local tag=$1
   { echo "# $label $tag pid $pid $(date '+%F %T %Z')"; cat /proc/$pid/smaps_rollup; } > "$out/$label-$tag-rollup.txt"
   bash "$here/smaps-group.sh" $pid > "$out/$label-$tag-groups.txt"
-  cp /proc/$pid/smaps "$out/$label-$tag-smaps.txt"  # kept as raw-smaps-*.tar.xz in git
+  cp /proc/$pid/smaps "$out/$label-$tag-smaps.txt"  # full smaps, not committed; *-groups.txt is
 }
 sleep 8; snap fresh
 sleep 22; snap after

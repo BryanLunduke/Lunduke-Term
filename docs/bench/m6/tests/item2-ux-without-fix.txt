@@ -1,0 +1,9 @@
+# ux_test WITHOUT the item-2 fix (src/terminal_view.cpp at dc3b544), Xvfb :44, llvmpipe, Mon Nov  2 20:47:19 EST 2026
+
+(ux_test:1927425): dbind-WARNING **: 20:47:19.753: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+FAIL ../tests/ux_test.cpp:127: n < total * 4 / 10
+FAIL ../tests/ux_test.cpp:127: n < total * 4 / 10
+plain render (gl; amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): bright pixels of 256000: amber 17192, Ctrl+Shift+E off 256000, profile plain 256000
+plain render (cpu; amber, effects: C++ fallback (4 threads), quality reduced): bright pixels of 256000: amber 17192, Ctrl+Shift+E off 13945, profile plain 6419
+2 failure(s)
+exit 1
