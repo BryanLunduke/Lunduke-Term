@@ -204,7 +204,8 @@ ux_test_exe = executable('ux_test', 'tests/ux_test.cpp', 'src/terminal_view.cpp'
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
 test('ux', ux_test_exe, env : view_env, timeout : 120, is_parallel : false)
 # Default scrollback 5000; a saved scrollback-lines is kept. Runs the binary; skips without $DISPLAY.
-test('scrollback-default', find_program('sh'), args : [files('tests/scrollback_default_test.sh'), lterm_exe],
+test('scrollback-default', find_program('sh'), args : [files('tests/scrollback_default_test.sh'), lterm_exe,
+    get_option('b_sanitize') != 'none' ? '10000' : '3000'],  # size-settle bound, as ltermWaitMs(3000, 10000)
   env : view_env, timeout : 240, is_parallel : false)
 # Perf step 1: --help, --version and an unknown option (exit 0, 0, 2). Needs no $DISPLAY.
 test('cli', find_program('sh'), args : [files('tests/cli_test.sh'), lterm_exe, meson.project_version()],
