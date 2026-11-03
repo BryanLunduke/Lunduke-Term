@@ -16,6 +16,7 @@
 #include <vector>
 #include <signal.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <algorithm>
 #include <cmath>
 
@@ -191,6 +192,191 @@ static void testSettingsFontPx() {
     CHECK(w.options().fontPx == 0);
     CHECK(v->autoFontPx() == amberPx);
     d->response(Gtk::RESPONSE_CLOSE);
+}
+
+// ---- perf step 1: F11 toggles fullscreen ----
+static void testFullscreenKey() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    TerminalWindow w(o);
+    w.settingsFile = "/dev/null";
+    w.show();
+    w.newTab(true);
+    pump(300);
+    GdkEventKey e = keyEv(GDK_KEY_F11, 0);
+    GdkEventKey shifted = keyEv(GDK_KEY_F11, GDK_SHIFT_MASK);
+    CHECK(!w.handleKey(&shifted));  // Shift+F11 goes to the program
+    // PR #9 review: Super+F11 too, whether GDK reports Super as MOD4, the virtual SUPER bit or both.
+    for (guint super : {guint(GDK_MOD4_MASK), guint(GDK_SUPER_MASK), guint(GDK_MOD4_MASK | GDK_SUPER_MASK)}) {
+        GdkEventKey s = keyEv(GDK_KEY_F11, super);
+        CHECK(!w.handleKey(&s));
+    }
+    for (guint m : {guint(GDK_CONTROL_MASK), guint(GDK_MOD1_MASK)}) {
+        GdkEventKey s = keyEv(GDK_KEY_F11, m);
+        CHECK(!w.handleKey(&s));
+    }
+    // NumLock (MOD2) is not a modifier here: F11 with NumLock on still toggles (checked below).
+    GdkEventKey numlock = keyEv(GDK_KEY_F11, GDK_MOD2_MASK);
+    CHECK(!w.fullscreenState());
+    CHECK(w.handleKey(&e));
+    const bool on = waitFor([&] { return w.fullscreenState(); }, 3000);
+    if (!on) {
+        // Without a window manager nobody answers _NET_WM_STATE_FULLSCREEN (plain xvfb-run).
+        std::printf("fullscreen: F11 handled, no window manager answered: state not checked\n");
+        return;
+    }
+    const int fw = w.get_width(), fh = w.get_height();
+    CHECK(w.handleKey(&numlock));
+    const bool off = waitFor([&] { return !w.fullscreenState(); }, 3000);
+    CHECK(off);
+    pump(200);
+    std::printf("fullscreen: F11 -> fullscreen %dx%d, F11 again -> %s %dx%d\n", fw, fh, off ? "windowed" : "STILL FULLSCREEN",
+                w.get_width(), w.get_height());
+}
+
+// ---- perf step 1: font zoom (Ctrl+= / Ctrl++ / Ctrl+- / Ctrl+0) ----
+static std::string fileText(const std::string& path);
+static void testFontZoom() {
+    g_mkdir_with_parents(home.c_str(), 0700);
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    TerminalWindow w(o);
+    const std::string saved = home + "/zoom-settings.ini";
+    w.settingsFile = saved;
+    w.set_default_size(800, 500);
+    w.show();
+    TerminalView* v = w.newTab(true);
+    pump(300);
+    CHECK(v);
+    if (!v) return;
+    // PR #9 review: under load (parallel suite, busy box) the window can still be mapping or
+    // resizing when the test starts, so each check first waits, with the ltermWaitMs() bounds,
+    // until the font size and the grid have settled instead of reading them after a fixed sleep.
+    // Only a failing case waits the whole bound.
+    const int waitMs = ltermWaitMs(3000, 10000);
+    auto settled = [&](const std::function<int()>& f) {
+        // the same value twice, 150 ms apart (or the bound ran out)
+        int last = f();
+        for (int t = 0; t < waitMs; t += 150) {
+            pump(150);
+            const int now = f();
+            if (now == last) return now;
+            last = now;
+        }
+        return last;
+    };
+    auto key = [&](guint keyval, guint state, int wantPx) {
+        GdkEventKey e = keyEv(keyval, state);
+        const bool taken = v->testKey(&e);
+        waitFor([&] { return v->fontPxInUse() == wantPx; }, waitMs);
+        settled([&] { return v->session().cols(); });
+        return taken;
+    };
+    const guint C = GDK_CONTROL_MASK, CS = GDK_CONTROL_MASK | GDK_SHIFT_MASK;
+    waitFor([&] { return v->autoFontPx() > 0 && v->session().cols() > 0; }, waitMs);
+    const int P = settled([&] { return v->autoFontPx(); });
+    const int cols0 = settled([&] { return v->session().cols(); });
+    CHECK(P > 0 && v->fontPxInUse() == P);
+    // PR #9 review: the zoom steps print no renderer line (stderr goes to a file meanwhile).
+    const std::string errPath = home + "/zoom-stderr.txt";
+    std::fflush(stderr);
+    const int savedErr = dup(2);
+    const int errFd = open(errPath.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0600);
+    if (errFd >= 0) dup2(errFd, 2);
+    CHECK(key(GDK_KEY_equal, C, P + 1) && v->fontPxInUse() == P + 1);
+    CHECK(key(GDK_KEY_plus, CS, P + 2) && v->fontPxInUse() == P + 2);  // Ctrl++ (Shift+= on US layouts)
+    CHECK(key(GDK_KEY_KP_Add, C, P + 3) && v->fontPxInUse() == P + 3);
+    const int colsBig = v->session().cols();
+    CHECK(colsBig < cols0);  // bigger cells, fewer columns in the same window
+    CHECK(key(GDK_KEY_minus, C, P + 2) && v->fontPxInUse() == P + 2);
+    CHECK(key(GDK_KEY_KP_Subtract, C, P + 1) && v->fontPxInUse() == P + 1);
+    CHECK(v->options().fontPx == 0 && w.options().fontPx == 0);  // zoom is no font-px override
+    CHECK(key(GDK_KEY_0, C, P) && v->fontPxInUse() == P && v->fontZoomPx() == 0);
+    CHECK(v->session().cols() == cols0);
+    std::fflush(stderr);
+    if (errFd >= 0) {
+        dup2(savedErr, 2);
+        close(errFd);
+    }
+    close(savedErr);
+    const std::string zoomErr = fileText(errPath);
+    if (!zoomErr.empty()) std::fputs(zoomErr.c_str(), stderr);  // whatever was printed, as it came
+    CHECK(zoomErr.find("lunduke-terminal: plain") == std::string::npos);
+    std::printf("font zoom: plain %d px, %d cols; Ctrl+= Ctrl++ KP+ -> %d px, %d cols; Ctrl+- KP- Ctrl+0 -> %d px, "
+                "%d cols\n", P, cols0, P + 3, colsBig, v->fontPxInUse(), v->session().cols());
+    v->zoomFont(-1000);
+    CHECK(v->fontPxInUse() == TerminalView::kMinZoomPx);
+    v->zoomFont(1000);
+    CHECK(v->fontPxInUse() == TerminalView::kMaxZoomPx);
+    CHECK(key(GDK_KEY_KP_0, C, P) && v->fontPxInUse() == P);
+
+    // M6 Settings font size: the field still shows the profile's size while zoomed, "Save as
+    // default" writes no font-px, an override from the field replaces the zoom, and Ctrl+0 then
+    // goes back to that override; a profile change starts at the new profile's size.
+    key(GDK_KEY_equal, C, P + 1);
+    key(GDK_KEY_equal, C, P + 2);
+    GdkEventKey s = keyEv(GDK_KEY_S, CS);
+    CHECK(w.handleKey(&s));
+    pump(100);
+    SettingsDialog* d = w.settingsDialog();
+    CHECK(d);
+    if (!d) return;
+    CHECK(d->fontPx.get_value_as_int() == P);
+    CHECK(v->fontPxInUse() == P + 2);  // opening Settings does not undo the zoom
+    d->save.clicked();
+    pump(100);
+    const std::string text = fileText(saved);
+    CHECK(!text.empty() && text.find("font-px") == std::string::npos);
+    d->fontPx.set_value(30);
+    waitFor([&] { return v->fontPxInUse() == 30; }, waitMs);
+    CHECK(w.options().fontPx == 30 && v->fontPxInUse() == 30 && v->fontZoomPx() == 0);
+    CHECK(key(GDK_KEY_equal, C, 31) && v->fontPxInUse() == 31 && w.options().fontPx == 30);
+    CHECK(d->fontPx.get_value_as_int() == 30);
+    CHECK(key(GDK_KEY_0, C, 30) && v->fontPxInUse() == 30);
+    key(GDK_KEY_minus, C, 29);
+    d->profile.set_active_id("amber");
+    waitFor([&] { return v->profile().id == "amber" && v->fontZoomPx() == 0; }, waitMs);
+    const int amberPx = v->autoFontPx();
+    std::printf("font zoom + settings: field %d px while zoomed (saved without font-px: %s); override 30 -> Ctrl+= 31 "
+                "-> Ctrl+0 30; amber after zoom: %d px (profile %d px)\n",
+                P, text.find("font-px") == std::string::npos ? "yes" : "NO", v->fontPxInUse(), amberPx);
+    CHECK(v->fontPxInUse() == amberPx && v->fontZoomPx() == 0);
+    d->response(Gtk::RESPONSE_CLOSE);
+}
+
+// PR #9 review: a base size outside 6..96 px steps 1 px toward the range instead of jumping
+// to a limit, and zoom never moves it further out.
+static void testZoomOutOfRange() {
+    using V = TerminalView;
+    CHECK(V::zoomedFontPx(16, 0) == 16 && V::zoomedFontPx(16, 3) == 19 && V::zoomedFontPx(16, -100) == V::kMinZoomPx);
+    CHECK(V::zoomedFontPx(16, 1000) == V::kMaxZoomPx);
+    CHECK(V::zoomedFontPx(120, 0) == 120 && V::zoomedFontPx(120, 1) == 120 && V::zoomedFontPx(120, -1) == 119);
+    CHECK(V::zoomedFontPx(120, -1000) == V::kMinZoomPx);
+    CHECK(V::zoomedFontPx(4, 0) == 4 && V::zoomedFontPx(4, -1) == 4 && V::zoomedFontPx(4, 1) == 5);
+    CHECK(V::zoomedFontPx(4, 1000) == V::kMaxZoomPx);
+    const int waitMs = ltermWaitMs(3000, 10000);
+    for (int base : {120, 4}) {
+        ViewOptions o;
+        o.profile = "plain";
+        o.fontPx = base;
+        o.command = {"/bin/sh", "-c", "exec sleep 30"};
+        Win w(o, 900, 500);
+        TerminalView* v = w.view;
+        v->start();
+        waitFor([&] { return v->session().cols() > 0; }, waitMs);
+        CHECK(v->fontPxInUse() == base);
+        v->zoomFont(base > V::kMaxZoomPx ? 1 : -1);  // further out: no change
+        CHECK(v->fontPxInUse() == base && v->fontZoomPx() == 0);
+        v->zoomFont(base > V::kMaxZoomPx ? -1 : 1);  // one step toward the range, not to its limit
+        const int stepped = v->fontPxInUse();
+        CHECK(stepped == (base > V::kMaxZoomPx ? base - 1 : base + 1));
+        GdkEventKey zero = keyEv(GDK_KEY_0, GDK_CONTROL_MASK);
+        CHECK(v->testKey(&zero) && v->fontPxInUse() == base && v->fontZoomPx() == 0);
+        std::printf("zoom from an out-of-range base: %d px -> further out %d px, toward the range %d px, Ctrl+0 %d px\n",
+                    base, base, stepped, v->fontPxInUse());
+    }
 }
 
 // ---- item 1: right-click menu ----
@@ -697,6 +883,9 @@ int main(int argc, char** argv) {
     testPlainRenders("gl");
     testPlainRenders("cpu");
     testSettingsFontPx();
+    testFullscreenKey();
+    testFontZoom();
+    testZoomOutOfRange();
     testContextMenu();
     testContextMenuWindow();
     testSelectionHasText();

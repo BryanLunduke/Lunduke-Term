@@ -35,7 +35,7 @@ main loop is left to run the child watch. The process is exiting, so init reaps 
 
 - **Setting / flag:** `effects-quality = auto|full|reduced|static` and `--effects-quality`.
   `cpu-budget` / `--cpu-budget PERCENT` sets the governor target; the default is 25 and 0
-  turns the governor off.
+  turns the governor off. (Perf step 1 lowered the default to 15.)
 - **Detection (software rendering):**
   - `GL_RENDERER` contains `llvmpipe`, `softpipe` or `swrast` (case-insensitive, read when the
     GtkGLArea is realized); or

@@ -1,0 +1,24 @@
+4,6c4,6
+< d=/tmp/lr2-run; mkdir -p $d; rm -f $d/$lab.*
+< out=/workspace/lterm-review2/out/raw; mkdir -p $out
+< h=$(mktemp -d /tmp/lr2-home-XXXX)
+---
+> d=/tmp/perf1-run; mkdir -p $d; rm -f $d/$lab.*
+> out=/workspace/perf1-work/raw; mkdir -p $out
+> h=$(mktemp -d /tmp/perf1-home-XXXX)
+13c13
+<   HOME=$h XDG_CONFIG_HOME=$h/.config XDG_DATA_HOME=$h/.local/share "$CRT_BIN" -e /workspace/lterm-review2/out/work.sh $lab > $out/$lab-stdout.txt 2>&1 &
+---
+>   HOME=$h XDG_CONFIG_HOME=$h/.config XDG_DATA_HOME=$h/.local/share "$CRT_BIN" -e /workspace/perf1-work/work.sh $lab > $out/$lab-stdout.txt 2>&1 &
+15c15
+<   HOME_KEEP=$HOME XDG_CONFIG_HOME=$h "$@" -e /workspace/lterm-review2/out/work.sh $lab > $out/$lab-stdout.txt 2>&1 &
+---
+>   HOME_KEEP=$HOME XDG_CONFIG_HOME=$h "$@" -e /workspace/perf1-work/work.sh $lab > $out/$lab-stdout.txt 2>&1 &
+3c3
+< lab=$1; d=/tmp/lr2-run
+---
+> lab=$1; d=/tmp/perf1-run
+7c7
+< t cat /tmp/lr2-big.txt
+---
+> t cat /workspace/perf1-work/big.txt

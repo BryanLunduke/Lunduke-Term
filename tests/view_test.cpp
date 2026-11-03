@@ -643,7 +643,9 @@ static void testGovernor(const char* renderer) {
     o.renderer = renderer;
     o.pauseWhenUnfocused = false;
     o.command = {"/bin/sh", "-c", "seq 1 400000; sleep 60"};
+    CHECK(o.cpuBudget == 0.15);  // perf step 1: the default budget (was 0.25)
     Win w(o);
+    CHECK(w.view->governor().config().budget == 0.15);
     w.view->governor().configure([&] {
         GovernorConfig c = w.view->governor().config();
         c.firstProbeMs = 1500;

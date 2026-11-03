@@ -31,7 +31,7 @@ process CPU from the frame clock's before-paint to after-paint, minus the source
 in `src/effects_governor.*`, which is pure logic with its own test.
 
 - Load is the frame cost divided by the tick interval, with hysteresis. The tick slows when load is
-  above the budget (0.25) and speeds up (×0.85) when load is under 0.6 × budget.
+  above the budget (0.25; 0.15 since perf step 1) and speeds up (×0.85) when load is under 0.6 × budget.
 - It demotes to static after 2 over-budget windows at the 1 fps floor.
 - It probes again after 1.5 s in tests and 10 s by default, doubling the delay on failure up to
   160 s. A passing probe (3 windows) returns to normal.

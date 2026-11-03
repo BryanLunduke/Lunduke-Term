@@ -182,6 +182,7 @@ int main(int argc, char** argv) {
         GlEffects gs(applyEffectsQuality(bezel, EffectsQuality::Static));
         gs.resize(W, H);
         gs.renderNoReadback(0.0f);
+        compare(gs, applyEffectsQuality(bezel, EffectsQuality::Static), a, b, &mx);  // readback: output FBO exists
         const long prog0 = GlPipeline::programsCompiled();
         const int t0 = gs.pipeline()->liveTextures(), f0 = gs.pipeline()->liveFramebuffers();
         double worst = 99.0;
@@ -201,11 +202,40 @@ int main(int argc, char** argv) {
         if (progs != 0 || t1 != t0 || f1 != f0 || worst < 40.0) ++fails;
     }
 
+    // Perf step 1: the RGBA8 output texture/FBO exist only once renderToMemory() reads back; a
+    // window-style tick (no readback) must not allocate them, and a resize frees them again.
+    {
+        GlEffects gw(m1);
+        gw.resize(W, H);
+        gw.renderNoReadback(0.0f);
+        const int t0 = gw.pipeline()->liveTextures(), f0 = gw.pipeline()->liveFramebuffers();
+        const size_t b0 = gw.pipeline()->liveTextureBytes();
+        gw.renderNoReadback(1.0f);
+        const bool noneYet = gw.pipeline()->liveTextures() == t0 && gw.pipeline()->liveTextureBytes() == b0;
+        std::vector<uint8_t> out(static_cast<size_t>(W) * H * 4);
+        gw.render(2.0f, out.data());
+        const int t1 = gw.pipeline()->liveTextures(), f1 = gw.pipeline()->liveFramebuffers();
+        const size_t b1 = gw.pipeline()->liveTextureBytes();
+        gw.render(3.0f, out.data());  // the second readback reuses them
+        const bool reused = gw.pipeline()->liveTextures() == t1 && gw.pipeline()->liveTextureBytes() == b1;
+        gw.resize(W / 2, H / 2);
+        gw.renderNoReadback(4.0f);
+        const int t2 = gw.pipeline()->liveTextures();
+        std::printf("lazy output texture: no readback %d textures / %d fbos / %zu B; after readback %d / %d / %zu B "
+                    "(+%zu B); after resize without readback %d textures\n",
+                    t0, f0, b0, t1, f1, b1, b1 - b0, t2);
+        if (!noneYet || !reused || t1 != t0 + 1 || f1 != f0 + 1 || b1 - b0 != static_cast<size_t>(W) * H * 4 ||
+            t2 != t0)
+            ++fails;
+    }
+
     // Resize loop: object counts must stay constant and the output must still match.
     EffectParams m1f = m1;  // with the bezel: its three extra textures must not leak either
     m1f.frame = true;
     m1f.rgbShift = 0.3f;
+    const long look0 = GlPipeline::uniformLookups();
     GlEffects gl(m1f);
+    const long lookCtor = GlPipeline::uniformLookups() - look0;
     gl.resize(W, H);
     gl.renderNoReadback(0.0f);
     const int tex0 = gl.pipeline()->liveTextures(), fbo0 = gl.pipeline()->liveFramebuffers();
@@ -221,5 +251,11 @@ int main(int argc, char** argv) {
     std::printf("after 50 resizes (bezel on): textures %d -> %d, fbos %d -> %d, glIsTexture %d -> %d, PSNR %.2f dB, max diff %d\n",
                 tex0, tex1, fbo0, fbo1, gltex0, gltex1, ps, mx);
     if (tex1 != tex0 || fbo1 != fbo0 || gltex1 != gltex0 || ps < 40.0) ++fails;
+    // Perf step 1: uniform locations are looked up once per pipeline (constructor); 50 resizes
+    // (bezel redrawn each time), content updates and ticks with readback add none.
+    const long lookFrames = GlPipeline::uniformLookups() - look0 - lookCtor;
+    std::printf("uniform lookups: %ld in the constructor, %ld during 50 resizes + frames + readback\n", lookCtor,
+                lookFrames);
+    if (lookCtor <= 0 || lookFrames != 0) ++fails;
     return fails ? 1 : 0;
 }

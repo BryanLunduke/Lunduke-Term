@@ -100,18 +100,24 @@ Without them, the profiles fall back to DejaVu Sans Mono. See `docs/FONTS.md`.
 
 Options: `--profile ID`, `--effects`/`--no-effects`, `--renderer auto|gl|cpu`, `--threads N`
 (C++ fallback), `--effects-fps N` (default 20), `--max-fps N` (default 60), `--no-pause-unfocused`,
-`--font FAMILY`, `--font-px N`, `--size WxH`, `--quit-after MS`, `--stats`, `--scrollback N` (default 5000 lines; a `scrollback-lines` already saved in settings.ini is used as is),
+`--font FAMILY`, `--font-px N`, `--size WxH`, `--quit-after MS` (close the window after MS **milliseconds**), `--stats`, `--scrollback N` (default 5000 lines; a `scrollback-lines` already saved in settings.ini is used as is),
 `--login`, `--cwd DIR`, `--on-exit close|hold|hold-on-error`, `--hold`, `--bell visual,urgent,audible|none`,
 `--cursor-shape block|underline|bar`, `--cursor-blink`/`--no-cursor-blink`,
-`--effects-quality auto|full|reduced|static`, `--cpu-budget PCT`, `--frame`/`--no-frame`
+`--effects-quality auto|full|reduced|static`, `--cpu-budget PCT` (software rendering only, percent of one core, default 15, 0 = off), `--frame`/`--no-frame`
 (bezel; amber/green/green-scanlines/vintage/paper-white only, ignored with a warning elsewhere), `--frame-size PX`
 (logical px, default 28), `--frame-color #RRGGBB`, `--frame-shininess 0..1` (reflection and
-highlights), `--rgb-shift X` (CRT `rbgShift`, 0 = off), `-T/--title TEXT`, `-e COMMAND...`.
+highlights), `--rgb-shift X` (CRT `rbgShift`, 0 = off), `-T/--title TEXT`, `-e COMMAND...`, `-h/--help` (all options and keys), `--version`.
+An unknown option exits with status 2, and so does a bad value for `--renderer`, `--on-exit`, `--cursor-shape`
+or `--effects-quality`; other option values are not checked.
 A press on the bezel neither selects nor is reported to the application; a drag that leaves the
 glass clamps to the edge cells.
 Right-click opens a menu with Copy (greyed out without a selection), Paste and Settings; when the
 application uses the mouse, Shift+right-click opens it.
-Keys: Ctrl+Shift+E toggles effects, Ctrl+Shift+P cycles the profiles (built-in, then custom), Ctrl+Shift+C/V copy/paste,
+Keys: F11 toggles fullscreen (Shift/Ctrl/Alt/Super+F11 still reach the program). Font zoom: Ctrl+= or Ctrl++ (also keypad +)
+makes the font 1 px bigger, Ctrl+- (keypad -) 1 px smaller (within 6–96 px; a size set outside that range only steps
+back toward it), Ctrl+0 (keypad 0) goes back to the profile's size, or to the
+`--font-px`/Settings size if one is set; the zoom is per tab, is not saved (the Settings font size field and "Save as default"
+ignore it) and starts again at 0 when the profile or the font size is changed. Ctrl+Shift+E toggles effects, Ctrl+Shift+P cycles the profiles (built-in, then custom), Ctrl+Shift+C/V copy/paste,
 Shift+PgUp/PgDn/Home/End scroll back, Shift+Insert or middle-click pastes PRIMARY, Shift bypasses
 mouse reporting. Tabs: Ctrl+Shift+T opens a tab (in the current tab's working directory),
 Ctrl+Shift+W closes it (asking first if a program other than the shell runs in it), Ctrl+PgUp/PgDn switch (wrapping); the tab bar shows only with two or more

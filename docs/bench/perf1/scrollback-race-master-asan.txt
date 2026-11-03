@@ -1,0 +1,20 @@
+== master test script run 1
+no settings.ini: sb-lines=5000 (want 5000)
+settings.ini without scrollback-lines: sb-lines=5000 (want 5000)
+saved scrollback-lines=10000: sb-lines=10000 (want 10000)
+saved scrollback-lines=7000: sb-lines=7000 (want 7000)
+scrollback default: ok
+rc=0
+== master test script run 2
+no settings.ini: sb-lines=5000 (want 5000)
+settings.ini without scrollback-lines: sb-lines=5000 (want 5000)
+saved scrollback-lines=10000: sb-lines=0 (want 10000)
+saved scrollback-lines=7000: sb-lines=7000 (want 7000)
+rc=1
+== master test script run 3
+no settings.ini: sb-lines=5000 (want 5000)
+settings.ini without scrollback-lines: sb-lines=5000 (want 5000)
+saved scrollback-lines=10000: sb-lines=10000 (want 10000)
+saved scrollback-lines=7000: sb-lines=7000 (want 7000)
+scrollback default: ok
+rc=0

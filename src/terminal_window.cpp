@@ -169,6 +169,7 @@ TerminalWindow::TerminalWindow(const ViewOptions& opts, const std::string& title
     });
     signal_window_state_event().connect([this](GdkEventWindowState* e) {
         iconified_ = (e->new_window_state & (GDK_WINDOW_STATE_ICONIFIED | GDK_WINDOW_STATE_WITHDRAWN)) != 0;
+        fullscreen_ = (e->new_window_state & GDK_WINDOW_STATE_FULLSCREEN) != 0;
         updateVisibility();
         return false;
     });
@@ -335,7 +336,15 @@ TerminalView* TerminalWindow::newTab(bool first) {
     v->signalBell.connect([this] {
         if (!is_active()) set_urgency_hint(true);
     });
-    v->signalBackend.connect([](const std::string& b) { std::fprintf(stderr, "lunduke-terminal: %s\n", b.c_str()); });
+    // PR #9 review: only a changed line is printed, so the font zoom (which rebuilds the painter
+    // and re-runs chooseMode()) does not repeat the renderer line on every step. It starts from
+    // the line the view had when it was created (emitted before this connect, so not printed,
+    // as before).
+    v->signalBackend.connect([last = v->backendName()](const std::string& b) mutable {
+        if (b == last) return;
+        last = b;
+        std::fprintf(stderr, "lunduke-terminal: %s\n", b.c_str());
+    });
     v->signalSearchChanged.connect([this, v] {
         if (v == currentView()) updateSearchStatus();
     });
@@ -521,9 +530,25 @@ void TerminalWindow::updateSearchStatus() {
 
 // ---- keys ----
 
+void TerminalWindow::toggleFullscreen() {
+    // The window manager confirms with a window-state event (fullscreen_); ask for the opposite
+    // of what it last reported.
+    if (fullscreen_) unfullscreen();
+    else fullscreen();
+}
+
 bool TerminalWindow::handleKey(GdkEventKey* ev) {
     const guint mods = ev->state & (GDK_CONTROL_MASK | GDK_SHIFT_MASK | GDK_MOD1_MASK);
     const guint k = gdk_keyval_to_lower(ev->keyval);
+    // Perf step 1: F11 toggles fullscreen (as in GNOME Terminal); it is no longer sent to the
+    // program. Shift/Ctrl/Alt/Super+F11 still are (PR #9 review: Super, Hyper and Meta are in
+    // this mask; X11 reports Super as MOD4 and GDK adds the virtual SUPER bit).
+    const guint fsMods = ev->state & (GDK_CONTROL_MASK | GDK_SHIFT_MASK | GDK_MOD1_MASK | GDK_MOD4_MASK |
+                                      GDK_SUPER_MASK | GDK_HYPER_MASK | GDK_META_MASK);
+    if (fsMods == 0 && ev->keyval == GDK_KEY_F11) {
+        toggleFullscreen();
+        return true;
+    }
     if (mods == (GDK_CONTROL_MASK | GDK_SHIFT_MASK)) {
         switch (k) {
         case GDK_KEY_t: newTab(); return true;

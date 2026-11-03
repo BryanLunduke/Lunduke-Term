@@ -10,7 +10,7 @@
 namespace lterm {
 
 struct GovernorConfig {
-    double budget = 0.25;          // cores
+    double budget = 0.15;          // cores (ViewOptions::cpuBudget sets it; perf step 1: was 0.25)
     double baseIntervalMs = 100;   // the quality's normal tick
     double maxIntervalMs = 1000;   // slowest tick before demoting
     double windowMs = 1000;        // evaluation window
