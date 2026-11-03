@@ -1,0 +1,4 @@
+# review test, one failure (REAL), release build at 5f95c13, 2026-11-02 ~22:27 EST, uptime load average 8.60 4.61 3.17 at 22:27:40
+FAIL ../tests/review_test.cpp:161: frames > 0 && frames <= static_cast<long>(s * 10 + 3)
+# (testFloodFrameCap, amber GL path; the frame count is printed only after the CHECK, so it was not logged; testlog was overwritten by the re-runs)
+# re-runs, same binary: 3/3 OK at load 7.58 / 6.65 / 5.31, each "flood amber: 19 content frames in 2.0 s"; release.txt (final) OK, 19 frames.

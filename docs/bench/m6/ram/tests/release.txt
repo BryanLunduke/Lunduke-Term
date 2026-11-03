@@ -1,0 +1,24 @@
+# source a3ed4b3 (src identical to 5f95c13), build/ release, --num-processes 1, Xvfb :46, llvmpipe, REAL
+## start 2026-11-02 22:56:46 EST, loadavg 1.48 2.46 2.79
+ 1/16 desktop-file OK               0.01s
+ 2/16 metainfo     OK               0.01s
+ 3/16 effects      OK               0.22s
+ 4/16 governor     OK               0.00s
+ 5/16 profiles     OK               0.01s
+ 6/16 painter      OK               0.08s
+ 7/16 fonts        OK               0.02s
+ 8/16 vterm        OK               0.00s
+ 9/16 gl-match     OK              11.62s
+10/16 session      OK               0.08s
+11/16 fixes        OK               0.39s
+12/16 fuzz-regress OK               0.01s
+13/16 unicode      OK               0.01s
+14/16 search       OK               0.81s
+15/16 view         OK             101.00s
+16/16 review       OK              38.63s
+Ok:                 16  
+Fail:               0   
+Timeout:            0   
+end 2026-11-02 22:59:19 EST
+flood amber (release build): longest main-loop gap 20 ms, 126 slices cut, 12 content frames, Ctrl+C -> exit 21 ms
+flood amber: 19 content frames in 2.0 s (cap 10 per s while flooding)

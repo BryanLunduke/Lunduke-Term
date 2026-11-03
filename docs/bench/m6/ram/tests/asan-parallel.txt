@@ -1,0 +1,23 @@
+# source fc56200, build-san, --num-processes 2 --timeout-multiplier 4, Xvfb :44, llvmpipe, REAL
+## run 1 start 2026-11-02 22:50:33 EST, loadavg 3.01 2.90 2.97
+ 1/16 desktop-file OK               0.01s
+ 2/16 metainfo     OK               0.01s
+ 3/16 governor     OK               0.01s
+ 4/16 profiles     OK               0.02s
+ 5/16 painter      OK               0.30s
+ 6/16 fonts        OK               0.06s
+ 7/16 vterm        OK               0.02s
+ 8/16 effects      OK               1.50s
+ 9/16 session      OK               0.12s
+10/16 fixes        OK               0.45s
+11/16 fuzz-regress OK               0.04s
+12/16 unicode      OK               0.03s
+13/16 search       OK              21.04s
+14/16 gl-match     OK              87.26s
+15/16 view         OK             116.25s
+16/16 review       OK              70.21s
+Ok:                 16  
+Fail:               0   
+Timeout:            0   
+sanitizer reports in testlog: 0
+end 2026-11-02 22:55:08 EST
