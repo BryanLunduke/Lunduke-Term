@@ -616,10 +616,12 @@ static void testDefaultProfile() {
     SettingsDialog* d = w.settingsDialog();
     CHECK(d && d->profile.get_active_id() == "amber");
     if (!d) return;
-    CHECK(d->profile.get_active_text().find("(default)") != Glib::ustring::npos);
+    // M6 item 5: the list shows plain labels; amber is still the default but not marked "(default)".
+    CHECK(d->profile.get_active_text() == findProfile("amber")->label);
+    CHECK(d->profile.get_active_text().find("default") == Glib::ustring::npos);
     d->profile.set_active_id("plain");  // plain stays selectable
     pump(100);
-    CHECK(d->profile.get_active_text().find("(default)") == Glib::ustring::npos);
+    CHECK(d->profile.get_active_text() == findProfile("plain")->label);
     CHECK(v->profile().id == "plain" && !v->effectsOn());
     d->response(Gtk::RESPONSE_CLOSE);
 }

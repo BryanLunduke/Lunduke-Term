@@ -1,0 +1,9 @@
+# head fa48262, release build, REAL
+round trip: 14 built-ins and one profile with every option changed
+corrupt: /tmp/lterm-custom-profiles-test-1971849/lunduke-terminal/profiles/BadColour.ini: [profile] foreground: bad colour (want #rrggbb) (skipped)
+corrupt: /tmp/lterm-custom-profiles-test-1971849/lunduke-terminal/profiles/BadNumber.ini: [effects] bloom: Key file contains key “bloom” in group “effects” which has a value that cannot be interpreted. (skipped)
+corrupt: /tmp/lterm-custom-profiles-test-1971849/lunduke-terminal/profiles/Binary.ini: no [profile] group (skipped)
+corrupt: /tmp/lterm-custom-profiles-test-1971849/lunduke-terminal/profiles/Broken.ini: Key file contains line “[profile” which is not a key-value pair, group, or comment (skipped)
+corrupt: /tmp/lterm-custom-profiles-test-1971849/lunduke-terminal/profiles/NoGroup.ini: no [profile] group (skipped)
+custom profiles: all passed
+exit 0

@@ -1,0 +1,26 @@
+# head 4ec60e4 (final PR A head), release build, meson test --num-processes 2, Xvfb :44, llvmpipe (NOT a GPU), REAL
+## start 2026-11-02 21:30:24 EST, loadavg 1.13 1.50 1.78
+ 1/18 desktop-file    OK               0.01s
+ 2/18 metainfo        OK               0.02s
+ 3/18 governor        OK               0.00s
+ 4/18 profiles        OK               0.01s
+ 5/18 custom-profiles OK               0.01s
+ 6/18 painter         OK               0.10s
+ 7/18 fonts           OK               0.02s
+ 8/18 vterm           OK               0.01s
+ 9/18 effects         OK               0.22s
+10/18 session         OK               0.08s
+11/18 fixes           OK               0.39s
+12/18 fuzz-regress    OK               0.01s
+13/18 unicode         OK               0.01s
+14/18 search          OK               0.90s
+15/18 gl-match        OK              12.10s
+16/18 view            OK             100.25s
+17/18 review          OK              38.72s
+18/18 ux              OK              12.80s
+Ok:                 18  
+Expected Fail:      0   
+Fail:               0   
+Unexpected Pass:    0   
+Skipped:            0   
+Timeout:            0   

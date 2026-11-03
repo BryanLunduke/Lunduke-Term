@@ -1,0 +1,16 @@
+# ux_test WITHOUT the item-3 fix (terminal_window.cpp/.hpp at 36ea3e1; TerminalView::autoFontPx accessor present), Xvfb :44, Mon Nov  2 20:53:19 EST 2026
+(ux_test:1937219): dbind-WARNING **: 20:53:19.714: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: plain, no effects
+FAIL ../tests/ux_test.cpp:156: shownAmber == amberPx
+FAIL ../tests/ux_test.cpp:158: shownPlain == plainPx
+lunduke-terminal: plain, no effects
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+FAIL ../tests/ux_test.cpp:169: d->fontPx.get_value_as_int() == amberPx
+FAIL ../tests/ux_test.cpp:170: w.options().fontPx == 0
+plain render (gl; amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): bright pixels of 256000: amber 16534, Ctrl+Shift+E off 13945, profile plain 6419
+plain render (cpu; amber, effects: C++ fallback (4 threads), quality reduced): bright pixels of 256000: amber 17139, Ctrl+Shift+E off 13945, profile plain 6419
+settings font size: amber uses 22 px, field 0; plain uses 16 px, field 0
+settings font size: override 30, then amber: field 30, override 30
+4 failure(s)
+exit 1

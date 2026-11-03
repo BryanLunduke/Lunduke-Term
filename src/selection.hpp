@@ -60,6 +60,9 @@ public:
     SelPos end() const { return end_; }
     bool contains(long line, int col) const;
     std::string text(const LineSource& src) const;
+    // !text(src).empty(), without building the text: stops at the first cell that would be
+    // copied (PR #7 review: the right-click menu's Copy item asks this on every right-click).
+    bool hasText(const LineSource& src) const;
     // The part of text() that lines [from, to] contribute (clipped to the selection); the
     // newline after a hard line end is included only between lines of the range.
     std::string text(const LineSource& src, long from, long to) const;

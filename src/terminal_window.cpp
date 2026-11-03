@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "terminal_window.hpp"
 
+#include "custom_profiles.hpp"
+
 #include <gdk/gdkkeysyms.h>
 #include <glib/gstdio.h>
 #if defined(__GLIBC__)
@@ -63,6 +65,25 @@ bool saveSettings(const ViewOptions& o, const std::string& path, std::string* er
         Glib::file_set_contents(path, kf.to_data());
         return true;
     } catch (const Glib::Error& e) {
+        if (error) *error = e.what();
+        return false;
+    }
+}
+
+bool resetDeletedDefaultProfile(const std::string& path, const std::string& deletedId, std::string* error) {
+    if (!Glib::file_test(path, Glib::FILE_TEST_IS_REGULAR)) return false;
+    try {
+        Glib::KeyFile kf;
+        kf.load_from_file(path, Glib::KEY_FILE_KEEP_COMMENTS);
+        if (!kf.has_group("terminal") || !kf.has_key("terminal", "profile") ||
+            kf.get_string("terminal", "profile") != deletedId)
+            return false;
+        kf.set_string("terminal", "profile", kDefaultProfile);
+        Glib::file_set_contents(path, kf.to_data());  // atomic, like saveSettings
+        return true;
+    } catch (const Glib::Error& e) {
+        // An unreadable settings.ini is left alone; at start-up an unknown profile falls back to
+        // the default anyway.
         if (error) *error = e.what();
         return false;
     }
@@ -318,6 +339,7 @@ TerminalView* TerminalWindow::newTab(bool first) {
     v->signalSearchChanged.connect([this, v] {
         if (v == currentView()) updateSearchStatus();
     });
+    v->signalSettingsRequested.connect([this] { showSettings(); });
 
     tabs_.push_back(std::move(tab));
     const int page = nb_.append_page(*v, tabs_.back()->label);
@@ -550,6 +572,12 @@ void TerminalWindow::commitScrollbackLimits() {
     for (auto& t : tabs_) t->view->commitScrollbackLimit();
 }
 
+void TerminalWindow::profilesChanged(const std::string& oldId, const std::string& newId) {
+    for (auto& t : tabs_)
+        if (t->view->profile().id == oldId) t->view->setProfile(newId);
+    if (opts_.profile == oldId) opts_.profile = newId;
+}
+
 void TerminalWindow::applySettings(const ViewOptions& o) {
     for (auto& t : tabs_) {
         TerminalView& v = *t->view;
@@ -579,7 +607,7 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     // the window's close button), never on a live spin-button change.
     signal_hide().connect([this] { win_.commitScrollbackLimits(); });
 
-    for (const auto& p : builtinProfiles()) profile.append(p.id, p.label + (p.id == kDefaultProfile ? "  (default)" : ""));
+    fillProfiles("");
     // Monospaced families that are installed, plus the profile's own choice.
     font.append("", "Profile font");
     {
@@ -591,7 +619,8 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     }
     fontPx.set_range(0, 96);
     fontPx.set_increments(1, 4);
-    fontPx.set_tooltip_text("Font size in pixels; 0 = the profile's size");
+    fontPx.set_tooltip_text("Font size in pixels. Shows the profile's size until you change it; choosing a "
+                           "profile switches to that profile's size (0 = the profile's size)");
     for (EffectsQuality q : {EffectsQuality::Auto, EffectsQuality::Full, EffectsQuality::Reduced, EffectsQuality::Static})
         quality.append(effectsQualityName(q), effectsQualityName(q));
     quality.set_tooltip_text("auto: reduced on software rendering; static: no animation (0% idle CPU)");
@@ -618,6 +647,24 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
         ++row;
     };
     addRow("Profile", profile);
+    {
+        auto* box = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 4));
+        for (Gtk::Button* b : {&newProfile, &copyProfile, &editProfile, &renameProfile, &deleteProfile})
+            box->pack_start(*b, false, false);
+        newProfile.set_tooltip_text("A new custom profile with the Plain profile's values");
+        copyProfile.set_tooltip_text("Built-in profiles are read-only: copy one to change it");
+        grid->attach(*box, 1, row++, 1, 1);
+        profileNote.set_halign(Gtk::ALIGN_START);
+        profileNote.set_xalign(0);
+        profileNote.set_line_wrap(true);
+        profileNote.set_max_width_chars(60);
+        grid->attach(profileNote, 1, row++, 1, 1);
+        newProfile.signal_clicked().connect([this] { createProfile(false); });
+        copyProfile.signal_clicked().connect([this] { createProfile(true); });
+        editProfile.signal_clicked().connect([this] { editCurrentProfile(); });
+        renameProfile.signal_clicked().connect([this] { renameCurrentProfile(); });
+        deleteProfile.signal_clicked().connect([this] { deleteCurrentProfile(); });
+    }
     addRow("Font", font);
     addRow("Font size (px)", fontPx);
     addRow("Effects quality", quality);
@@ -653,12 +700,13 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
 void SettingsDialog::load(const ViewOptions& o) {
     loading_ = true;
     base_ = o;
-    profile.set_active_id(o.profile);
+    fillProfiles(o.profile);
     if (!font.set_active_id(o.fontFamily)) {
         font.append(o.fontFamily, o.fontFamily + " (not monospaced or not installed)");
         font.set_active_id(o.fontFamily);
     }
-    fontPx.set_value(std::max(0, o.fontPx));
+    lastProfile_ = o.profile;
+    syncFontPx(std::max(0, o.fontPx));
     quality.set_active_id(effectsQualityName(o.effectsQuality));
     scrollback.set_value(static_cast<double>(clampScrollbackLines(o.scrollbackLines)));
     updateScrollbackNote();
@@ -672,11 +720,147 @@ ViewOptions SettingsDialog::options() const {
     ViewOptions o = base_;
     o.profile = profile.get_active_id();
     o.fontFamily = font.get_active_id();
-    o.fontPx = fontPx.get_value_as_int();
+    // The profile's own size is no override, so a later profile change keeps following it.
+    o.fontPx = fontPx.get_value_as_int() == autoPx_ ? 0 : fontPx.get_value_as_int();
     parseEffectsQuality(quality.get_active_id(), o.effectsQuality);
     o.scrollbackLines = static_cast<long long>(scrollback.get_value());
     o.tube.frame = std::stoi(frame.get_active_id().empty() ? std::string("-1") : std::string(frame.get_active_id()));
     return o;
+}
+
+void SettingsDialog::fillProfiles(const std::string& activeId) {
+    const bool was = loading_;
+    loading_ = true;
+    profile.remove_all();
+    for (const auto& p : builtinProfiles()) profile.append(p.id, p.label);
+    for (const auto& p : customProfiles()) profile.append(p.id, p.label);
+    if (!activeId.empty()) profile.set_active_id(activeId);
+    loading_ = was;
+    updateProfileButtons();
+}
+
+void SettingsDialog::updateProfileButtons() {
+    const bool custom = isCustomProfileId(profile.get_active_id());
+    for (Gtk::Button* b : {&editProfile, &renameProfile, &deleteProfile}) b->set_sensitive(custom);
+    copyProfile.set_sensitive(findProfile(profile.get_active_id()) != nullptr);
+    profileNote.set_text(custom ? "Custom profile, stored in " + customProfilesDir()
+                                : "Built-in profile (read-only). Copy it to make your own.");
+}
+
+std::string SettingsDialog::askName(const std::string& title, const std::string& suggested, const std::string& renaming) {
+    if (askNameHook) return askNameHook(title, suggested);
+    Gtk::Dialog d(title, *this, true);
+    d.add_button("_Cancel", Gtk::RESPONSE_CANCEL);
+    Gtk::Button* ok = d.add_button("_OK", Gtk::RESPONSE_OK);
+    d.set_default_response(Gtk::RESPONSE_OK);
+    Gtk::Entry entry;
+    entry.set_text(suggested);
+    entry.set_activates_default(true);
+    Gtk::Label why;
+    why.set_xalign(0);
+    auto check = [&] {
+        std::string err;
+        const bool good = validateProfileName(entry.get_text(), &err, renaming, customProfilesDir());
+        ok->set_sensitive(good);
+        why.set_text(good ? "" : err);
+    };
+    entry.signal_changed().connect(check);
+    check();
+    auto* box = d.get_content_area();
+    box->set_spacing(6);
+    box->set_border_width(12);
+    box->pack_start(*Gtk::manage(new Gtk::Label("Profile name")), false, false);
+    box->pack_start(entry, false, false);
+    box->pack_start(why, false, false);
+    box->show_all();
+    return d.run() == Gtk::RESPONSE_OK ? std::string(entry.get_text()) : std::string();
+}
+
+void SettingsDialog::createProfile(bool copyCurrent) {
+    const Profile* src = findProfile(copyCurrent ? std::string(profile.get_active_id()) : std::string("plain"));
+    if (!src) return;
+    const std::string base = copyCurrent ? src->label + " (copy)" : std::string("My profile");
+    std::string suggested = base;
+    for (int i = 2; !validateProfileName(suggested, nullptr, "", customProfilesDir()) && i < 1000; ++i) suggested = base + " " + std::to_string(i);
+    const std::string name = askName(copyCurrent ? "Copy to custom profile" : "New profile", suggested, "");
+    if (name.empty()) return;
+    Profile p = *src;
+    p.id = customProfileId(name);
+    p.label = name;
+    std::string err;
+    if (!saveCustomProfile(customProfilesDir(), p, &err)) {
+        status.set_text("Profile not saved: " + err);
+        return;
+    }
+    fillProfiles(p.id);
+    changed();  // the new profile is now the active one
+    editCurrentProfile();
+}
+
+void SettingsDialog::editCurrentProfile() {
+    const std::string id = profile.get_active_id();
+    const Profile* p = findProfile(id);
+    if (!p || !isCustomProfileId(id)) return;  // built-ins are read-only
+    editor = std::make_unique<ProfileEditor>(*this, *p);
+    editor->onSave = [this, id](const Profile& r) {
+        Profile q = r;
+        q.id = id;
+        std::string err;
+        if (!saveCustomProfile(customProfilesDir(), q, &err)) {
+            status.set_text("Profile not saved: " + err);
+            return;
+        }
+        status.set_text("Profile saved");
+        win_.profilesChanged(id, id);
+        syncFontPx(fontPx.get_value_as_int() == autoPx_ ? 0 : fontPx.get_value_as_int());
+        updateFrameSensitivity();
+    };
+    editor->show();
+}
+
+void SettingsDialog::renameCurrentProfile() {
+    const std::string id = profile.get_active_id();
+    if (!isCustomProfileId(id)) return;
+    const std::string name = askName("Rename profile", customProfileName(id), id);
+    if (name.empty() || name == customProfileName(id)) return;
+    std::string err;
+    if (!renameCustomProfile(customProfilesDir(), id, name, &err)) {
+        status.set_text("Not renamed: " + err);
+        return;
+    }
+    const std::string newId = customProfileId(name);
+    win_.profilesChanged(id, newId);
+    lastProfile_ = newId;  // the same profile: keep the font size
+    fillProfiles(newId);
+}
+
+void SettingsDialog::deleteCurrentProfile() {
+    const std::string id = profile.get_active_id();
+    if (!isCustomProfileId(id)) return;
+    const std::string q = "Delete the profile \"" + customProfileName(id) + "\"? Its file is removed.";
+    bool yes;
+    if (confirmDeleteHook) yes = confirmDeleteHook(q);
+    else {
+        Gtk::MessageDialog m(*this, q, false, Gtk::MESSAGE_QUESTION, Gtk::BUTTONS_NONE, true);
+        m.add_button("_Cancel", Gtk::RESPONSE_CANCEL);
+        m.add_button("_Delete", Gtk::RESPONSE_OK);
+        yes = m.run() == Gtk::RESPONSE_OK;
+    }
+    if (!yes) return;
+    std::string err;
+    if (!deleteCustomProfile(customProfilesDir(), id, &err)) {
+        status.set_text("Not deleted: " + err);
+        return;
+    }
+    win_.profilesChanged(id, kDefaultProfile);
+    fillProfiles(kDefaultProfile);
+    changed();
+    // PR #7 review: the deleted profile was the saved default: settings.ini goes back to amber.
+    std::string resetErr;
+    if (resetDeletedDefaultProfile(win_.settingsFile, id, &resetErr))
+        status.set_text("Deleted. The saved default profile is " + std::string(kDefaultProfile) + " again.");
+    else if (!resetErr.empty())
+        status.set_text("Deleted, but " + win_.settingsFile + " could not be updated: " + resetErr);
 }
 
 void SettingsDialog::updateFrameSensitivity() {
@@ -701,8 +885,25 @@ void SettingsDialog::changed() {
     updateScrollbackNote();
     if (loading_) return;
     updateFrameSensitivity();
+    updateProfileButtons();
     status.set_text("");
-    win_.applySettings(options());
+    ViewOptions o = options();
+    if (o.profile != lastProfile_) {
+        o.fontPx = 0;  // the new profile's size (pixel fonts look right only at their own sizes)
+        lastProfile_ = o.profile;
+    }
+    win_.applySettings(o);
+    syncFontPx(o.fontPx);
+}
+
+void SettingsDialog::syncFontPx(int overridePx) {
+    TerminalView* v = win_.currentView();
+    const Profile* p = findProfile(profile.get_active_id());
+    autoPx_ = v && p && v->profile().id == p->id && v->autoFontPx() > 0 ? v->autoFontPx() : (p ? profileFont(*p).px : 0);
+    const bool was = loading_;
+    loading_ = true;
+    fontPx.set_value(overridePx > 0 ? overridePx : autoPx_);
+    loading_ = was;
 }
 
 }  // namespace lterm

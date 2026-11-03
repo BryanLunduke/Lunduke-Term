@@ -1,0 +1,53 @@
+# head f01c307, build-san (-Db_sanitize=address,undefined, leak checking on: meson's ASAN_OPTIONS detect_leaks=1 + tests/lsan.supp), meson test --num-processes 1 --timeout-multiplier 4, LD_LIBRARY_PATH=lterm-tools (metainfo), Xvfb :44, llvmpipe (NOT a GPU), REAL
+## run 1 start 2026-11-02 21:10:44 EST
+   loadavg at start: 1.67 1.43 1.15, nproc 8
+ 1/18 desktop-file    OK               0.01s
+ 2/18 metainfo        OK               0.03s
+ 3/18 effects         OK               1.79s
+ 4/18 governor        OK               0.01s
+ 5/18 profiles        OK               0.02s
+ 6/18 custom-profiles OK               0.03s
+ 7/18 painter         OK               0.33s
+ 8/18 fonts           OK               0.06s
+ 9/18 vterm           OK               0.02s
+10/18 gl-match        OK              88.30s
+11/18 session         OK               0.12s
+12/18 fixes           OK               0.45s
+13/18 fuzz-regress    OK               0.03s
+14/18 unicode         OK               0.02s
+15/18 search          OK              20.78s
+16/18 view            OK             107.51s
+17/18 review          OK              69.60s
+18/18 ux              OK              24.01s
+Ok:                 18  
+Expected Fail:      0   
+Fail:               0   
+Unexpected Pass:    0   
+Skipped:            0   
+Timeout:            0   
+## run 2 start 2026-11-02 21:15:58 EST
+   loadavg at start: 3.01 2.25 1.56, nproc 8
+ 1/18 desktop-file    OK               0.01s
+ 2/18 metainfo        OK               0.02s
+ 3/18 effects         OK               1.56s
+ 4/18 governor        OK               0.01s
+ 5/18 profiles        OK               0.01s
+ 6/18 custom-profiles OK               0.03s
+ 7/18 painter         OK               0.30s
+ 8/18 fonts           OK               0.05s
+ 9/18 vterm           OK               0.02s
+10/18 gl-match        OK              86.50s
+11/18 session         OK               0.12s
+12/18 fixes           OK               0.45s
+13/18 fuzz-regress    OK               0.03s
+14/18 unicode         OK               0.02s
+15/18 search          OK              21.18s
+16/18 view            OK             115.88s
+17/18 review          OK              73.59s
+18/18 ux              OK              24.31s
+Ok:                 18  
+Expected Fail:      0   
+Fail:               0   
+Unexpected Pass:    0   
+Skipped:            0   
+Timeout:            0   

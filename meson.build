@@ -12,6 +12,7 @@ epoxy_dep = dependency('epoxy')
 egl_dep = dependency('egl')
 threads_dep = dependency('threads')
 fontconfig_dep = dependency('fontconfig')
+glib_dep = dependency('glib-2.0')
 util_dep = meson.get_compiler('cpp').find_library('util')
 
 inc = include_directories('src')
@@ -39,8 +40,8 @@ view_env.set('LIBGL_ALWAYS_SOFTWARE', '1')
 effects_lib = static_library('lterm-effects',
   'src/effects.cpp', 'src/cpu_effects.cpp', 'src/thread_pool.cpp',
   'src/grid_painter.cpp', 'src/synthetic_frame.cpp', 'src/profiles.cpp',
-  'src/font_resolve.cpp', 'src/effects_governor.cpp',
-  dependencies : [pangocairo_dep, threads_dep, fontconfig_dep])
+  'src/font_resolve.cpp', 'src/effects_governor.cpp', 'src/custom_profiles.cpp',
+  dependencies : [pangocairo_dep, threads_dep, fontconfig_dep, glib_dep])
 
 gl_lib = static_library('lterm-gl', 'src/gl_effects.cpp', 'src/gl_pipeline.cpp',
   link_with : effects_lib, dependencies : [epoxy_dep, egl_dep])
@@ -49,7 +50,7 @@ vterm_lib = static_library('lterm-vterm', 'src/vterm_session.cpp', 'src/selectio
   link_with : effects_lib, dependencies : [vterm_dep, util_dep, pangocairo_dep])
 
 executable('lunduke-terminal',
-  'src/main.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp',
+  'src/main.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep],
   install : true)
@@ -85,13 +86,13 @@ executable('lterm-m3-bench', 'tools/m3_bench.cpp',
   include_directories : inc,
   link_with : [vterm_lib, effects_lib],
   dependencies : [vterm_dep, pangocairo_dep])
-executable('lterm-m3-close-bench', 'tools/m3_close_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp',
+executable('lterm-m3-close-bench', 'tools/m3_close_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
 executable('lterm-m5-probe-bench', 'tools/m5_probe_bench.cpp', 'src/terminal_view.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
-executable('lterm-m5-idle-bench', 'tools/m5_idle_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp',
+executable('lterm-m5-idle-bench', 'tools/m5_idle_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
 executable('lterm-m5-flood-bench', 'tools/m5_flood_bench.cpp', 'src/terminal_view.cpp',
@@ -106,6 +107,9 @@ test('governor', executable('governor_test', 'tests/governor_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]), env : test_env)
 test('profiles', executable('profiles_test', 'tests/profiles_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]), env : test_env)
+# M6 item 4: custom profile files (round trip, corrupt files, rename/delete, names, built-ins read-only).
+test('custom-profiles', executable('custom_profiles_test', 'tests/custom_profiles_test.cpp',
+  include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep, glib_dep]), env : test_env)
 test('painter', executable('painter_test', 'tests/painter_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]), env : test_env)
 test('fonts', executable('fonts_test', 'tests/fonts_test.cpp',
@@ -133,14 +137,19 @@ test('search', executable('search_test', 'tests/search_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
   timeout : 60, env : test_env)
 # GTK-level fixes; AddressSanitizer makes a use-after-free fail loudly. Skips without $DISPLAY.
-view_test_exe = executable('view_test', 'tests/view_test.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp',
+view_test_exe = executable('view_test', 'tests/view_test.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep, dependency('x11')],
   cpp_args : ['-fsanitize=address', '-fno-omit-frame-pointer'], link_args : ['-fsanitize=address'])
 test('view', view_test_exe, env : view_env,
   timeout : 150, is_parallel : false)
 # M5 review fixes (output flood, input method, hidden tabs, ...). Skips without $DISPLAY.
-review_test_exe = executable('review_test', 'tests/review_test.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp',
+review_test_exe = executable('review_test', 'tests/review_test.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
 test('review', review_test_exe, env : view_env, timeout : 120, is_parallel : false)
+# M6 PR A: context menu, plain rendering, settings font size, custom profiles. Skips without $DISPLAY.
+ux_test_exe = executable('ux_test', 'tests/ux_test.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
+  include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
+  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
+test('ux', ux_test_exe, env : view_env, timeout : 120, is_parallel : false)

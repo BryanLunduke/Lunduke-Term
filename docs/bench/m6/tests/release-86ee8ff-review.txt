@@ -1,0 +1,25 @@
+# head 86ee8ff, release build (build), meson test --num-processes 2, LD_LIBRARY_PATH=lterm-tools (metainfo), Xvfb :47, llvmpipe (NOT a GPU), REAL
+## start 2026-11-02 21:40:13 CST, loadavg 2.29 2.90 3.05
+ 1/18 desktop-file    OK               0.01s
+ 2/18 metainfo        OK               0.02s
+ 3/18 governor        OK               0.00s
+ 4/18 profiles        OK               0.00s
+ 5/18 custom-profiles OK               0.09s
+ 6/18 painter         OK               0.09s
+ 7/18 fonts           OK               0.03s
+ 8/18 vterm           OK               0.00s
+ 9/18 effects         OK               0.23s
+10/18 session         OK               0.07s
+11/18 fixes           OK               0.38s
+12/18 fuzz-regress    OK               0.01s
+13/18 unicode         OK               0.00s
+14/18 search          OK               0.82s
+15/18 gl-match        OK              12.18s
+16/18 view            OK              99.48s
+17/18 review          OK              39.02s
+18/18 ux              OK              15.84s
+Ok:                 18  
+Fail:               0   
+Skipped:            0   
+Timeout:            0   
+## end 21:43:00 CST

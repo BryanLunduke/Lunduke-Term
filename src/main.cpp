@@ -20,6 +20,7 @@
 // scrollback-lines and frame there ("Save as default"), keeping the other keys.
 // Keys: Ctrl+Shift+T new tab, Ctrl+Shift+W close tab, Ctrl+PgUp/PgDn switch tabs,
 // Ctrl+Shift+F search the scrollback, Ctrl+Shift+S settings.
+#include "custom_profiles.hpp"
 #include "terminal_window.hpp"
 
 #include <gtkmm.h>
@@ -90,6 +91,13 @@ void loadSettings(lterm::ViewOptions& o) {
 
 int main(int argc, char** argv) {
     lterm::ViewOptions opts;
+    {
+        // M6 item 4: custom profiles (profiles/*.ini next to settings.ini) before the settings and
+        // --profile pick one; a corrupt file is skipped with a message.
+        std::vector<std::string> warnings;
+        lterm::reloadCustomProfiles(&warnings);
+        for (const auto& w : warnings) std::fprintf(stderr, "lunduke-terminal: profile %s\n", w.c_str());
+    }
     loadSettings(opts);
     int w = 1280, h = 800, quitAfter = 0;
     int statsEvery = 0;  // --stats-every: seconds between memory lines (M4 item 4)
@@ -133,11 +141,7 @@ int main(int argc, char** argv) {
         else if (a == "--frame-shininess" && i + 1 < argc) opts.tube.frameShininess = static_cast<float>(std::atof(argv[++i]));
         else if (a == "--rgb-shift" && i + 1 < argc) opts.tube.rgbShift = static_cast<float>(std::atof(argv[++i]));
         else if (a == "--list-profiles") {
-            for (const auto& p : lterm::builtinProfiles()) {
-                const auto f = lterm::profileFont(p);
-                std::printf("%-16s %-22s font: %s %dpx%s%s\n", p.id.c_str(), (p.label + (p.id == lterm::kDefaultProfile ? " [default]" : "")).c_str(),
-                            f.family.c_str(), f.px, f.fallback ? " (fallback)" : "", f.monospace ? "" : " (not monospaced!)");
-            }
+            std::fputs(lterm::profileListText().c_str(), stdout);
             return 0;
         } else if (a == "-e") {
             for (++i; i < argc; ++i) opts.command.push_back(argv[i]);

@@ -1,0 +1,19 @@
+# --list-profiles '[default]' removal, REAL, 2026-11-02 21:38 CST
+## before (525f16c src/main.cpp):
+148:                std::printf("%-16s %-22s font: %s %dpx%s%s\n", p.id.c_str(), (p.label + (p.id == lterm::kDefaultProfile ? " [default]" : "")).c_str(),
+## after (this head, build/lunduke-terminal --list-profiles, no custom profiles):
+plain            Plain (no effects)     font: DejaVu Sans Mono 16px
+amber            Amber                  font: DejaVu Sans Mono 22px (fallback)
+green            Green                  font: DejaVu Sans Mono 22px (fallback)
+green-scanlines  Green scanlines        font: DejaVu Sans Mono 22px (fallback)
+ibm-dos          IBM DOS (colour)       font: DejaVu Sans Mono 22px (fallback)
+ibm-3278         IBM 3278 (static)      font: DejaVu Sans Mono 22px (fallback)
+vintage          Vintage                font: DejaVu Sans Mono 22px (fallback)
+futuristic       Futuristic (colour)    font: DejaVu Sans Mono 22px (fallback)
+paper-white      Paper white            font: DejaVu Sans Mono 22px (fallback)
+pixel-8bit       Pixel 8-bit (blue)     font: DejaVu Sans Mono 22px (fallback)
+pixel-hires-mono Pixel hi-res mono      font: DejaVu Sans Mono 22px (fallback)
+pixel-16bit      Pixel 16-bit           font: DejaVu Sans Mono 22px (fallback)
+pixel-40col      Pixel 40-column        font: DejaVu Sans Mono 22px (fallback)
+modern           Modern (mint)          font: DejaVu Sans Mono 22px (fallback)
+## grep -c default in that output: 0

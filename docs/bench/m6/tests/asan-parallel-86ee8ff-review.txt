@@ -1,0 +1,25 @@
+# head 86ee8ff, build-san (address,undefined, detect_leaks=1 + tests/lsan.supp), --num-processes 2 --timeout-multiplier 4, LD_LIBRARY_PATH=lterm-tools (metainfo), Xvfb :47, llvmpipe, REAL
+## run 1 start 2026-11-02 21:54:03 CST, loadavg 2.37 2.79 2.92
+ 1/18 desktop-file    OK               0.01s
+ 2/18 metainfo        OK               0.02s
+ 3/18 governor        OK               0.01s
+ 4/18 profiles        OK               0.02s
+ 5/18 custom-profiles OK               0.17s
+ 6/18 painter         OK               0.29s
+ 7/18 fonts           OK               0.06s
+ 8/18 vterm           OK               0.02s
+ 9/18 effects         OK               1.53s
+10/18 session         OK               0.12s
+11/18 fixes           OK               0.44s
+12/18 fuzz-regress    OK               0.03s
+13/18 unicode         OK               0.03s
+14/18 search          OK              20.09s
+15/18 gl-match        OK              86.99s
+16/18 view            OK             106.50s
+17/18 review          OK              70.56s
+18/18 ux              OK              36.00s
+Ok:                 18  
+Fail:               0   
+Skipped:            0   
+Timeout:            0   
+## run 1 end 21:59:04 CST
