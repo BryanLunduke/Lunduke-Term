@@ -1,0 +1,2 @@
+# source fc56200, build-san (address,undefined, detect_leaks=1 + tests/lsan.supp), --num-processes 1 --timeout-multiplier 4, Xvfb :44, llvmpipe, REAL
+## run 1 start 2026-11-02 22:40:49 EST, loadavg 3.00 3.04 3.09

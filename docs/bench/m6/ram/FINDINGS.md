@@ -77,3 +77,78 @@ of plain that grows. What we control:
 1. Scrollback cell size.
 2. Our effects buffers: the GL textures, and the C++ path's float buffers.
 3. Nothing in the driver or the shared libraries.
+
+## Fixes on m6-ram
+
+All four fixes keep the output the same. None of them changes timing or governor code.
+
+1. **1481dd7, GL path: 8-bit `texSrc_`** (was RGBA16F). The Cairo source is 8-bit, so RGBA8 holds
+   it exactly. This saves 4 B/px (4.1 MB at 1280x800). `texture-bytes` went from 32,817,152 to
+   28,721,152 (REAL). The minimum PSNR in the gl-match test went from 60.68 to 58.81 dB (threshold
+   40). The largest pixel difference is 2/255.
+2. **dabebdf, scrollback: 16-byte packed cells** instead of libvterm's 40-byte `VTermScreenCell`:
+   - Each cell keeps the codepoint, the 18 attribute bits, the width, and fg/bg.
+   - The rare extra combining characters go in a per-line side array.
+   - `sb-bytes` for 10,000 lines went from 11,415,200 to 5,032,848 (REAL).
+   - The test is `session_test` `testScrollbackCells`. It checks that rich SGR, combining marks,
+     wide characters and DECDWL/DECDHL survive history and sb_popline, and that a 100-column line
+     costs 1600 bytes (REAL).
+   - On the master scrollback code the test fails (2 failures: 4032 bytes per line, plus the
+     raw-cell check). The raw-cell check also failed on master until two libvterm limits were
+     excluded. libvterm does not restore DECDWL/DECDHL or the colours of a wide character's right
+     half on popline, with or without this change.
+   - A mutation run that dropped the font bits and the extra flag made the test fail 3 times (REAL).
+   - Fuzz: 601 s, 75,659 runs, no crash or leak. The log is `fuzz/fuzz-dabebdf.txt`.
+3. **5f95c13, C++ path: byte `src_`** (was float RGBA, 16 B/px, now 4 B/px). Reads convert
+   with the same `k * (1/255)`, so the output is bit-identical. `exact/` shows identical output
+   hashes for 6 parameter sets x 4 frames (bezel, rgbShift, full-res burn-in, bloom off).
+4. **5f95c13, C++ path with the bezel**: no more full copy of the bezel layer (`base_`). The
+   three base floats of each reflecting pixel now live in its `Refl` entry. This is bit-identical
+   too (same `exact/` run).
+
+## Before / after (REAL, kB, Private_Dirty fresh / after, 1280x800, one tab)
+
+| profile | master dc3b544 | final (5f95c13 source) | change (DERIVED) |
+|---|---|---|---|
+| amber, effects on, GL (llvmpipe) | 93,328 / 103,944 | 89,356 / 93,656 | -4.0 / -10.3 MB |
+| amber, effects on, C++ path | 82,532 / 94,104 | 70,532 / 75,940 | -12.0 / -18.2 MB |
+| amber C++ path + bezel (`--frame`) | 117,168 / 122,556 * | 91,004 / 96,384 | -26.2 / -26.2 MB |
+| plain | 10,652 / 22,600 | 10,664 / 16,316 | 0 / -6.3 MB |
+
+| profile | Rss master | Rss final | Pss master | Pss final |
+|---|---|---|---|---|
+| amber GL | 196,372 / 207,052 | 198,184 / 202,484 | 155,221 / 148,376 | 147,518 / 151,804 |
+| amber C++ | 125,184 / 136,820 | 112,660 / 118,068 | 108,125 / 119,745 | 86,720 / 92,132 |
+| plain | 53,176 / 65,124 | 52,652 / 58,368 | 33,145 / 45,054 | 27,542 / 33,197 |
+
+`*` The bezel "before" was run at 094697e. That commit already has fixes 1 and 2, but its C++ path
+code is the same as master's, so its "after" column already includes the scrollback saving. The
+final numbers are from `raw-fix34/` (one run each for GL and plain; the C++ path ran twice, 70,532
+both times). The master numbers are run 1 of `raw/`.
+
+Rss and Pss for GL did not improve, although Private_Dirty did. That is because they mostly
+track shared, clean pages of libLLVM and Mesa, and those vary with other processes and page-cache
+pressure.
+
+## What remains vs the 32 MB target, and why
+
+- **Plain**:
+  - Pss is 27.5 MB fresh and 33.2 MB after output; Rss is 52.7 / 58.4 MB (REAL, final).
+  - The remaining Rss is mostly shared libraries and the fontconfig cache: about 31 MB of
+    GTK/glib/Pango/Cairo/other libraries, and the 8 MB fontconfig mmap.
+  - Private_Dirty is 10.7 MB fresh. It is mostly the heap (8 MB), plus one 4 MB Cairo surface.
+  - Growth after output is now 5.6 MB for 10,000 lines of history.
+- **Amber GL here**: llvmpipe's own cost dominates (libLLVM, JIT shaders, and textures held in
+  process memory). About 150 MB of Rss is fixed (DERIVED). This box cannot say what a GPU driver
+  would cost.
+- **What we still control, not changed** (each would change output or cost CPU; report only):
+  - GL: `texStatic_` is RGBA16F, 8.2 MB (values exceed 1.0). down, bloomA, bloomB and the two
+    burn textures are RGBA16F at half resolution, 2 MB each.
+  - C++ path: `static_`, `warp_` and the full-res burn buffer are float, 16.4 MB each at
+    1280x800 (DERIVED). `down_`, `bloomA_` and `bloomB_` are 4.1 MB each.
+  - Scrollback default of 10,000 lines. This is a setting; it was not changed.
+- **Not a lever**:
+  - `malloc_trim`: heap-free is about 3 MB and releasable 35 kB.
+  - `M_ARENA_MAX`: `LP_NUM_THREADS=1` made no difference.
+  - Glyph cache: under 60 KB.
+  - Pixbuf copies: none found.

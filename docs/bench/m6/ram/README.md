@@ -19,3 +19,14 @@ shaders in the process, and maps libLLVM. All numbers REAL unless marked DERIVED
 - `run-diag.sh`: one run each to attribute the GL path: window size (640x400, 1024x768),
   `LP_NUM_THREADS=1`, `GALLIUM_DRIVER=softpipe`, `--effects-quality static`, plain at 1024x768,
   and the GtkGLArea baseline at 1280x800. Outputs in `raw-diag/`, smaps in `raw-smaps-diag.tar.xz`.
+- `raw-fixed/`: the same matrix after fixes 1+2 (dabebdf), plus amber GL 1024x768 x2 (the second
+  run's "after" snapshot is missing: the run was interrupted) and plain 1024x768. `summary-fixed.txt`.
+  Its `plain-sb0 after` Rss/Pss are low because the kernel reclaimed clean file pages while the
+  fuzzer ran (Private_Dirty is unaffected).
+- `raw-fix34/`: before (094697e build) / after (5f95c13) for the C++ path with and without the
+  bezel, and the final amber GL and plain runs. `summary-fix34.txt`. The tarred smaps of
+  `before-amber-cpu-r1` come from an earlier, interrupted attempt of the same run (read-only files
+  could not be overwritten). Its rollup and groups files are from the run in the summary.
+- `exact/`: C++ effects bit-exactness check for fixes 3+4. `fuzz/`: the fuzz run on fix 2.
+  `tests/`: release and ASan/UBSan runs on the final source.
+- Findings, fixes and the before/after table: [`FINDINGS.md`](FINDINGS.md).
