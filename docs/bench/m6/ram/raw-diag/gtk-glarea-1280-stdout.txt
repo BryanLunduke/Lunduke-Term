@@ -1,0 +1,2 @@
+
+(gtk_baseline:2002657): dbind-WARNING **: 21:57:00.074: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files

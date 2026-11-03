@@ -1,0 +1,64 @@
+half-res burn-in, renderer llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1: PSNR 62.90 dB, max diff 2
+full-res burn-in, renderer llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1: PSNR 62.94 dB, max diff 2
+amber full: PSNR 62.77 dB, max diff 2
+amber reduced: PSNR 62.57 dB, max diff 2
+amber static: PSNR 62.47 dB, max diff 2
+green-scanlines full: PSNR 63.55 dB, max diff 1
+green-scanlines reduced: PSNR 63.24 dB, max diff 1
+green-scanlines static: PSNR 63.22 dB, max diff 1
+amber full scale 2: PSNR 63.98 dB, max diff 2
+amber reduced scale 2: PSNR 63.71 dB, max diff 2
+amber static scale 2: PSNR 63.61 dB, max diff 2
+green-scanlines full scale 2: PSNR 64.72 dB, max diff 1
+green-scanlines reduced scale 2: PSNR 64.38 dB, max diff 2
+green-scanlines static scale 2: PSNR 64.32 dB, max diff 1
+ibm-dos rgb full scale 1: PSNR 61.16 dB, max diff 1
+ibm-dos rgb reduced scale 1: PSNR 60.94 dB, max diff 1
+ibm-dos rgb static scale 1: PSNR 60.95 dB, max diff 1
+amber bezel full scale 1: PSNR 62.40 dB, max diff 2
+amber bezel reduced scale 1: PSNR 62.20 dB, max diff 2
+amber bezel static scale 1: PSNR 62.17 dB, max diff 2
+green-scanlines bezel full scale 1: PSNR 63.05 dB, max diff 1
+green-scanlines bezel reduced scale 1: PSNR 62.75 dB, max diff 2
+green-scanlines bezel static scale 1: PSNR 62.64 dB, max diff 2
+amber bezel+rgb full scale 1: PSNR 63.15 dB, max diff 1
+amber bezel+rgb reduced scale 1: PSNR 62.95 dB, max diff 1
+amber bezel+rgb static scale 1: PSNR 62.94 dB, max diff 1
+vintage bezel full scale 1: PSNR 64.19 dB, max diff 1
+vintage bezel reduced scale 1: PSNR 63.90 dB, max diff 1
+vintage bezel static scale 1: PSNR 64.03 dB, max diff 1
+futuristic full scale 1: PSNR 64.19 dB, max diff 1
+futuristic reduced scale 1: PSNR 64.80 dB, max diff 1
+futuristic static scale 1: PSNR 64.78 dB, max diff 1
+paper-white bezel full scale 1: PSNR 59.03 dB, max diff 2
+paper-white bezel reduced scale 1: PSNR 58.87 dB, max diff 2
+paper-white bezel static scale 1: PSNR 58.81 dB, max diff 2
+ibm-dos rgb full scale 2: PSNR 62.43 dB, max diff 1
+ibm-dos rgb reduced scale 2: PSNR 62.07 dB, max diff 1
+ibm-dos rgb static scale 2: PSNR 62.06 dB, max diff 1
+amber bezel full scale 2: PSNR 63.29 dB, max diff 1
+amber bezel reduced scale 2: PSNR 63.08 dB, max diff 2
+amber bezel static scale 2: PSNR 63.00 dB, max diff 2
+green-scanlines bezel full scale 2: PSNR 63.77 dB, max diff 1
+green-scanlines bezel reduced scale 2: PSNR 63.44 dB, max diff 2
+green-scanlines bezel static scale 2: PSNR 63.37 dB, max diff 2
+amber bezel+rgb full scale 2: PSNR 63.67 dB, max diff 1
+amber bezel+rgb reduced scale 2: PSNR 63.48 dB, max diff 1
+amber bezel+rgb static scale 2: PSNR 63.45 dB, max diff 1
+vintage bezel full scale 2: PSNR 64.57 dB, max diff 1
+vintage bezel reduced scale 2: PSNR 64.43 dB, max diff 1
+vintage bezel static scale 2: PSNR 64.54 dB, max diff 1
+futuristic full scale 2: PSNR 64.21 dB, max diff 1
+futuristic reduced scale 2: PSNR 64.84 dB, max diff 1
+futuristic static scale 2: PSNR 64.92 dB, max diff 1
+paper-white bezel full scale 2: PSNR 59.95 dB, max diff 1
+paper-white bezel reduced scale 2: PSNR 59.76 dB, max diff 2
+paper-white bezel static scale 2: PSNR 59.70 dB, max diff 2
+setParams -> amber bezel reduced: PSNR 62.20 dB, max diff 2
+setParams -> amber bezel static: PSNR 62.17 dB, max diff 2
+setParams -> amber bezel full: PSNR 62.40 dB, max diff 2
+setParams -> amber bezel static: PSNR 62.17 dB, max diff 2
+setParams -> amber bezel reduced: PSNR 62.20 dB, max diff 2
+setParams -> amber bezel static: PSNR 62.17 dB, max diff 2
+setParams x6: programs compiled 0, textures 12 -> 12, fbos 10 -> 10, worst PSNR 62.17 dB
+after 50 resizes (bezel on): textures 12 -> 12, fbos 10 -> 10, glIsTexture 13 -> 13, PSNR 63.22 dB, max diff 2

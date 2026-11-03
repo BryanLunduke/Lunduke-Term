@@ -16,3 +16,6 @@ shaders in the process, and maps libLLVM. All numbers REAL unless marked DERIVED
 - cool-retro-term 1.2.0+ds2-4 (Debian 13) and its Qt5/QML deps were unpacked with `dpkg-deb -x`
   into `/workspace/lterm-tools/crt/root` (no system install), run with LD_LIBRARY_PATH,
   QT_PLUGIN_PATH, QML2_IMPORT_PATH and an empty config; default profile, window 1024x768.
+- `run-diag.sh`: one run each to attribute the GL path: window size (640x400, 1024x768),
+  `LP_NUM_THREADS=1`, `GALLIUM_DRIVER=softpipe`, `--effects-quality static`, plain at 1024x768,
+  and the GtkGLArea baseline at 1280x800. Outputs in `raw-diag/`, smaps in `raw-smaps-diag.tar.xz`.

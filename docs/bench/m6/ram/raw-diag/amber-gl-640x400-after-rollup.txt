@@ -1,0 +1,24 @@
+# amber-gl-640x400 after pid 2003679 2026-11-02 21:59:00 EST
+5620ac1be000-7ffd56f50000 ---p 00000000 00:00 0                          [rollup]
+Rss:              174332 kB
+Pss:              134629 kB
+Pss_Dirty:         74808 kB
+Pss_Anon:          74308 kB
+Pss_File:          59821 kB
+Pss_Shmem:           500 kB
+Shared_Clean:      56548 kB
+Shared_Dirty:       1000 kB
+Private_Clean:     42476 kB
+Private_Dirty:     74308 kB
+Referenced:       174332 kB
+Anonymous:         74308 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
