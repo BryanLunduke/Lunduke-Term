@@ -242,6 +242,55 @@ int main() {
         g_unlink((dir + "/notes.txt").c_str());
         g_unlink((dir + "/Partial.ini").c_str());
     }
+    // ---- PR #7 review: a file skipped as broken is never written over (New, Copy, Rename, Save) ----
+    {
+        auto read = [](const std::string& path) {
+            char* d = nullptr;
+            gsize n = 0;
+            std::string s = g_file_get_contents(path.c_str(), &d, &n, nullptr) ? std::string(d, n) : std::string("<none>");
+            g_free(d);
+            return s;
+        };
+        const std::string badColor = dir + "/badcolor.ini", broken = dir + "/broken.ini";
+        const std::string badColorText = "[profile]\nforeground=#nothex\n# keep me\n";
+        const std::string brokenText = "[profile\nnot a key file, hand-edited\n";
+        writeFile(badColor, badColorText);
+        writeFile(broken, brokenText);
+        std::vector<std::string> w;
+        setCustomProfiles({});
+        reloadCustomProfiles(&w);
+        CHECK(w.size() == 2);
+        CHECK(!findProfile("custom:badcolor") && !findProfile("custom:broken"));
+        CHECK(unloadedProfileFile(dir, "badcolor") == "badcolor.ini");
+        CHECK(unloadedProfileFile(dir, "BROKEN") == "broken.ini");  // case-insensitive
+        CHECK(unloadedProfileFile(dir, "My Tube").empty());         // loaded: no conflict
+        CHECK(unloadedProfileFile("", "badcolor").empty());          // no dir: no disk check
+        // The name dialog's check (with the directory) explains why.
+        CHECK(!validateProfileName("badcolor", &err, "", dir) && err.find("badcolor.ini") != std::string::npos &&
+              err.find("could not be loaded") != std::string::npos);
+        CHECK(!validateProfileName("Broken", &err, "", dir));
+        // New / Copy: saveCustomProfile of a new custom id onto the skipped file's name.
+        Profile n = *findProfile("amber");
+        n.id = customProfileId("badcolor");
+        err.clear();
+        CHECK(!saveCustomProfile(dir, n, &err) && err.find("could not be loaded") != std::string::npos);
+        n.id = customProfileId("BadColor");  // a case variant would leave two files that clash
+        CHECK(!saveCustomProfile(dir, n, &err));
+        // Rename a loaded profile onto it.
+        CHECK(!renameCustomProfile(dir, "custom:My Tube", "broken", &err) && err.find("broken.ini") != std::string::npos);
+        CHECK(findProfile("custom:My Tube") && exists(dir + "/My Tube.ini"));
+        // Byte-identical afterwards, and still the only files with those names.
+        CHECK(read(badColor) == badColorText);
+        CHECK(read(broken) == brokenText);
+        CHECK(!exists(dir + "/BadColor.ini"));
+        CHECK(!findProfile("custom:badcolor") && !findProfile("custom:BadColor") && !findProfile("custom:broken"));
+        // Once the user removes the broken file, the name is free again.
+        g_unlink(broken.c_str());
+        CHECK(renameCustomProfile(dir, "custom:My Tube", "broken", &err));
+        CHECK(renameCustomProfile(dir, "custom:broken", "My Tube", &err));
+        g_unlink(badColor.c_str());
+        CHECK(validateProfileName("badcolor", &err, "", dir));
+    }
     // A directory that cannot be written: save fails with a message, nothing crashes.
     {
         Profile r = p;

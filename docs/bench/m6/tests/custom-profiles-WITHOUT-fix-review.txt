@@ -1,0 +1,13 @@
+# custom_profiles_test with the new disk check disabled ("if (false && ...)" in validateProfileName), head 525f16c + review tests. REAL output, 2026-11-02 21:32 CST.
+FAIL ../tests/custom_profiles_test.cpp:269: !validateProfileName("badcolor", &err, "", dir) && err.find("badcolor.ini") != std::string::npos && err.find("could not be loaded") != std::string::npos
+FAIL ../tests/custom_profiles_test.cpp:271: !validateProfileName("Broken", &err, "", dir)
+FAIL ../tests/custom_profiles_test.cpp:276: !saveCustomProfile(dir, n, &err) && err.find("could not be loaded") != std::string::npos
+FAIL ../tests/custom_profiles_test.cpp:280: !renameCustomProfile(dir, "custom:My Tube", "broken", &err) && err.find("broken.ini") != std::string::npos
+FAIL ../tests/custom_profiles_test.cpp:281: findProfile("custom:My Tube") && exists(dir + "/My Tube.ini")
+FAIL ../tests/custom_profiles_test.cpp:283: read(badColor) == badColorText
+FAIL ../tests/custom_profiles_test.cpp:284: read(broken) == brokenText
+FAIL ../tests/custom_profiles_test.cpp:286: !findProfile("custom:badcolor") && !findProfile("custom:BadColor") && !findProfile("custom:broken")
+FAIL ../tests/custom_profiles_test.cpp:289: renameCustomProfile(dir, "custom:My Tube", "broken", &err)
+FAIL ../tests/custom_profiles_test.cpp:292: validateProfileName("badcolor", &err, "", dir)
+round trip: 14 built-ins and one profile with every option changed
+10 failure(s)

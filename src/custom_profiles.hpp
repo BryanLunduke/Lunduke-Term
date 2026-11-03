@@ -27,7 +27,14 @@ std::string customProfilesDir();
 // characters ('/', '\\'), no control characters, not starting with '.' or ending in blanks,
 // and not the name or id of a built-in or of another custom profile (case-insensitive).
 // `renaming` is the id being renamed (it may keep its own name, e.g. change its case).
-bool validateProfileName(const std::string& name, std::string* err, const std::string& renaming = "");
+// With `dir` (the profiles directory), a name is also refused when a file of that name
+// (case-insensitive) is in `dir` but is not a loaded profile, e.g. one skipped as broken, so
+// New, Copy, Rename and Save never write over it (PR #7 review).
+bool validateProfileName(const std::string& name, std::string* err, const std::string& renaming = "",
+                         const std::string& dir = "");
+// The file name ("NAME.ini") of a file in `dir` matching `name` case-insensitively that is not a
+// loaded custom profile (and not `renaming`'s own file); "" when there is none.
+std::string unloadedProfileFile(const std::string& dir, const std::string& name, const std::string& renaming = "");
 
 // Serialization. Missing keys keep the values of the built-in "plain" profile; out-of-range
 // numbers are clamped. A file that is not a key file, lacks [profile], or has a bad colour is

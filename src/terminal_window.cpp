@@ -741,7 +741,7 @@ std::string SettingsDialog::askName(const std::string& title, const std::string&
     why.set_xalign(0);
     auto check = [&] {
         std::string err;
-        const bool good = validateProfileName(entry.get_text(), &err, renaming);
+        const bool good = validateProfileName(entry.get_text(), &err, renaming, customProfilesDir());
         ok->set_sensitive(good);
         why.set_text(good ? "" : err);
     };
@@ -762,7 +762,7 @@ void SettingsDialog::createProfile(bool copyCurrent) {
     if (!src) return;
     const std::string base = copyCurrent ? src->label + " (copy)" : std::string("My profile");
     std::string suggested = base;
-    for (int i = 2; !validateProfileName(suggested, nullptr) && i < 1000; ++i) suggested = base + " " + std::to_string(i);
+    for (int i = 2; !validateProfileName(suggested, nullptr, "", customProfilesDir()) && i < 1000; ++i) suggested = base + " " + std::to_string(i);
     const std::string name = askName(copyCurrent ? "Copy to custom profile" : "New profile", suggested, "");
     if (name.empty()) return;
     Profile p = *src;

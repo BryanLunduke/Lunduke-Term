@@ -179,7 +179,30 @@ std::string customProfilesDir() {
     return s;
 }
 
-bool validateProfileName(const std::string& name, std::string* err, const std::string& renaming) {
+std::string unloadedProfileFile(const std::string& dir, const std::string& name, const std::string& renaming) {
+    if (dir.empty()) return {};
+    GDir* d = g_dir_open(dir.c_str(), 0, nullptr);
+    if (!d) return {};
+    const std::string l = lower(name), own = customProfileName(renaming);
+    std::string found;
+    while (const char* f = g_dir_read_name(d)) {
+        const std::string s = f;
+        if (s.size() <= 4 || s.compare(s.size() - 4, 4, ".ini") != 0) continue;
+        const std::string stem = s.substr(0, s.size() - 4);
+        if (lower(stem) != l || (!own.empty() && stem == own)) continue;
+        // A loaded profile's own file is no conflict here (the registry check covers it).
+        const bool loaded = std::any_of(customProfiles().begin(), customProfiles().end(),
+                                        [&](const Profile& c) { return customProfileName(c.id) == stem; });
+        if (!loaded) {
+            found = s;
+            break;
+        }
+    }
+    g_dir_close(d);
+    return found;
+}
+
+bool validateProfileName(const std::string& name, std::string* err, const std::string& renaming, const std::string& dir) {
     auto bad = [&](const char* why) {
         if (err) *err = why;
         return false;
@@ -202,6 +225,14 @@ bool validateProfileName(const std::string& name, std::string* err, const std::s
         if (lower(p.id) == l || lower(p.label) == l) return bad("A built-in profile has this name");
     for (const auto& p : customProfiles())
         if (p.id != renaming && lower(customProfileName(p.id)) == l) return bad("A custom profile has this name");
+    // PR #7 review: a file that was skipped as broken (bad colour, not a key file, ...) is not in
+    // the registry, but it is on disk: writing NAME.ini would silently replace it.
+    const std::string file = unloadedProfileFile(dir, name, renaming);
+    if (!file.empty()) {
+        if (err) *err = "A profile file named \"" + file + "\" already exists in " + dir +
+                        " but could not be loaded; fix or remove it by hand, or pick another name";
+        return false;
+    }
     return true;
 }
 
@@ -399,7 +430,7 @@ bool saveCustomProfile(const std::string& dir, const Profile& p, std::string* er
     }
     const bool exists = std::any_of(customProfiles().begin(), customProfiles().end(),
                                     [&](const Profile& c) { return c.id == p.id; });
-    if (!validateProfileName(name, err, exists ? p.id : "")) return false;
+    if (!validateProfileName(name, err, exists ? p.id : "", dir)) return false;
     if (!ensureDir(dir, err) || !writeAtomic(profilePath(dir, name), profileToIni(p), err)) return false;
     std::vector<Profile> v = customProfiles();
     Profile stored = p;
@@ -419,7 +450,7 @@ bool renameCustomProfile(const std::string& dir, const std::string& id, const st
         if (err) *err = isCustomProfileId(id) ? "No such custom profile" : "Built-in profiles are read-only";
         return false;
     }
-    if (!validateProfileName(newName, err, id)) return false;
+    if (!validateProfileName(newName, err, id, dir)) return false;
     const std::string from = profilePath(dir, customProfileName(id)), to = profilePath(dir, newName);
     if (from != to) {
         // Write the new file first (atomic), then remove the old one: an interruption leaves
