@@ -1,0 +1,17 @@
+# tests/session_test.cpp from m6-ram (testScrollbackCells) built against master dc3b544 sources (git worktree), release, REAL. Exit 1.
+FAIL ../tests/session_test.cpp:582: VtermSession::scrollbackBytesFull(1, 100) - VtermSession::scrollbackBytesFull(1, 0) == size_t(1600)
+  got  [4000]
+  want [1600]
+transcript:
+T=xterm-256color C=truecolor
+TTY
+10 60
+SESSIONLEADER
+IUTF8
+
+
+
+
+
+1 failure(s)
+scrollback cells: 3 rows x 40 columns round-tripped; 4032 bytes per 100-column line

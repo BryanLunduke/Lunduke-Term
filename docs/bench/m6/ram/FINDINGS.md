@@ -93,10 +93,11 @@ All four fixes keep the output the same. None of them changes timing or governor
    - The test is `session_test` `testScrollbackCells`. It checks that rich SGR, combining marks,
      wide characters and DECDWL/DECDHL survive history and sb_popline, and that a 100-column line
      costs 1600 bytes (REAL).
-   - On the master scrollback code the test fails (2 failures: 4032 bytes per line, plus the
-     raw-cell check). The raw-cell check also failed on master until two libvterm limits were
-     excluded. libvterm does not restore DECDWL/DECDHL or the colours of a wide character's right
-     half on popline, with or without this change.
+   - Built against master's sources, the final test fails, exit 1, on the size check: 4032 bytes
+     per 100-column line instead of 1600 (`tests/session-test-on-master.txt`, REAL). The cell
+     round-trip part passes on master, as it should, because master stores full cells. It leaves
+     out two libvterm limits that apply with or without this change: on popline, libvterm does not
+     restore DECDWL/DECDHL or the colours of a wide character's right half.
    - A mutation run that dropped the font bits and the extra flag made the test fail 3 times (REAL).
    - Fuzz: 601 s, 75,659 runs, no crash or leak. The log is `fuzz/fuzz-dabebdf.txt`.
 3. **5f95c13, C++ path: byte `src_`** (was float RGBA, 16 B/px, now 4 B/px). Reads convert
