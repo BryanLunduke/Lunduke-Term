@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+option('libvterm', type : 'combo', choices : ['bundled', 'system'], value : 'bundled',
+  description : 'bundled: build third_party/libvterm (0.3.3 + third_party/libvterm-patches) as a static library; system: use the installed libvterm (>= 0.3) without those patches')

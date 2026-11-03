@@ -7,7 +7,30 @@ project('lunduke-terminal', 'cpp',
 
 gtkmm_dep = dependency('gtkmm-3.0', version : '>=3.24')
 pangocairo_dep = dependency('pangocairo')
-vterm_dep = dependency('vterm', version : '>=0.3')
+# libvterm: bundled by default (third_party/README.md): the pristine 0.3.3 source plus the patches
+# in third_party/libvterm-patches, applied at build time to a copy in the build directory.
+# -Dlibvterm=system uses the installed libvterm instead (no patches).
+lv_dir = 'third_party/libvterm'
+lv_sources = files(lv_dir / 'src/encoding.c', lv_dir / 'src/keyboard.c', lv_dir / 'src/mouse.c',
+  lv_dir / 'src/parser.c', lv_dir / 'src/pen.c', lv_dir / 'src/state.c', lv_dir / 'src/unicode.c',
+  lv_dir / 'src/vterm.c')
+lv_inc = include_directories(lv_dir / 'include', lv_dir / 'src')
+lv_series = files('third_party/libvterm-patches/series')
+lv_patches = []  # in series order
+lv_c_opts = ['c_std=c99', 'warning_level=1']  # upstream builds with -std=c99 -Wall
+if get_option('libvterm') == 'system'
+  vterm_dep = dependency('vterm', version : '>=0.3')
+else
+  add_languages('c', native : false, required : true)
+  lv_screen_c = custom_target('libvterm-screen.c',
+    input : [lv_dir / 'src/screen.c'], output : 'libvterm-screen.c',
+    command : [find_program('python3'), files('tools/libvterm_patch.py'), find_program('patch'),
+               '@INPUT0@', '@OUTPUT@', lv_series, lv_patches],
+    depend_files : [lv_series, lv_patches, files('tools/libvterm_patch.py')])
+  lv_lib = static_library('vterm-bundled', lv_sources, lv_screen_c,
+    include_directories : lv_inc, override_options : lv_c_opts, pic : true)
+  vterm_dep = declare_dependency(link_with : lv_lib, include_directories : include_directories(lv_dir / 'include'))
+endif
 epoxy_dep = dependency('epoxy')
 egl_dep = dependency('egl')
 threads_dep = dependency('threads')
@@ -156,3 +179,7 @@ test('ux', ux_test_exe, env : view_env, timeout : 120, is_parallel : false)
 # Default scrollback 5000; a saved scrollback-lines is kept. Runs the binary; skips without $DISPLAY.
 test('scrollback-default', find_program('sh'), args : [files('tests/scrollback_default_test.sh'), lterm_exe],
   env : view_env, timeout : 240, is_parallel : false)
+# The vendored libvterm is byte-identical to the upstream 0.3.3 tarball (third_party/README.md).
+test('libvterm-pristine', find_program('sha256sum'),
+  args : ['--quiet', '--strict', '-c', meson.current_source_dir() / 'third_party' / 'libvterm-SHA256SUMS'],
+  workdir : meson.current_source_dir() / 'third_party' / 'libvterm')

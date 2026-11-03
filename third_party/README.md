@@ -17,3 +17,12 @@
   warranties with regard to this software."
 - **Pristine:** nothing under `third_party/libvterm/` is edited. `libvterm-SHA256SUMS` lists every
   file of the tarball, and the `libvterm-pristine` test checks the tree against it.
+- **Build:** by default meson builds it as the static library `vterm-bundled` (C99, `-Wall`, as
+  upstream does), so the binary no longer needs `libvterm0`. `src/screen.c` is the only patched
+  file. `tools/libvterm_patch.py` copies it into the build directory as `libvterm-screen.c` and
+  applies the patches listed in `libvterm-patches/series` with `patch --fuzz=0`; a patch that no
+  longer fits stops the build. `-Dlibvterm=system` builds against the installed libvterm
+  (>= 0.3) instead, without the patches.
+- **Patches** (`third_party/libvterm-patches/`, in `series` order; each file says what it changes
+  and why): none yet.
+- Local changes only; nothing has been sent upstream.
