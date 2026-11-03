@@ -1,0 +1,24 @@
+# before-amber-cpu-r2 fresh pid 2170032 2026-11-02 22:36:01 EST
+5634b06ce000-7ffe58720000 ---p 00000000 00:00 0                          [rollup]
+Rss:              124688 kB
+Pss:               98692 kB
+Pss_Dirty:         84528 kB
+Pss_Anon:          82528 kB
+Pss_File:          14164 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      29164 kB
+Shared_Dirty:       4000 kB
+Private_Clean:      8996 kB
+Private_Dirty:     82528 kB
+Referenced:       124688 kB
+Anonymous:         82528 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

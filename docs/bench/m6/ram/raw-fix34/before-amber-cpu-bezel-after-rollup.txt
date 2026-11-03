@@ -1,0 +1,24 @@
+# before-amber-cpu-bezel after pid 2170938 2026-11-02 22:37:23 EST
+556ae1ee6000-7fff29874000 ---p 00000000 00:00 0                          [rollup]
+Rss:              164924 kB
+Pss:              139536 kB
+Pss_Dirty:        124556 kB
+Pss_Anon:         122556 kB
+Pss_File:          14980 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      28464 kB
+Shared_Dirty:       4000 kB
+Private_Clean:      9904 kB
+Private_Dirty:    122556 kB
+Referenced:       164904 kB
+Anonymous:        122556 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

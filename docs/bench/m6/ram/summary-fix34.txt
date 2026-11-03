@@ -1,0 +1,17 @@
+label                        snap        Rss      Pss Priv_Dirty  Shared_Cl
+after-amber-cpu-bezel        after    138572   107636      96384      37620
+after-amber-cpu-bezel        fresh    133192   107947      91004      28264
+after-amber-cpu-r1           after    118068    92132      75940      29104
+after-amber-cpu-r1           fresh    112660    86720      70532      29104
+after-amber-cpu-r2           after    116988    86499      75884      36580
+after-amber-cpu-r2           fresh    112940    86884      70532      29256
+after-amber-gl               after    202484   151804      93656      66280
+after-amber-gl               fresh    198184   147518      89356      66256
+after-plain                  after     58368    33197      16316      28184
+after-plain                  fresh     52652    27542      10664      28120
+before-amber-cpu-bezel       after    164924   139536     122556      28464
+before-amber-cpu-bezel       fresh    159536   134151     117168      28464
+before-amber-cpu-r1          after    130168   104142      87880      29224
+before-amber-cpu-r1          fresh    124816    98793      82528      29224
+before-amber-cpu-r2          after    130096   104104      87936      29164
+before-amber-cpu-r2          fresh    124688    98692      82528      29164
