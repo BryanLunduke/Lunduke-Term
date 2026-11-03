@@ -103,6 +103,9 @@ public:
     bool softwareRendering() const { return software_; }
     double tickIntervalMs() const { return tickIntervalMs_; }
     int scaleFactor() const { return scale_; }
+    // Font size (logical px) the profile and font family give without a --font-px override;
+    // the Settings dialog shows it while there is no override (M6 item 3).
+    int autoFontPx() const { return autoFontPx_; }
     int deviceWidth() const { return w_; }
     int deviceHeight() const { return h_; }
     // Test hook: the cell under a pointer position in logical (event) coordinates.
@@ -174,6 +177,7 @@ protected:
 
 private:
     std::string fontWarned_;  // the --font value already warned about
+    int autoFontPx_ = 0;
     enum class Mode { Plain, Cpu, Gl };
     bool onKey(GdkEventKey* ev);
     // Review item 2: input methods (dead keys, Compose, ibus/fcitx for CJK). The IM shows its

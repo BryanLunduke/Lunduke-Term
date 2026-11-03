@@ -409,6 +409,7 @@ void TerminalView::applyProfile() {
     }
     if (!pick.monospace)
         std::fprintf(stderr, "lunduke-terminal: font '%s' is not monospaced\n", pick.family.c_str());
+    autoFontPx_ = pick.px;
     const int px = opts_.fontPx > 0 ? opts_.fontPx : pick.px;
     painter_.reset(new GridPainter(pick.family, px, scale_));  // px stays logical
     applyColors();

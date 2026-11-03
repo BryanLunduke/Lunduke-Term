@@ -128,6 +128,50 @@ static void testPlainRenders(const char* renderer) {
     }
 }
 
+// ---- item 3: the Font size field follows the profile ----
+static void testSettingsFontPx() {
+    ViewOptions o;
+    o.profile = "amber";
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    TerminalWindow w(o);
+    w.settingsFile = "/dev/null";
+    w.show();
+    TerminalView* v = w.newTab(true);
+    pump(300);
+    GdkEventKey e = keyEv(GDK_KEY_S, GDK_CONTROL_MASK | GDK_SHIFT_MASK);
+    CHECK(w.handleKey(&e));
+    pump(100);
+    SettingsDialog* d = w.settingsDialog();
+    CHECK(d && v);
+    if (!d || !v) return;
+    const int amberPx = v->autoFontPx();
+    const int shownAmber = d->fontPx.get_value_as_int();
+    d->profile.set_active_id("plain");
+    pump(200);
+    const int plainPx = v->autoFontPx();
+    const int shownPlain = d->fontPx.get_value_as_int();
+    std::printf("settings font size: amber uses %d px, field %d; plain uses %d px, field %d\n", amberPx, shownAmber,
+                plainPx, shownPlain);
+    CHECK(amberPx > 0 && plainPx > 0 && amberPx != plainPx);  // else the test proves nothing
+    CHECK(shownAmber == amberPx);
+    CHECK(v->profile().id == "plain");
+    CHECK(shownPlain == plainPx);
+    CHECK(w.options().fontPx == 0);  // showing the profile's size is no override
+    // An override is applied; a profile change then shows (and uses) the new profile's size.
+    d->fontPx.set_value(30);
+    pump(200);
+    CHECK(w.options().fontPx == 30);
+    CHECK(d->fontPx.get_value_as_int() == 30);
+    d->profile.set_active_id("amber");
+    pump(200);
+    std::printf("settings font size: override 30, then amber: field %d, override %d\n", d->fontPx.get_value_as_int(),
+                w.options().fontPx);
+    CHECK(d->fontPx.get_value_as_int() == amberPx);
+    CHECK(w.options().fontPx == 0);
+    CHECK(v->autoFontPx() == amberPx);
+    d->response(Gtk::RESPONSE_CLOSE);
+}
+
 int main(int argc, char** argv) {
     if (!std::getenv("DISPLAY") && !std::getenv("WAYLAND_DISPLAY")) {
         std::printf("ux_test: no display, skipped\n");
@@ -140,6 +184,7 @@ int main(int argc, char** argv) {
     app->register_application();
     testPlainRenders("gl");
     testPlainRenders("cpu");
+    testSettingsFontPx();
     if (failures) std::printf("%d failure(s)\n", failures);
     else std::printf("ux_test: all passed\n");
     return failures ? 1 : 0;

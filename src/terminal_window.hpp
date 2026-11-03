@@ -143,9 +143,14 @@ public:
 private:
     void changed();
     void updateFrameSensitivity();
+    // M6 item 3: with no size override the field shows the size the profile (and font) uses;
+    // a profile change drops the override and shows the new profile's size.
+    void syncFontPx(int overridePx);
     TerminalWindow& win_;
     ViewOptions base_;
     bool loading_ = false;
+    int autoPx_ = 0;           // the size shown when there is no override
+    std::string lastProfile_;  // profile the controls were last applied with
 };
 
 }  // namespace lterm

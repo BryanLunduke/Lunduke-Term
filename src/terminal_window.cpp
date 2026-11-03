@@ -591,7 +591,8 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     }
     fontPx.set_range(0, 96);
     fontPx.set_increments(1, 4);
-    fontPx.set_tooltip_text("Font size in pixels; 0 = the profile's size");
+    fontPx.set_tooltip_text("Font size in pixels. Shows the profile's size until you change it; choosing a "
+                           "profile switches to that profile's size (0 = the profile's size)");
     for (EffectsQuality q : {EffectsQuality::Auto, EffectsQuality::Full, EffectsQuality::Reduced, EffectsQuality::Static})
         quality.append(effectsQualityName(q), effectsQualityName(q));
     quality.set_tooltip_text("auto: reduced on software rendering; static: no animation (0% idle CPU)");
@@ -658,7 +659,8 @@ void SettingsDialog::load(const ViewOptions& o) {
         font.append(o.fontFamily, o.fontFamily + " (not monospaced or not installed)");
         font.set_active_id(o.fontFamily);
     }
-    fontPx.set_value(std::max(0, o.fontPx));
+    lastProfile_ = o.profile;
+    syncFontPx(std::max(0, o.fontPx));
     quality.set_active_id(effectsQualityName(o.effectsQuality));
     scrollback.set_value(static_cast<double>(clampScrollbackLines(o.scrollbackLines)));
     updateScrollbackNote();
@@ -672,7 +674,8 @@ ViewOptions SettingsDialog::options() const {
     ViewOptions o = base_;
     o.profile = profile.get_active_id();
     o.fontFamily = font.get_active_id();
-    o.fontPx = fontPx.get_value_as_int();
+    // The profile's own size is no override, so a later profile change keeps following it.
+    o.fontPx = fontPx.get_value_as_int() == autoPx_ ? 0 : fontPx.get_value_as_int();
     parseEffectsQuality(quality.get_active_id(), o.effectsQuality);
     o.scrollbackLines = static_cast<long long>(scrollback.get_value());
     o.tube.frame = std::stoi(frame.get_active_id().empty() ? std::string("-1") : std::string(frame.get_active_id()));
@@ -702,7 +705,23 @@ void SettingsDialog::changed() {
     if (loading_) return;
     updateFrameSensitivity();
     status.set_text("");
-    win_.applySettings(options());
+    ViewOptions o = options();
+    if (o.profile != lastProfile_) {
+        o.fontPx = 0;  // the new profile's size (pixel fonts look right only at their own sizes)
+        lastProfile_ = o.profile;
+    }
+    win_.applySettings(o);
+    syncFontPx(o.fontPx);
+}
+
+void SettingsDialog::syncFontPx(int overridePx) {
+    TerminalView* v = win_.currentView();
+    const Profile* p = findProfile(profile.get_active_id());
+    autoPx_ = v && p && v->profile().id == p->id && v->autoFontPx() > 0 ? v->autoFontPx() : (p ? profileFont(*p).px : 0);
+    const bool was = loading_;
+    loading_ = true;
+    fontPx.set_value(overridePx > 0 ? overridePx : autoPx_);
+    loading_ = was;
 }
 
 }  // namespace lterm
