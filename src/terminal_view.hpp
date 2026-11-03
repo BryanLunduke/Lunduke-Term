@@ -107,6 +107,15 @@ public:
     // Font size (logical px) the profile and font family give without a --font-px override;
     // the Settings dialog shows it while there is no override (M6 item 3).
     int autoFontPx() const { return autoFontPx_; }
+    // Perf step 1: font zoom (Ctrl+= / Ctrl++ bigger, Ctrl+- smaller, Ctrl+0 back). A per-tab
+    // runtime offset in logical px on top of the configured size (the --font-px / Settings /
+    // settings.ini override, else the profile's); never saved, and options().fontPx is untouched.
+    // A profile or font change from Settings (or Ctrl+Shift+P) starts again at zoom 0.
+    void zoomFont(int steps);  // +-1 px per step, the result clamped to kMinZoomPx..kMaxZoomPx
+    void resetFontZoom();
+    int fontZoomPx() const { return zoomPx_; }
+    int fontPxInUse() const { return fontPxInUse_; }  // the size the painter uses (logical px)
+    static constexpr int kMinZoomPx = 6, kMaxZoomPx = 96;  // 96: the Settings field's maximum
     int deviceWidth() const { return w_; }
     int deviceHeight() const { return h_; }
     // Test hook: the cell under a pointer position in logical (event) coordinates.
@@ -186,6 +195,8 @@ protected:
 private:
     std::string fontWarned_;  // the --font value already warned about
     int autoFontPx_ = 0;
+    int zoomPx_ = 0;       // perf step 1: font zoom offset (px), see zoomFont()
+    int fontPxInUse_ = 0;
     enum class Mode { Plain, Cpu, Gl };
     bool onKey(GdkEventKey* ev);
     // Review item 2: input methods (dead keys, Compose, ibus/fcitx for CJK). The IM shows its

@@ -223,6 +223,84 @@ static void testFullscreenKey() {
                 w.get_width(), w.get_height());
 }
 
+// ---- perf step 1: font zoom (Ctrl+= / Ctrl++ / Ctrl+- / Ctrl+0) ----
+static std::string fileText(const std::string& path);
+static void testFontZoom() {
+    g_mkdir_with_parents(home.c_str(), 0700);
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    TerminalWindow w(o);
+    const std::string saved = home + "/zoom-settings.ini";
+    w.settingsFile = saved;
+    w.set_default_size(800, 500);
+    w.show();
+    TerminalView* v = w.newTab(true);
+    pump(300);
+    CHECK(v);
+    if (!v) return;
+    auto key = [&](guint keyval, guint state) {
+        GdkEventKey e = keyEv(keyval, state);
+        const bool taken = v->testKey(&e);
+        pump(60);
+        return taken;
+    };
+    const guint C = GDK_CONTROL_MASK, CS = GDK_CONTROL_MASK | GDK_SHIFT_MASK;
+    const int P = v->autoFontPx();
+    const int cols0 = v->session().cols();
+    CHECK(P > 0 && v->fontPxInUse() == P);
+    CHECK(key(GDK_KEY_equal, C) && v->fontPxInUse() == P + 1);
+    CHECK(key(GDK_KEY_plus, CS) && v->fontPxInUse() == P + 2);  // Ctrl++ (Shift+= on US layouts)
+    CHECK(key(GDK_KEY_KP_Add, C) && v->fontPxInUse() == P + 3);
+    const int colsBig = v->session().cols();
+    CHECK(colsBig < cols0);  // bigger cells, fewer columns in the same window
+    CHECK(key(GDK_KEY_minus, C) && v->fontPxInUse() == P + 2);
+    CHECK(key(GDK_KEY_KP_Subtract, C) && v->fontPxInUse() == P + 1);
+    CHECK(v->options().fontPx == 0 && w.options().fontPx == 0);  // zoom is no font-px override
+    CHECK(key(GDK_KEY_0, C) && v->fontPxInUse() == P && v->fontZoomPx() == 0);
+    CHECK(v->session().cols() == cols0);
+    std::printf("font zoom: plain %d px, %d cols; Ctrl+= Ctrl++ KP+ -> %d px, %d cols; Ctrl+- KP- Ctrl+0 -> %d px, "
+                "%d cols\n", P, cols0, P + 3, colsBig, v->fontPxInUse(), v->session().cols());
+    v->zoomFont(-1000);
+    CHECK(v->fontPxInUse() == TerminalView::kMinZoomPx);
+    v->zoomFont(1000);
+    CHECK(v->fontPxInUse() == TerminalView::kMaxZoomPx);
+    CHECK(key(GDK_KEY_KP_0, C) && v->fontPxInUse() == P);
+
+    // M6 Settings font size: the field still shows the profile's size while zoomed, "Save as
+    // default" writes no font-px, an override from the field replaces the zoom, and Ctrl+0 then
+    // goes back to that override; a profile change starts at the new profile's size.
+    key(GDK_KEY_equal, C);
+    key(GDK_KEY_equal, C);
+    GdkEventKey s = keyEv(GDK_KEY_S, CS);
+    CHECK(w.handleKey(&s));
+    pump(100);
+    SettingsDialog* d = w.settingsDialog();
+    CHECK(d);
+    if (!d) return;
+    CHECK(d->fontPx.get_value_as_int() == P);
+    CHECK(v->fontPxInUse() == P + 2);  // opening Settings does not undo the zoom
+    d->save.clicked();
+    pump(100);
+    const std::string text = fileText(saved);
+    CHECK(!text.empty() && text.find("font-px") == std::string::npos);
+    d->fontPx.set_value(30);
+    pump(200);
+    CHECK(w.options().fontPx == 30 && v->fontPxInUse() == 30 && v->fontZoomPx() == 0);
+    CHECK(key(GDK_KEY_equal, C) && v->fontPxInUse() == 31 && w.options().fontPx == 30);
+    CHECK(d->fontPx.get_value_as_int() == 30);
+    CHECK(key(GDK_KEY_0, C) && v->fontPxInUse() == 30);
+    key(GDK_KEY_minus, C);
+    d->profile.set_active_id("amber");
+    pump(200);
+    const int amberPx = v->autoFontPx();
+    std::printf("font zoom + settings: field %d px while zoomed (saved without font-px: %s); override 30 -> Ctrl+= 31 "
+                "-> Ctrl+0 30; amber after zoom: %d px (profile %d px)\n",
+                P, text.find("font-px") == std::string::npos ? "yes" : "NO", v->fontPxInUse(), amberPx);
+    CHECK(v->fontPxInUse() == amberPx && v->fontZoomPx() == 0);
+    d->response(Gtk::RESPONSE_CLOSE);
+}
+
 // ---- item 1: right-click menu ----
 static bool menuShown(TerminalView& v) { return v.contextMenu().get_visible(); }
 static void closeMenu(TerminalView& v) {
@@ -728,6 +806,7 @@ int main(int argc, char** argv) {
     testPlainRenders("cpu");
     testSettingsFontPx();
     testFullscreenKey();
+    testFontZoom();
     testContextMenu();
     testContextMenuWindow();
     testSelectionHasText();

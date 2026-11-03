@@ -21,7 +21,8 @@
 // The settings dialog (Ctrl+Shift+S) writes profile, font, font-px, effects-quality,
 // scrollback-lines and frame there ("Save as default"), keeping the other keys.
 // Keys: Ctrl+Shift+T new tab, Ctrl+Shift+W close tab, Ctrl+PgUp/PgDn switch tabs,
-// Ctrl+Shift+F search the scrollback, Ctrl+Shift+S settings, F11 fullscreen.
+// Ctrl+Shift+F search the scrollback, Ctrl+Shift+S settings, F11 fullscreen,
+// Ctrl+=/Ctrl++/Ctrl+- font zoom (per tab, not saved), Ctrl+0 zoom reset.
 #include "custom_profiles.hpp"
 #include "terminal_window.hpp"
 
@@ -95,6 +96,8 @@ const char kUsage[] =
     "  Ctrl+Shift+P                  next profile\n"
     "  Shift+PgUp/PgDn/Home/End      scroll the scrollback\n"
     "  F11                           toggle fullscreen\n"
+    "  Ctrl+= or Ctrl++ / Ctrl+-     font 1 px bigger / smaller (this tab only, not saved)\n"
+    "  Ctrl+0                        font back to the profile's size (or the --font-px/Settings one)\n"
     "\n"
     "Settings: $XDG_CONFIG_HOME/lunduke-terminal/settings.ini (command-line options win).\n";
 
