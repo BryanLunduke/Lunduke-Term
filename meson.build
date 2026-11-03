@@ -79,10 +79,18 @@ view_env.set('LSAN_OPTIONS', 'suppressions=' + (meson.current_source_dir() / 'te
 view_env.set('UBSAN_OPTIONS', 'print_stacktrace=1:halt_on_error=1')
 view_env.set('LIBGL_ALWAYS_SOFTWARE', '1')
 
+# The C++ effects path is compiled without floating-point contraction, so builds that allow FMA
+# (-march=x86-64-v3, aarch64) round it like the baseline x86-64 build does (PR #11 review N1). On
+# the baseline build the flag changes no instruction.
+cpu_effects_lib = static_library('lterm-cpu-effects', 'src/cpu_effects.cpp',
+  cpp_args : meson.get_compiler('cpp').get_supported_arguments('-ffp-contract=off'),
+  dependencies : [pangocairo_dep, threads_dep, fontconfig_dep, glib_dep])
+
 effects_lib = static_library('lterm-effects',
-  'src/effects.cpp', 'src/cpu_effects.cpp', 'src/thread_pool.cpp',
+  'src/effects.cpp', 'src/thread_pool.cpp',
   'src/grid_painter.cpp', 'src/synthetic_frame.cpp', 'src/profiles.cpp',
   'src/font_resolve.cpp', 'src/effects_governor.cpp', 'src/custom_profiles.cpp',
+  link_whole : cpu_effects_lib,
   dependencies : [pangocairo_dep, threads_dep, fontconfig_dep, glib_dep])
 
 gl_lib = static_library('lterm-gl', 'src/gl_effects.cpp', 'src/gl_pipeline.cpp',

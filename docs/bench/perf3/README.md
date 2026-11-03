@@ -9,11 +9,21 @@ from sizes or from REAL numbers.
 
 | item | before (master) | after (perf-step3) | output |
 |---|---|---|---|
-| GL: bloom ping-pong | down, bloomA, bloomB (3 half-res RGBA16F) | down, bloomB; the vertical blur writes back into down | bit-identical |
+| GL: bloom ping-pong | down, bloomA, bloomB (3 half-res RGBA16F) | down, bloomB; the vertical blur writes back into down | bit-identical* |
 | GL: texture formats | RGBA16F | RGBA16F (unchanged, see the experiments below) | - |
-| CPU: warp table `warp_` | 4 floats per pixel | gone: one column table and one row table (pre-barrel coordinates are separable); the barrel is applied per pixel exactly as before | bit-identical |
-| CPU: bloom buffers | down, bloomA, bloomB, RGBA float | down, bloomB, RGB float; the blur ping-pongs down -> bloomB -> down | bit-identical |
-| CPU: static buffer `static_` | RGBA float | RGB float (nothing reads its alpha) | bit-identical |
+| CPU: warp table `warp_` | 4 floats per pixel | gone: one column table and one row table (pre-barrel coordinates are separable); the barrel is computed one row at a time (row prepass, PR #11 review) with the same operations as before | bit-identical* |
+| CPU: bloom buffers | down, bloomA, bloomB, RGBA float | down, bloomB, RGB float; the blur ping-pongs down -> bloomB -> down | bit-identical* |
+| CPU: static buffer `static_` | RGBA float | RGB float (nothing reads its alpha) | bit-identical* |
+
+\* Bit-identical without FMA, that is, identical on this build: x86-64 baseline, no FMA
+contraction. Ted's review measured a `-march=x86-64-v3` build, where GCC contracts into FMA: master
+and the PR then differed by 1 LSB in 4,522 of 20.27 G output bytes. aarch64 (where GCC contracts by
+default) was not tested. Since the PR #11 review, `src/cpu_effects.cpp` is built with
+`-ffp-contract=off` (meson.build, a separate `lterm-cpu-effects` static library). On this build the
+flag changes no instruction: the object's disassembly is identical with and without it, so it costs
+nothing here, and the 48-config render is byte-identical to master with it. With `-march=x86-64-v3`
+it takes the file's FMA instructions from 255 to 0. A v3 build was not rendered or timed, and other
+files (effects.cpp, the bezel layer) can still contract on FMA builds.
 
 In both paths the half-res burn-in, the only other reader of the downsample, now runs before
 the blur, so the downsample can hold the bloom.
@@ -86,7 +96,7 @@ dropping the third half-res texture (gl8): 2 MB at 1280x800.
 ## Screenshots
 
 See screenshots/README.md. The window captures (plain, amber GL, amber CPU) at 1280x800 and the
-offline renders are pixel-identical before and after. No visible change, so there is nothing to
+offline renders are pixel-identical before and after (on this build, x86-64 without FMA contraction; see the note under "What changed"). No visible change, so there is nothing to
 make optional.
 
 ## Window measurements
