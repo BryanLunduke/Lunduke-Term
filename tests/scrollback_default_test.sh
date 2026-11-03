@@ -11,9 +11,13 @@ trap 'rm -rf "$tmp"' EXIT
 fail=0
 
 # Prints the last sb-lines= value of a run that prints 12000 lines, then exits.
+# The output waits 1 s for the window to settle: the window manager's first resize can come after
+# the start, and when it makes the window taller libvterm pops scrollback lines back onto the
+# screen (here 17). A slower terminal is still printing then and refills the scrollback; with
+# the bundled libvterm's row rotation the 12000 lines were already done and sb-lines ended 17 short.
 run() {
     XDG_CONFIG_HOME=$1 timeout 60 "$bin" --profile plain --renderer cpu --stats-every 1 --on-exit close \
-        -e sh -c 'seq 1 12000; sleep 2' 2>&1 | sed -n 's/^stats-mem .* sb-lines=\([0-9]*\) .*/\1/p' | tail -n 1
+        -e sh -c 'sleep 1; seq 1 12000; sleep 2' 2>&1 | sed -n 's/^stats-mem .* sb-lines=\([0-9]*\) .*/\1/p' | tail -n 1
 }
 check() {  # name config-dir expected
     got=$(run "$2")

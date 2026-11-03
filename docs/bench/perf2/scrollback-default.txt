@@ -1,0 +1,24 @@
+# scrollback-default with patch 0002: timing race in the test, not a libvterm difference (REAL, 2026-11-03 CST)
+# see tests-round2.txt: master/sys/stock/repfix pass, patched fails (17 lines short), load 4-5, WM alive
+# probe (10:45-10:46 CST, own Xvfb :83 + xfwm4): the test's command, sb-lines at each 1 s stats tick (t:sb-lines),
+# stock = branch objects + libvterm-stock.a, patched = branch build; pre='sleep 1; ' delays the output 1 s.
+1 | pre='' | stock | t:sb-lines 2:5000 | load 3.74 | wm alive
+1 | pre='' | patched | t:sb-lines 2:4983 | load 3.74 | wm alive
+1 | pre='sleep 1; ' | stock | t:sb-lines 2:5000 3:5000 | load 3.76 | wm alive
+1 | pre='sleep 1; ' | patched | t:sb-lines 1:5000 2:5000 | load 3.78 | wm alive
+2 | pre='' | stock | t:sb-lines 1:5000 | load 3.78 | wm alive
+2 | pre='' | patched | t:sb-lines 1:4983 | load 3.78 | wm alive
+2 | pre='sleep 1; ' | stock | t:sb-lines 1:2837 2:5000 3:5000 | load 3.80 | wm alive
+2 | pre='sleep 1; ' | patched | t:sb-lines 1:0 2:5000 3:5000 | load 3.81 | wm alive
+3 | pre='' | stock | t:sb-lines 2:5000 | load 3.81 | wm alive
+3 | pre='' | patched | t:sb-lines 2:4983 | load 3.81 | wm alive
+3 | pre='sleep 1; ' | stock | t:sb-lines 1:5000 2:5000 | load 3.83 | wm alive
+3 | pre='sleep 1; ' | patched | t:sb-lines 1:5000 2:5000 | load 3.84 | wm alive
+stopped own xfwm4 2670170 Xvfb 2670142
+
+Reading: the window grows by 17 rows shortly after start (WM). libvterm pops 17 scrollback lines onto
+the screen. Stock is still printing and refills the capped scrollback; patched (rows rotate instead of
+being moved) has already printed all 12000 lines, so the pop is final. With the output 1 s later both
+give 5000. The same bytes + the same resize give the same scrollback in stock and patched (differential
+tests, which include resizes with a full scrollback). Fix: the test waits 1 s before printing.
+Probe script: docs/bench/perf2/sbprobe.sh.
