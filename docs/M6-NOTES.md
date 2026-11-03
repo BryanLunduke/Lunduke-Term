@@ -23,6 +23,29 @@ box has **no GPU**: every GL result is Mesa llvmpipe on Xvfb. Times are EST.
 ## Caveats
 
 - Item 2: that the GL composite reads the unflushed xlib surface is shown by the experiments and the GTK 3.24 source; why cairo-xlib holds back that particular blit is inferred, not traced inside cairo. Verified on llvmpipe/Xvfb only (no GPU, no Wayland session).
-- Item 4: an effect switched off in the editor keeps its slider value only while the editor is open; the file stores the effective value (0 = off). Ctrl+Shift+P cycles the built-in profiles only. Custom profile labels are their names.
+- Item 4: an effect switched off in the editor keeps its slider value only while the editor is open; the file stores the effective value (0 = off). Ctrl+Shift+P cycled the built-in profiles only (fixed in the PR #7 review, below). Custom profile labels are their names.
 - Screenshots come from Xvfb without a window manager and without the SVG pixbuf loader in the tools prefix, so spin-button +/- icons are drawn as grey squares; a real desktop shows the icons.
 - `review_test` failed once during development at its flood frame-cap check (line 161) and passed on 3 reruns and in every suite run above; it looks timing-sensitive under load.
+
+## PR #7 review fixes (2026-11-02, CST)
+
+Ted's review of 525f16c ("approve after one fix"), plus the editor's decision on `--list-profiles`.
+Every result is REAL (measured here, Xvfb + llvmpipe, no GPU). "Fails without the fix" runs are
+the new tests with the fix disabled in a scratch build, outputs committed.
+
+| Item | Change | Evidence |
+|---|---|---|
+| MUST FIX: a profile file skipped as broken was overwritten | `validateProfileName(name, err, renaming, dir)` also refuses a name when `dir` holds `NAME.ini` (case-insensitive) that is not a loaded profile (`unloadedProfileFile`). `saveCustomProfile` (New, Copy, editor Save) and `renameCustomProfile` pass the directory; the name dialog's live check does too, so OK is greyed out with the reason: *A profile file named "broken.ini" already exists in DIR but could not be loaded; fix or remove it by hand, or pick another name*. The status line shows the same text if a save/rename is refused. | `custom-profiles` test: `badcolor.ini` (bad colour) and `broken.ini` (not a key file) stay byte-identical after New/Copy onto `badcolor`/`BadColor` and Rename onto `broken`; the name is free once the file is removed. Without the fix: **10 failures** (`bench/m6/tests/custom-profiles-WITHOUT-fix-review.txt`). `ux_test` `testBrokenProfileFileKept` (New, Copy, Rename through the dialog): **9 of the 11** failures in `ux-WITHOUT-fixes-review.txt` |
+| Ctrl+Shift+P includes custom profiles | `nextProfileId()`: built-ins, then custom profiles, wrapping. | `ux_test` `testProfileCycle`: modern > custom:Cycle A > custom:Cycle B > plain > … > modern. Without the fix: 2 failures (it went modern > plain) |
+| ux_test removes its `/tmp/lterm-ux-test-PID` | `removeTree(home)` at the end of `main` and in an `atexit` handler (covers `exit()` paths; a crash or signal still leaves it). Only paths under `/tmp/lterm-ux-test-` are removed. | prints "config folder … removed" and checks it; without it: 1 failure ("LEFT BEHIND") |
+| Cheap Copy check | `Selection::hasText()` answers `!text().empty()` without building the text (stops at the first cell that would be copied); the context menu uses it. | `ux_test` `testSelectionHasText`: 8,000 random selections (blanks, literal spaces, wide chars, soft wraps) agree with `!text().empty()`, 0 mismatches; a 5,000 × 80 soft-wrapped selection: `hasText` read 1 cell, `text()` 400,000. The existing Copy menu tests pass unchanged. (No failing-without-fix test: the old code was correct, only slow.) |
+| Deleting the saved default | `resetDeletedDefaultProfile()`: after a custom profile is deleted, if settings.ini's `[terminal] profile` is that id it becomes `amber`; other keys and groups are kept, the write is atomic, an unreadable settings.ini is left alone (status line says so). | `ux_test` `testDeleteSavedDefault`: deleting another custom profile leaves settings.ini byte-identical; deleting the saved one gives `profile=amber` and keeps `[other] keep=yes` and `scrollback-lines`. Without the fix: 1 failure |
+| `--list-profiles` without "[default]" (editor's decision) | The list moved into `profileListText()` (used by `main`); no default marker. | `custom-profiles` test: no "default" in the output, one line per built-in and custom profile, `amber  Amber`. Before/after: `bench/m6/tests/list-profiles-no-default-review.txt`. (The captured output in `docs/TERMINUS-ON-ISO.md` is an older dated capture and was left as is.) |
+
+Tests on head 86ee8ff (source as pushed; later commits are docs only):
+- Release: **18/18 OK** (`release-86ee8ff-review.txt`).
+- ASan/UBSan with leak checking: serial **2 × 18/18 OK**, parallel (2 processes) **1 × 18/18 OK**, no leak or UBSan reports (`asan-serial-86ee8ff-review.txt`, `asan-parallel-86ee8ff-review.txt`, 21:43–21:59 CST).
+- `src/vterm_session.cpp` unchanged: no fuzz run. Governor and timing code untouched.
+
+Left as the review asked: case-only renames on case-insensitive filesystems and the other nits.
+15 older `/tmp/lterm-ux-test-*` folders from runs before this fix are still on the box (not repo files, not deleted).

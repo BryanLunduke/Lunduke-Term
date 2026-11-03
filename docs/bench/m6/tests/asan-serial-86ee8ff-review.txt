@@ -1,0 +1,49 @@
+# head 86ee8ff, build-san (address,undefined, detect_leaks=1 + tests/lsan.supp), --num-processes 1 --timeout-multiplier 4, LD_LIBRARY_PATH=lterm-tools (metainfo), Xvfb :47, llvmpipe, REAL
+## run 1 start 2026-11-02 21:43:09 CST, loadavg 2.20 2.76 2.98
+ 1/18 desktop-file    OK               0.01s
+ 2/18 metainfo        OK               0.01s
+ 3/18 effects         OK               1.75s
+ 4/18 governor        OK               0.01s
+ 5/18 profiles        OK               0.01s
+ 6/18 custom-profiles OK               0.17s
+ 7/18 painter         OK               0.30s
+ 8/18 fonts           OK               0.06s
+ 9/18 vterm           OK               0.02s
+10/18 gl-match        OK              88.47s
+11/18 session         OK               0.13s
+12/18 fixes           OK               0.45s
+13/18 fuzz-regress    OK               0.03s
+14/18 unicode         OK               0.02s
+15/18 search          OK              21.02s
+16/18 view            OK             115.06s
+17/18 review          OK              69.18s
+18/18 ux              OK              36.12s
+Ok:                 18  
+Fail:               0   
+Skipped:            0   
+Timeout:            0   
+## run 1 end 21:48:42 CST
+## run 2 start 2026-11-02 21:48:42 CST, loadavg 2.56 2.79 2.94
+ 1/18 desktop-file    OK               0.01s
+ 2/18 metainfo        OK               0.02s
+ 3/18 effects         OK               1.61s
+ 4/18 governor        OK               0.01s
+ 5/18 profiles        OK               0.02s
+ 6/18 custom-profiles OK               0.16s
+ 7/18 painter         OK               0.31s
+ 8/18 fonts           OK               0.06s
+ 9/18 vterm           OK               0.02s
+10/18 gl-match        OK              87.16s
+11/18 session         OK               0.11s
+12/18 fixes           OK               0.45s
+13/18 fuzz-regress    OK               0.03s
+14/18 unicode         OK               0.03s
+15/18 search          OK              20.08s
+16/18 view            OK             105.60s
+17/18 review          OK              69.18s
+18/18 ux              OK              35.70s
+Ok:                 18  
+Fail:               0   
+Skipped:            0   
+Timeout:            0   
+## run 2 end 21:54:03 CST
