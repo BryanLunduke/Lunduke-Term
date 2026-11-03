@@ -6,7 +6,7 @@ Work in progress, not part of LCOS 1.0.
 
 License: GPL-3.0-or-later (see `LICENSE`).
 
-## Status: M5 in progress (branch `m5-core`; M4 merged as PR #5)
+## Status: M6 in progress (branch `m6-ux`; M5 merged as PR #6)
 
 M0 (the spike, PR #1) answered the feasibility questions; see
 [`docs/M0-RECOMMENDATION.md`](docs/M0-RECOMMENDATION.md). M1 checkpoint A: the GLSL effects run on a
@@ -47,6 +47,11 @@ window (Ctrl+C gets through), input methods (dead keys, Compose, ibus/fcitx), hi
 paint nor keep their effects buffers, the cursor stops blinking after the blink timeout, closing
 a tab or window that runs a program asks first, and the scrollback maximum is 100,000 lines
 (Settings shows what that can cost; lowering it trims only when new output arrives).
+
+M6 (see [`docs/M6-NOTES.md`](docs/M6-NOTES.md)): a right-click menu (Copy, Paste, Settings); the
+plain profile and Ctrl+Shift+E no longer leave the window blank once effects have run on the GL
+path; the Settings "Font size (px)" field follows the chosen profile; custom profiles (create, copy
+from a built-in, edit every option, rename, delete); the amber entry is no longer labelled "(default)".
 
 | Part | Where |
 |---|---|
@@ -101,19 +106,29 @@ Options: `--profile ID`, `--effects`/`--no-effects`, `--renderer auto|gl|cpu`, `
 highlights), `--rgb-shift X` (CRT `rbgShift`, 0 = off), `-T/--title TEXT`, `-e COMMAND...`.
 A press on the bezel neither selects nor is reported to the application; a drag that leaves the
 glass clamps to the edge cells.
-Keys: Ctrl+Shift+E toggles effects, Ctrl+Shift+P cycles profiles, Ctrl+Shift+C/V copy/paste,
+Right-click opens a menu with Copy (greyed out without a selection), Paste and Settings; when the
+application uses the mouse, Shift+right-click opens it.
+Keys: Ctrl+Shift+E toggles effects, Ctrl+Shift+P cycles the built-in profiles, Ctrl+Shift+C/V copy/paste,
 Shift+PgUp/PgDn/Home/End scroll back, Shift+Insert or middle-click pastes PRIMARY, Shift bypasses
 mouse reporting. Tabs: Ctrl+Shift+T opens a tab (in the current tab's working directory),
 Ctrl+Shift+W closes it (asking first if a program other than the shell runs in it), Ctrl+PgUp/PgDn switch (wrapping); the tab bar shows only with two or more
 tabs, and hidden tabs do not animate. Search: Ctrl+Shift+F opens the search bar over the scrollback
 (matches highlighted, current one in orange, "N of M"); Enter goes to the next older match,
 Shift+Enter to the newer one, Escape closes. Settings: Ctrl+Shift+S opens a dialog for profile,
-font and size, effects quality, scrollback lines and bezel; changes apply live to every tab in the window and to new tabs;
+font and size (the size field shows the profile's own size; typing another size overrides it until the profile changes), effects quality, scrollback lines and bezel; changes apply live to every tab in the window and to new tabs;
 "Save as default" writes them to the settings file (other keys are kept; a corrupt file is kept as `settings.ini.corrupt` and replaced). Defaults can be set in
 `~/.config/lunduke-terminal/settings.ini` (group `[terminal]`, keys `profile`, `effects`,
 `renderer`, `threads`, `effects-fps`, `max-fps`, `pause-unfocused`, `font`, `font-px`,
 `scrollback-lines`, `login-shell`, `cwd`, `on-exit`, `bell`, `cursor-shape`, `cursor-blink`, `word-chars`,
 `effects-quality`, `cpu-budget`, `frame`, `frame-size`, `frame-color`, `frame-shininess`, `rgb-shift`).
+Custom profiles: in Settings, "New..." starts from plain, "Copy to custom profile..." starts from the
+selected profile, and "Edit...", "Rename..." and "Delete" work on custom profiles only (built-ins are
+read-only). Each one is a file `~/.config/lunduke-terminal/profiles/NAME.ini` (`$XDG_CONFIG_HOME`;
+groups `[profile]` and `[effects]`), written atomically; missing keys take plain's values, out-of-range
+values are clamped, and a file that cannot be read is skipped with a warning and left on disk. They
+are listed by `--list-profiles` and chosen with `--profile "custom:NAME"`. Names may not be empty,
+start with '.', have leading or trailing spaces, contain `/`, `\` or control characters, be longer than
+64 bytes, or match another profile (case-insensitive).
 
     build/lterm-m1-bench --paint
     LIBGL_ALWAYS_SOFTWARE=1 build/lterm-m1-bench --compare --resize-loop 60
