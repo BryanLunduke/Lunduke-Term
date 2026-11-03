@@ -1,0 +1,187 @@
+own Xvfb :82 pid 2670705, xfwm4 pid 2670723; 2026-11-03 10:46:26 CST; nproc 8
+before: /workspace/perf2-work/bin/before/lterm-m5-throughput-bench sha256 0e20b5cb4adac710 libvterm: libvterm.so.0 => /lib/x86_64-linux-gnu/libvterm.so.0
+mid: /workspace/perf2-work/bin/mid/lterm-m5-throughput-bench sha256 5f071f04275ba6f2 libvterm: static
+after: /workspace/perf2-work/bin/after/lterm-m5-throughput-bench sha256 6ac8641bfea722d8 libvterm: static
+== 10:46:26 before seq amber rep 1 | load 3.77 3.98 5.67 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 7.20 s
+10 ms timer: 543 runs, longest gap 133 ms, p99 44 ms; content frames 66 (9.2/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:46:33 mid seq amber rep 1 | load 4.35 4.10 5.70 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 7.26 s
+10 ms timer: 569 runs, longest gap 88 ms, p99 29 ms; content frames 69 (9.5/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:46:41 after seq amber rep 1 | load 4.30 4.10 5.68 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 3.44 s
+10 ms timer: 266 runs, longest gap 92 ms, p99 32 ms; content frames 30 (8.7/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:46:44 before seq plain rep 1 | load 4.30 4.10 5.68 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile plain (plain, no effects), 1280x800
+on screen after 9.67 s
+10 ms timer: 818 runs, longest gap 18 ms, p99 14 ms; content frames 410 (42.4/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:46:54 mid seq plain rep 1 | load 4.25 4.09 5.67 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile plain (plain, no effects), 1280x800
+on screen after 9.47 s
+10 ms timer: 796 runs, longest gap 41 ms, p99 14 ms; content frames 399 (42.1/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:04 after seq plain rep 1 | load 4.21 4.09 5.65 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile plain (plain, no effects), 1280x800
+on screen after 3.45 s
+10 ms timer: 308 runs, longest gap 18 ms, p99 14 ms; content frames 155 (45.0/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:07 before cat amber rep 1 | load 4.20 4.09 5.64 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 1.31 s, 6.40 MB/s
+10 ms timer: 97 runs, longest gap 104 ms, p99 104 ms; content frames 12 (9.2/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:09 mid cat amber rep 1 | load 4.20 4.09 5.64 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 1.30 s, 6.45 MB/s
+10 ms timer: 97 runs, longest gap 90 ms, p99 90 ms; content frames 12 (9.2/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:10 after cat amber rep 1 | load 4.34 4.12 5.64 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 0.89 s, 9.46 MB/s
+10 ms timer: 63 runs, longest gap 101 ms, p99 101 ms; content frames 8 (9.0/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:11 before cat plain rep 1 | load 4.34 4.12 5.64 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile plain (plain, no effects), 1280x800
+on screen after 1.29 s, 6.48 MB/s
+10 ms timer: 112 runs, longest gap 19 ms, p99 16 ms; content frames 57 (44.0/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:13 mid cat plain rep 1 | load 4.34 4.12 5.64 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile plain (plain, no effects), 1280x800
+on screen after 1.31 s, 6.40 MB/s
+10 ms timer: 112 runs, longest gap 36 ms, p99 18 ms; content frames 57 (43.5/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:14 after cat plain rep 1 | load 4.34 4.12 5.64 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile plain (plain, no effects), 1280x800
+on screen after 0.68 s, 12.34 MB/s
+10 ms timer: 58 runs, longest gap 20 ms, p99 20 ms; content frames 30 (44.1/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:15 after seq amber rep 2 | load 4.31 4.12 5.63 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 3.61 s
+10 ms timer: 274 runs, longest gap 94 ms, p99 36 ms; content frames 33 (9.1/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:19 before seq amber rep 2 | load 4.31 4.12 5.63 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 6.91 s
+10 ms timer: 538 runs, longest gap 92 ms, p99 30 ms; content frames 66 (9.6/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:26 mid seq amber rep 2 | load 4.26 4.11 5.61 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 6.85 s
+10 ms timer: 523 runs, longest gap 102 ms, p99 31 ms; content frames 63 (9.2/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:33 after seq plain rep 2 | load 4.32 4.13 5.61 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile plain (plain, no effects), 1280x800
+on screen after 3.37 s
+10 ms timer: 304 runs, longest gap 18 ms, p99 14 ms; content frames 153 (45.4/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:37 before seq plain rep 2 | load 4.46 4.16 5.61 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile plain (plain, no effects), 1280x800
+on screen after 9.50 s
+10 ms timer: 814 runs, longest gap 18 ms, p99 14 ms; content frames 408 (42.9/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:46 mid seq plain rep 2 | load 4.53 4.19 5.61 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile plain (plain, no effects), 1280x800
+on screen after 9.14 s
+10 ms timer: 776 runs, longest gap 18 ms, p99 13 ms; content frames 389 (42.6/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:55 after cat amber rep 2 | load 4.45 4.18 5.59 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 0.92 s, 9.08 MB/s
+10 ms timer: 63 runs, longest gap 97 ms, p99 97 ms; content frames 9 (9.7/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:56 before cat amber rep 2 | load 4.45 4.18 5.59 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 1.29 s, 6.50 MB/s
+10 ms timer: 95 runs, longest gap 92 ms, p99 92 ms; content frames 12 (9.3/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:58 mid cat amber rep 2 | load 4.45 4.18 5.59 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 1.31 s, 6.39 MB/s
+10 ms timer: 99 runs, longest gap 97 ms, p99 97 ms; content frames 12 (9.1/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:47:59 after cat plain rep 2 | load 4.45 4.18 5.59 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile plain (plain, no effects), 1280x800
+on screen after 0.71 s, 11.77 MB/s
+10 ms timer: 53 runs, longest gap 101 ms, p99 101 ms; content frames 28 (39.3/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:48:00 before cat plain rep 2 | load 4.50 4.19 5.58 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile plain (plain, no effects), 1280x800
+on screen after 1.27 s, 6.62 MB/s
+10 ms timer: 110 runs, longest gap 19 ms, p99 17 ms; content frames 56 (44.2/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:48:02 mid cat plain rep 2 | load 4.50 4.19 5.58 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile plain (plain, no effects), 1280x800
+on screen after 1.37 s, 6.13 MB/s
+10 ms timer: 116 runs, longest gap 19 ms, p99 18 ms; content frames 61 (44.6/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:48:03 mid seq amber rep 3 | load 4.50 4.19 5.58 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 7.24 s
+10 ms timer: 545 runs, longest gap 104 ms, p99 32 ms; content frames 64 (8.8/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:48:11 after seq amber rep 3 | load 4.42 4.19 5.57 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 3.67 s
+10 ms timer: 279 runs, longest gap 97 ms, p99 32 ms; content frames 33 (9.0/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:48:15 before seq amber rep 3 | load 4.42 4.19 5.57 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 7.35 s
+10 ms timer: 564 runs, longest gap 93 ms, p99 30 ms; content frames 64 (8.7/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:48:22 mid seq plain rep 3 | load 5.08 4.33 5.60 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile plain (plain, no effects), 1280x800
+on screen after 9.42 s
+10 ms timer: 802 runs, longest gap 19 ms, p99 14 ms; content frames 402 (42.7/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:48:32 after seq plain rep 3 | load 5.36 4.42 5.61 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile plain (plain, no effects), 1280x800
+on screen after 3.44 s
+10 ms timer: 309 runs, longest gap 24 ms, p99 13 ms; content frames 155 (45.1/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:48:35 before seq plain rep 3 | load 5.57 4.48 5.63 | before: Xvfb alive, xfwm4 alive
+seq 2000000, profile plain (plain, no effects), 1280x800
+on screen after 9.69 s
+10 ms timer: 821 runs, longest gap 21 ms, p99 14 ms; content frames 413 (42.6/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:48:45 mid cat amber rep 3 | load 5.71 4.54 5.64 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 1.42 s, 5.92 MB/s
+10 ms timer: 102 runs, longest gap 111 ms, p99 39 ms; content frames 13 (9.2/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:48:47 after cat amber rep 3 | load 5.71 4.54 5.64 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 0.91 s, 9.24 MB/s
+10 ms timer: 60 runs, longest gap 117 ms, p99 117 ms; content frames 8 (8.8/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:48:48 before cat amber rep 3 | load 5.71 4.54 5.64 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)), 1280x800
+on screen after 1.42 s, 5.91 MB/s
+10 ms timer: 99 runs, longest gap 102 ms, p99 102 ms; content frames 13 (9.2/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:48:49 mid cat plain rep 3 | load 5.71 4.54 5.64 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile plain (plain, no effects), 1280x800
+on screen after 1.34 s, 6.26 MB/s
+10 ms timer: 115 runs, longest gap 18 ms, p99 18 ms; content frames 59 (44.0/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:48:51 after cat plain rep 3 | load 5.73 4.57 5.64 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile plain (plain, no effects), 1280x800
+on screen after 0.68 s, 12.40 MB/s
+10 ms timer: 57 runs, longest gap 22 ms, p99 22 ms; content frames 31 (45.8/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 10:48:52 before cat plain rep 3 | load 5.73 4.57 5.64 | before: Xvfb alive, xfwm4 alive
+cat /workspace/perf2-work/flood8.txt, profile plain (plain, no effects), 1280x800
+on screen after 1.31 s, 6.40 MB/s
+10 ms timer: 113 runs, longest gap 19 ms, p99 19 ms; content frames 57 (43.5/s)
+exit 0 | after: Xvfb alive, xfwm4 alive
+== 2026-11-03 10:48:53 CST done | Xvfb alive, xfwm4 alive | load 5.73 4.57 5.64
+stopped own xfwm4 2670723 and Xvfb 2670705
+matrix exit 0
