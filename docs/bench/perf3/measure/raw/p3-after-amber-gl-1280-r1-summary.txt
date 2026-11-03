@@ -1,0 +1,14 @@
+startup_map_ms 507
+geom Window 6291459   Position: 10,58 (screen: 0)   Geometry: 1280x800 
+idle_cpu_pct_30s 10.2
+work_cpu_s 9.6
+seq 2745
+cat 536
+yes 2351
+done
+idle_cpu_pct_after_30s 11.5
+elapsed_before_quit_ms 77286 (quit-after 170000)
+clean_exit yes
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=55 full-repaints=1 rows-painted=909 ticks=630 median paint 0.41 ms, median effects-source 10.45 ms, median tick 3.38 ms, glyphs cached 82
+stats: quality=reduced software=1 tick-interval 262.1 ms
+wm_alive_before_after yes (xfwm4 pid 3217421)

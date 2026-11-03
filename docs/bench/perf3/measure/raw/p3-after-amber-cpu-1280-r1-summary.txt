@@ -1,0 +1,14 @@
+startup_map_ms 508
+geom Window 6291459   Position: 10,58 (screen: 0)   Geometry: 1280x800 
+idle_cpu_pct_30s 14.0
+work_cpu_s 11.2
+seq 3342
+cat 591
+yes 2621
+done
+idle_cpu_pct_after_30s 12.9
+elapsed_before_quit_ms 78411 (quit-after 170000)
+clean_exit yes
+stats: backend="amber, effects: C++ fallback (4 threads), quality reduced" content-frames=56 full-repaints=1 rows-painted=1018 ticks=485 median paint 0.64 ms, median effects-source 15.84 ms, median tick 10.84 ms, glyphs cached 87
+stats: quality=reduced software=1 tick-interval 379.2 ms
+wm_alive_before_after yes (xfwm4 pid 3217421)
