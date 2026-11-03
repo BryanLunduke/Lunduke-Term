@@ -83,8 +83,8 @@ void CpuEffects::buildFrame() {
 void CpuEffects::buildLut() {
     // Perf step 3: no per-pixel warp table (was 4 floats per pixel, 16 MB at 1280x800). Before the
     // barrel warp, the screen-local coordinate is separable (lu depends on x only, lv on y only), so
-    // only those are kept; warpAt() applies the barrel per pixel exactly as screenCoords() does, so
-    // the coordinates are bit-identical to the table's.
+    // only those are kept; warpRow() applies the barrel one row at a time exactly as screenCoords()
+    // does, so the coordinates are bit-identical to the table's (without FMA contraction).
     geom_ = frameGeometry(p_, w_, h_);
     colLu_.resize(w_);
     rowLv_.resize(h_);
@@ -95,6 +95,49 @@ void CpuEffects::buildLut() {
     for (int y = 0; y < h_; ++y) {
         const float v = (y + 0.5f) / h_;
         rowLv_[y] = (v - geom_.iy) / (1.0f - 2.0f * geom_.iy);
+    }
+}
+
+void CpuEffects::warpRow(int y, float* __restrict su, float* __restrict sv, float* __restrict dist,
+                         float* __restrict inScreen) const {
+    const float* __restrict col = colLu_.data();
+    const int w = w_;
+    const float lv0 = rowLv_[static_cast<size_t>(y)];
+    const float curv = d_.curvature, ix = geom_.ix, iy = geom_.iy;
+    const float kx = 1.0f - 2.0f * ix, ky = 1.0f - 2.0f * iy;
+    const float cy = 0.5f - lv0, cy2 = cy * cy;
+    if (curv != 0.0f) {
+        for (int x = 0; x < w; ++x) {
+            const float lu0 = col[x];
+            const float cx = 0.5f - lu0;
+            const float d = (cx * cx + cy2) * curv;
+            su[x] = ix + (lu0 - cx * (1.0f + d) * d) * kx;  // same order as barrel()
+        }
+        for (int x = 0; x < w; ++x) {
+            const float cx = 0.5f - col[x];
+            const float d = (cx * cx + cy2) * curv;
+            sv[x] = iy + (lv0 - cy * (1.0f + d) * d) * ky;
+        }
+    } else {
+        for (int x = 0; x < w; ++x) su[x] = ix + col[x] * kx;
+        for (int x = 0; x < w; ++x) sv[x] = iy + lv0 * ky;
+    }
+    if (!dist) return;
+    for (int x = 0; x < w; ++x) {
+        const float cx = 0.5f - col[x];
+        dist[x] = std::sqrt(cx * cx + cy2);
+    }
+    for (int x = 0; x < w; ++x) {
+        float lu = col[x], lv = lv0;
+        if (curv != 0.0f) {
+            const float cx = 0.5f - lu;
+            const float d = (cx * cx + cy2) * curv;
+            lu = lu - cx * (1.0f + d) * d;
+            lv = lv - cy * (1.0f + d) * d;
+        }
+        const float a = (lu >= 0.0f ? 1.0f : 0.0f) - (lu >= 1.0f ? 1.0f : 0.0f);
+        const float b = (lv >= 0.0f ? 1.0f : 0.0f) - (lv >= 1.0f ? 1.0f : 0.0f);
+        inScreen[x] = a < b ? a : b;
     }
 }
 
@@ -220,11 +263,13 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
     const float shift = rgbShiftPx(p_) / std::max(1, w_);  // uv
     pool_->parallelFor(h_, [&](int y0, int y1) {
         float t[4], b[4], rc[4], lc[4];
+        // The row's warped coordinates first, in a tight loop (no dependency on the samples below).
+        std::vector<float> rowCu(static_cast<size_t>(w_)), rowCv(static_cast<size_t>(w_));
         for (int y = y0; y < y1; ++y) {
+            warpRow(y, rowCu.data(), rowCv.data(), nullptr, nullptr);
             for (int x = 0; x < w_; ++x) {
                 const size_t idx = static_cast<size_t>(y) * w_ + x;
-                float cu, cv, lu, lv;
-                warpAt(x, y, cu, cv, lu, lv);
+                const float cu = rowCu[x], cv = rowCv[x];
                 sampleClamp<3>(src_.data(), w_, h_, cu, cv, t);
                 if (shift != 0.0f) {  // CRT rbgShift
                     sampleClamp<3>(src_.data(), w_, h_, cu + shift, cv, rc);
@@ -306,9 +351,9 @@ void CpuEffects::renderTo(float timeMs, uint8_t* out, int stride, PixelOrder ord
     pool_->parallelFor(h_, [&](int y0, int y1) {
         float nt[4] = {0, 0, 0, 0}, t[4], b[4];
         std::vector<float> rowf(frame ? static_cast<size_t>(w_) * 3 : 0);  // unquantised, for the bezel
+        std::vector<float> rowW(static_cast<size_t>(w_) * 4);  // su, sv, dist, inScreen of the row (planar)
         for (int y = y0; y < y1; ++y) {
             const float v = (y + 0.5f) / h_;
-            const float cy = 0.5f - rowLv_[y];
             float dx = 0.0f;
             if (p_.horizontalSync != 0.0f) {
                 dx = std::sin((v + timeMs * 0.001f) * fu.hsyncFreq) * fu.hsyncScale;
@@ -320,13 +365,13 @@ void CpuEffects::renderTo(float timeMs, uint8_t* out, int stride, PixelOrder ord
                        d_.glowingLine;
             }
             uint8_t* orow = out + static_cast<size_t>(y) * stride;
+            float* const rSu = rowW.data();
+            float* const rSv = rSu + w_;
+            float* const rDist = rSv + w_;
+            float* const rIn = rDist + w_;
+            warpRow(y, rSu, rSv, rDist, rIn);  // distance from the centre of the unwarped glass: noise, ambient
             for (int x = 0; x < w_; ++x) {
-                float su, sv, lu, lv;
-                warpAt(x, y, su, sv, lu, lv);
-                // Distance from the centre of the (unwarped) glass: noise and ambient light.
-                const float cx = 0.5f - colLu_[x];
-                const float dist = std::sqrt(cx * cx + cy * cy);
-                const float inScreen = std::min(step(0.0f, lu) - step(1.0f, lu), step(0.0f, lv) - step(1.0f, lv));
+                const float su = rSu[x], sv = rSv[x], dist = rDist[x], inScreen = rIn[x];
                 const float u = (x + 0.5f) / w_ + dx;
                 if (useNoise) sampleRepeat(noise, kNoiseSize, kNoiseSize, snx * u + fu.noiseOffsetX,
                                            sny * v + fu.noiseOffsetY, nt);

@@ -44,14 +44,12 @@ private:
     std::vector<float> static_;
     // Perf step 3: the screen-local coordinates before the barrel warp (separable), per column / row.
     std::vector<float> colLu_, rowLv_;
-    // Source uv (su, sv) and warped screen-local uv (lu, lv) of pixel (x, y); mirrors screenCoords().
-    void warpAt(int x, int y, float& su, float& sv, float& lu, float& lv) const {
-        lu = colLu_[static_cast<size_t>(x)];
-        lv = rowLv_[static_cast<size_t>(y)];
-        if (d_.curvature != 0.0f) barrel(lu, lv, d_.curvature, lu, lv);
-        su = geom_.ix + lu * (1.0f - 2.0f * geom_.ix);
-        sv = geom_.iy + lv * (1.0f - 2.0f * geom_.iy);
-    }
+    // Row y of the warp, mirroring screenCoords() (barrel(), then the bezel inset; same operations in
+    // the same order): source uv (su, sv) per pixel always; when non-null, the distance from the
+    // centre of the unwarped glass and the in-screen mask of the warped screen-local uv. Plain loops
+    // over locals so the compiler can vectorise them (Ted's row prepass, PR #11 review).
+    void warpRow(int y, float* __restrict su, float* __restrict sv, float* __restrict dist,
+                 float* __restrict inScreen) const;
     std::vector<float> weights_;
     // Bezel (p_.frame): the composited premultiplied layer (static base + content reflection),
     // the pixels that carry a reflection, and per row the x spans where the layer is not empty.
