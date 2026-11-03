@@ -30,4 +30,10 @@
     cell (`screen.c:190`) and damages one column past the screen. The patch stops at the margin
     and clamps the damage rect. Found by `tools/fuzz/vterm_fuzz`
     (`tests/data/fuzz/crash-46ca723d-libvterm-rep.bin`); test `libvterm-rep`.
+  - `0002-screen-ring-rotation-for-full-screen-scroll.patch`: a whole-screen scroll up (every
+    line of `seq`, `cat`, ...) moved every remaining row of the cell buffer. Each buffer now has
+    a row offset (`ringtop`) that `getcell()` adds, and such a scroll only advances it; partial
+    scrolls are unchanged, and `resize_buffer()` puts the rows back in order first. Output is
+    meant to be byte-identical to stock: tests `libvterm-t-patched` (upstream's `t/` suite) and
+    `libvterm-diff` (randomised stock vs patched comparison).
 - Local changes only; nothing has been sent upstream.

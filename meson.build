@@ -23,7 +23,8 @@ lv_sources = files(lv_dir / 'src/encoding.c', lv_dir / 'src/keyboard.c', lv_dir 
 lv_inc = include_directories(lv_dir / 'include', lv_dir / 'src')
 lv_series = files('third_party/libvterm-patches/series')
 lv_patches = files(  # in series order
-  'third_party/libvterm-patches/0001-screen-rep-wide-glyph-at-right-margin.patch')
+  'third_party/libvterm-patches/0001-screen-rep-wide-glyph-at-right-margin.patch',
+  'third_party/libvterm-patches/0002-screen-ring-rotation-for-full-screen-scroll.patch')
 lv_c_opts = ['c_std=c99', 'warning_level=1']  # upstream builds with -std=c99 -Wall
 if get_option('libvterm') == 'system'
   vterm_dep = dependency('vterm', version : '>=0.3')
@@ -37,6 +38,14 @@ else
   lv_lib = static_library('vterm-bundled', lv_sources, lv_screen_c,
     include_directories : lv_inc, override_options : lv_c_opts, pic : true)
   vterm_dep = declare_dependency(link_with : lv_lib, include_directories : include_directories(lv_dir / 'include'))
+  # Tests only: the pristine screen.c, to check the patched library against stock.
+  lv_screen_stock_c = custom_target('libvterm-screen-stock.c',
+    input : [lv_dir / 'src/screen.c'], output : 'libvterm-screen-stock.c',
+    command : [find_program('python3'), files('tools/libvterm_patch.py'), find_program('patch'),
+               '@INPUT0@', '@OUTPUT@', lv_series],
+    depend_files : [lv_series, files('tools/libvterm_patch.py')])
+  lv_stock_lib = static_library('vterm-stock', lv_sources, lv_screen_stock_c,
+    include_directories : lv_inc, override_options : lv_c_opts, build_by_default : false)
 endif
 epoxy_dep = dependency('epoxy')
 egl_dep = dependency('egl')
@@ -189,3 +198,14 @@ test('scrollback-default', find_program('sh'), args : [files('tests/scrollback_d
 test('libvterm-pristine', find_program('sha256sum'),
   args : ['--quiet', '--strict', '-c', meson.current_source_dir() / 'third_party' / 'libvterm-SHA256SUMS'],
   workdir : meson.current_source_dir() / 'third_party' / 'libvterm')
+if get_option('libvterm') == 'bundled'
+  # libvterm's own t/ suite (upstream `make test`), on the patched library and on stock.
+  lv_t_suite = files('tools/libvterm_t_suite.sh')
+  foreach v : [['patched', lv_lib], ['stock', lv_stock_lib]]
+    test('libvterm-t-' + v[0], lv_t_suite,
+      args : [executable('libvterm_harness_' + v[0], lv_dir / 't/harness.c', include_directories : lv_inc,
+                         link_with : v[1], override_options : lv_c_opts),
+              meson.current_source_dir() / lv_dir],
+      timeout : 120, env : test_env)
+  endforeach
+endif
