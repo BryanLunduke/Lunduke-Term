@@ -1,0 +1,24 @@
+# crt-default-r2 fresh pid 1998128 2026-11-02 21:50:22 EST
+55ec3e47b000-7ffd07592000 ---p 00000000 00:00 0                          [rollup]
+Rss:              196156 kB
+Pss:              156651 kB
+Pss_Dirty:         83788 kB
+Pss_Anon:          82252 kB
+Pss_File:          72863 kB
+Pss_Shmem:          1536 kB
+Shared_Clean:      55436 kB
+Shared_Dirty:       3072 kB
+Private_Clean:     55396 kB
+Private_Dirty:     82252 kB
+Referenced:       196156 kB
+Anonymous:         82252 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

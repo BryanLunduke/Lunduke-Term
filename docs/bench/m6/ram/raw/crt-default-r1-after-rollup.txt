@@ -1,0 +1,24 @@
+# crt-default-r1 after pid 1997702 2026-11-02 21:50:14 EST
+56286fb40000-7ffca14e0000 ---p 00000000 00:00 0                          [rollup]
+Rss:              200672 kB
+Pss:              161253 kB
+Pss_Dirty:         86556 kB
+Pss_Anon:          85020 kB
+Pss_File:          74697 kB
+Pss_Shmem:          1536 kB
+Shared_Clean:      55300 kB
+Shared_Dirty:       3072 kB
+Private_Clean:     57280 kB
+Private_Dirty:     85020 kB
+Referenced:       200672 kB
+Anonymous:         85020 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
