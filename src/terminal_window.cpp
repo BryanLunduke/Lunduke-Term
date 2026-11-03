@@ -318,6 +318,7 @@ TerminalView* TerminalWindow::newTab(bool first) {
     v->signalSearchChanged.connect([this, v] {
         if (v == currentView()) updateSearchStatus();
     });
+    v->signalSettingsRequested.connect([this] { showSettings(); });
 
     tabs_.push_back(std::move(tab));
     const int page = nb_.append_page(*v, tabs_.back()->label);

@@ -172,6 +172,99 @@ static void testSettingsFontPx() {
     d->response(Gtk::RESPONSE_CLOSE);
 }
 
+// ---- item 1: right-click menu ----
+static bool menuShown(TerminalView& v) { return v.contextMenu().get_visible(); }
+static void closeMenu(TerminalView& v) {
+    v.contextMenu().popdown();
+    pump(100);
+}
+
+static void testContextMenu() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-c", "echo READY-MENU; exec cat"};
+    Win w(o);
+    TerminalView& v = *w.view;
+    CHECK(v.start());
+    CHECK(waitFor([&] { return screenText(v.shownGrid()).find("READY-MENU") != std::string::npos; }, 5000));
+    CHECK(v.contextCopy().get_label() == "_Copy" && v.contextPaste().get_label() == "_Paste" &&
+          v.contextSettings().get_label() == "_Settings");
+    const double x0 = v.marginX() + 2, y0 = v.marginY() + 4;
+    // No selection: Copy is disabled, Paste and Settings are not.
+    v.testButton(true, 3, x0 + 100, y0 + 40);
+    v.testButton(false, 3, x0 + 100, y0 + 40);
+    pump(200);
+    CHECK(menuShown(v));
+    CHECK(!v.contextCopy().get_sensitive());
+    CHECK(v.contextPaste().get_sensitive() && v.contextSettings().get_sensitive());
+    closeMenu(v);
+    CHECK(!menuShown(v));
+    // Select "READY" (5 cells) with the left button, then Copy from the menu.
+    int r, c0, c1;
+    double x1 = x0;
+    CHECK(v.cellAtLogical(x0, y0, r, c0) && r == 0 && c0 == 0);
+    while (v.cellAtLogical(x1, y0, r, c1) && c1 < 4) x1 += 1;
+    v.testButton(true, 1, x0, y0);
+    v.testMotion(x1, y0, GDK_BUTTON1_MASK);
+    v.testButton(false, 1, x1, y0, GDK_BUTTON1_MASK);
+    pump(100);
+    std::printf("context menu: selection '%s'\n", v.selectionText().c_str());
+    CHECK(v.selectionText() == "READY");
+    v.testButton(true, 3, x1, y0);
+    v.testButton(false, 3, x1, y0);
+    pump(200);
+    CHECK(menuShown(v));
+    CHECK(v.contextCopy().get_sensitive());
+    Gtk::Clipboard::get(GDK_SELECTION_CLIPBOARD)->set_text("nothing");
+    v.contextCopy().activate();
+    closeMenu(v);
+    pump(100);
+    const Glib::ustring clip = Gtk::Clipboard::get(GDK_SELECTION_CLIPBOARD)->wait_for_text();
+    std::printf("context menu: Copy put '%s' on the clipboard\n", clip.c_str());
+    CHECK(clip == "READY");
+    // Paste sends the clipboard to the application (cat echoes it back).
+    Gtk::Clipboard::get(GDK_SELECTION_CLIPBOARD)->set_text("PASTED-BY-MENU");
+    pump(50);
+    v.testButton(true, 3, x0 + 100, y0 + 40);
+    v.testButton(false, 3, x0 + 100, y0 + 40);
+    pump(100);
+    v.contextPaste().activate();
+    closeMenu(v);
+    CHECK(waitFor([&] { return screenText(v.shownGrid()).find("PASTED-BY-MENU") != std::string::npos; }, 3000));
+}
+
+// The menu stays out of the way of mouse-reporting applications (Shift+right-click still opens
+// it) and "Settings" opens the window's settings dialog.
+static void testContextMenuWindow() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-c", "printf 'MOUSE-ON\\033[?1000h'; exec sleep 30"};
+    TerminalWindow w(o);
+    w.settingsFile = "/dev/null";
+    w.show();
+    TerminalView* v = w.newTab(true);
+    CHECK(v && waitFor([&] { return screenText(v->shownGrid()).find("MOUSE-ON") != std::string::npos; }, 5000));
+    if (!v) return;
+    pump(200);
+    const double x = v->marginX() + 40, y = v->marginY() + 40;
+    v->testButton(true, 3, x, y);
+    v->testButton(false, 3, x, y);
+    pump(200);
+    CHECK(!menuShown(*v));  // the application got the click
+    v->testButton(true, 3, x, y, GDK_SHIFT_MASK);
+    v->testButton(false, 3, x, y, GDK_SHIFT_MASK);
+    pump(200);
+    CHECK(menuShown(*v));
+    CHECK(!w.settingsDialog() || !w.settingsDialog()->get_visible());
+    v->contextSettings().activate();
+    closeMenu(*v);
+    pump(200);
+    CHECK(w.settingsDialog() && w.settingsDialog()->get_visible());
+    std::printf("context menu: mouse reporting %s the plain right-click; Shift+right-click menu; Settings %s\n",
+                "takes", w.settingsDialog() && w.settingsDialog()->get_visible() ? "opened the dialog" : "did nothing");
+    if (w.settingsDialog()) w.settingsDialog()->response(Gtk::RESPONSE_CLOSE);
+}
+
 int main(int argc, char** argv) {
     if (!std::getenv("DISPLAY") && !std::getenv("WAYLAND_DISPLAY")) {
         std::printf("ux_test: no display, skipped\n");
@@ -185,6 +278,8 @@ int main(int argc, char** argv) {
     testPlainRenders("gl");
     testPlainRenders("cpu");
     testSettingsFontPx();
+    testContextMenu();
+    testContextMenuWindow();
     if (failures) std::printf("%d failure(s)\n", failures);
     else std::printf("ux_test: all passed\n");
     return failures ? 1 : 0;

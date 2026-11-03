@@ -136,6 +136,13 @@ public:
     int searchIndex() const { return matchIndex_; }  // -1: none
     const std::vector<SearchMatch>& searchMatches() const { return matches_; }
     sigc::signal<void> signalSearchChanged;  // matches or the current match changed
+    // M6 item 1: right-click menu (Copy, Paste, Settings). Shift+right-click opens it while an
+    // application reports the mouse. "Settings" asks the window to show its dialog.
+    sigc::signal<void> signalSettingsRequested;
+    Gtk::Menu& contextMenu() { return menu_; }  // tests
+    Gtk::MenuItem& contextCopy() { return menuCopy_; }
+    Gtk::MenuItem& contextPaste() { return menuPaste_; }
+    Gtk::MenuItem& contextSettings() { return menuSettings_; }
     // M3: the search runs on a cache (SearchIndex) that is built in <= 4 ms idle slices; a query
     // typed before the cache is complete is pending (searchPending(), count 0) and finishes from
     // the idle worker. prepareSearch() starts building it ahead (the search bar opened).
@@ -243,6 +250,9 @@ private:
     std::unique_ptr<VtermSession> session_;
     Gtk::DrawingArea area_;
     Gtk::GLArea gl_;
+    Gtk::Menu menu_;
+    Gtk::MenuItem menuCopy_{"_Copy", true}, menuPaste_{"_Paste", true}, menuSettings_{"_Settings", true};
+    void showContextMenu(GdkEventButton* ev);
     Mode mode_ = Mode::Plain;
     bool effectsOn_ = false;
     bool glFailed_ = false;
