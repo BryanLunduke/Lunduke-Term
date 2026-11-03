@@ -6,6 +6,8 @@ Script: a copy of /workspace/lterm-review2/out/measure.sh and work.sh with only 
 Units: idle CPU = % of one core over 30 s (from /proc/PID/stat utime+stime), measured fresh (about 8 s after map) and again 3 s after the work load (seq/cat/yes). Private_Dirty is in kB from /proc/PID/smaps_rollup at the fresh and after snapshots.
 --stats texture bytes are not available: measure.sh stops the process with SIGTERM, so it prints no --stats output.
 
+**Window manager:** xfwm4 (PID 2346967) was running for round 1 (all 8 r1 runs) and for after-amber-gl-1280-r2. It died during the box stall (02:53–07:00 CST), so the other 15 runs (the rest of rounds 2 and 3) ran on Xvfb :71 **without a window manager**. You can see this in each summary's `geom` line: window at 10,58 (decorated) for the first group and 0,0 for the second. Before and after are still paired under the same conditions within each round, and the round-1 runs alone (WM running) show the same direction and size: idle CPU fresh 17.5→12.3 (gl-1280), 17.6→12.0 (gl-1024), 20.9→12.2 (cpu-1024); Private_Dirty fresh −4140 kB (gl-1280), −2864 kB (gl-1024) (REAL r1 values; the differences are DERIVED).
+
 ## REAL: every run
 
 | profile | build | run | idle CPU % fresh | idle CPU % after work | Private_Dirty fresh kB | Private_Dirty after kB | note |
