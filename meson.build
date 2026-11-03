@@ -46,6 +46,14 @@ else
     depend_files : [lv_series, files('tools/libvterm_patch.py')])
   lv_stock_lib = static_library('vterm-stock', lv_sources, lv_screen_stock_c,
     include_directories : lv_inc, override_options : lv_c_opts, build_by_default : false)
+  # Tests only: stock plus 0001 (the REP fix), for the differential test's mode b.
+  lv_screen_repfix_c = custom_target('libvterm-screen-repfix.c',
+    input : [lv_dir / 'src/screen.c'], output : 'libvterm-screen-repfix.c',
+    command : [find_program('python3'), files('tools/libvterm_patch.py'), find_program('patch'),
+               '@INPUT0@', '@OUTPUT@', lv_series, lv_patches[0]],
+    depend_files : [lv_series, lv_patches[0], files('tools/libvterm_patch.py')])
+  lv_repfix_lib = static_library('vterm-repfix', lv_sources, lv_screen_repfix_c,
+    include_directories : lv_inc, override_options : lv_c_opts, build_by_default : false)
 endif
 epoxy_dep = dependency('epoxy')
 egl_dep = dependency('egl')
@@ -208,4 +216,22 @@ if get_option('libvterm') == 'bundled'
               meson.current_source_dir() / lv_dir],
       timeout : 120, env : test_env)
   endforeach
+  # Differential test: tests/libvterm_diff.c logs every screen callback and dumps the whole
+  # screen for random escape-sequence streams; the patched build must print byte for byte what
+  # stock prints. Mode a: stock vs patched. Mode b: stock+0001 vs patched, with REP of wide
+  # glyphs and 1-column screens, which crash stock. Long runs: docs/bench/perf2/.
+  lv_diff_exe = {}
+  foreach v : [['stock', lv_stock_lib], ['repfix', lv_repfix_lib], ['patched', lv_lib]]
+    lv_diff_exe += {v[0] : executable('libvterm_diff_' + v[0], 'tests/libvterm_diff.c',
+      include_directories : include_directories(lv_dir / 'include'), link_with : v[1],
+      override_options : lv_c_opts)}
+  endforeach
+  test('libvterm-diff', find_program('python3'),
+    args : [files('tools/libvterm_diff_run.py'), lv_diff_exe['stock'], lv_diff_exe['patched'],
+            'a', '1', '100', '2000', '--timeout', '300'],
+    timeout : 900, env : test_env)
+  test('libvterm-diff-repfix', find_program('python3'),
+    args : [files('tools/libvterm_diff_run.py'), lv_diff_exe['repfix'], lv_diff_exe['patched'],
+            'b', '1', '100', '2000', '--timeout', '300'],
+    timeout : 900, env : test_env)
 endif
