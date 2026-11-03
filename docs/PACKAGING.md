@@ -91,6 +91,8 @@ libvterm is bundled (`third_party/libvterm`, 0.3.3, MIT; patches in `third_party
 applied at build time) and linked statically, so the package no longer depends on `libvterm0`.
 `debian/copyright` has its stanza. `-Dlibvterm=system` (with `libvterm-dev`) is still possible, but
 then the REP fix and the scroll speed-up are missing.
+A `-Dlibvterm=system` build still has the REP crash: a NULL dereference at screen.c:190 when REP
+repeats a wide character at the right margin (patch 0001, test `libvterm-rep`).
 
 ## Not done (on purpose)
 
