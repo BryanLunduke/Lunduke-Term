@@ -22,22 +22,24 @@ fail=0
 # window grows after the 12000 lines are out, libvterm pops scrollback lines back onto the screen
 # (here 17), and sb-lines ends that many short. settle.sh polls `stty size` every 100 ms; the
 # size has settled once it changed and then read the same 3 more times (300 ms), or when it never
-# changed within settle-ms. A size still changing after settle-ms writes "timeout" to the status
-# file, prints nothing, and the check fails with that message.
+# changed within settle-ms. The bound counts polls (settle-ms / 100), not wall time, so one stalled
+# poll (a 52 s stall was seen once under ASan) does not end the wait early. A size still changing
+# after the last poll writes "timeout" to the status file, prints nothing, and the check fails.
 cat > "$tmp/settle.sh" <<'SETTLE'
-status=$1 max_ms=$2
+status=$1 max_polls=$(( $2 / 100 ))
 now_ms() { echo $(( $(date +%s%N) / 1000000 )); }
 t0=$(now_ms)
-last=$(stty size) same=0 changed=0
+last=$(stty size) same=0 changed=0 polls=0
 while :; do
     sleep 0.1
+    polls=$((polls + 1))
     cur=$(stty size)
     if [ "$cur" = "$last" ]; then same=$((same + 1)); else same=0 changed=1 last=$cur; fi
     t=$(( $(now_ms) - t0 ))
     if [ "$changed" = 1 ] && [ "$same" -ge 3 ]; then echo "settled $cur after $t ms" > "$status"; break; fi
-    if [ "$t" -ge "$max_ms" ]; then
+    if [ "$polls" -ge "$max_polls" ]; then
         if [ "$changed" = 0 ]; then echo "settled $cur after $t ms (unchanged)" > "$status"; break; fi
-        echo "timeout: terminal size still changing after $t ms (last $cur)" > "$status"
+        echo "timeout: terminal size still changing after $polls polls, $t ms (last $cur)" > "$status"
         exit 1
     fi
 done
