@@ -9,9 +9,10 @@
 
 namespace lterm {
 
-// Review item 3: the float textures (frame-sized ones and the noise) are half floats (8 B per texel, was 16). Every
-// value is a colour in 0..~4 (bloom sums) or a burn-in level; the gl-match test checks the
-// result against the C++ reference (PSNR).
+// Review item 3: the float textures (down/bloom, burn-in, static and the noise) are half floats (8 B per
+// texel, was 16). Every value is a colour in 0..~4 (bloom sums) or a burn-in level; the gl-match test
+// checks the result against the C++ reference (PSNR). The source and output textures are RGBA8
+// (M6 item 6: the source comes from an 8-bit Cairo image).
 static constexpr GLenum kSizedFmt = GL_RGBA16F;
 
 GlPipeline::GlPipeline(const EffectParams& params)
@@ -178,7 +179,9 @@ void GlPipeline::resize(int width, int height) {
     hh_ = std::max(1, h_ / 2);
     bw_ = p_.burnInHalfRes ? hw_ : w_;
     bh_ = p_.burnInHalfRes ? hh_ : h_;
-    texSrc_ = makeTex(w_, h_, kSizedFmt, true, false);
+    // M6 item 6: the source is uploaded from an 8-bit Cairo image (glTexSubImage2D, GL_UNSIGNED_BYTE), so
+    // an 8-bit texture holds it exactly; a half-float one cost 4 more bytes per pixel (4 MB at 1280x800).
+    texSrc_ = makeTex(w_, h_, GL_RGBA8, true, false);
     texDown_ = makeTex(hw_, hh_, kSizedFmt, true, false);
     texBloomA_ = makeTex(hw_, hh_, kSizedFmt, true, false);
     texBloomB_ = makeTex(hw_, hh_, kSizedFmt, true, false);
@@ -252,7 +255,7 @@ void GlPipeline::updateSource(const uint8_t* px, int stride, PixelOrder order, f
     glDisable(GL_SCISSOR_TEST);
     glDisable(GL_DEPTH_TEST);
     if (rowEnd > rowBegin) {
-        // 8-bit rows straight into the float texture; GL normalises (c / 255) on upload.
+        // 8-bit rows straight into the RGBA8 source texture; shaders sample it as c / 255.
         glBindTexture(GL_TEXTURE_2D, texSrc_);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
         glPixelStorei(GL_UNPACK_ROW_LENGTH, stride / 4);

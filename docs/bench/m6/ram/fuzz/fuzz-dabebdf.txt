@@ -1,0 +1,42 @@
+# Fuzz run on dabebdf (fix 2), tools/fuzz/build.sh, -max_len=8192 -timeout=10 -max_total_time=600; started/ended (box clock, EST):
+Mon Nov  2 22:09:33 EST 2026
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3061511407
+INFO: Loaded 1 modules   (10175 inline 8-bit counters): 10175 [0x55dda81c4070, 0x55dda81c682f), 
+INFO: Loaded 1 PC tables (10175 PCs): 10175 [0x55dda81c6830,0x55dda81ee420), 
+INFO:        0 files found in /workspace/m6-work/fuzz/corpus
+INFO:       53 files found in tools/fuzz/seeds
+INFO: seed corpus: files: 53 min: 5b max: 6004b total: 109106b rss: 38Mb
+#56	INITED cov: 2652 ft: 8876 corp: 53/106Kb exec/s: 0 rss: 78Mb
+#57	NEW    cov: 2653 ft: 8936 corp: 54/108Kb lim: 6004 exec/s: 0 rss: 78Mb L: 2114/6004 MS: 1 CopyPart-
+#58	NEW    cov: 2655 ft: 8961 corp: 55/110Kb lim: 6004 exec/s: 0 rss: 79Mb L: 1556/6004 MS: 1 EraseBytes-
+#59	NEW    cov: 2655 ft: 8964 corp: 56/110Kb lim: 6004 exec/s: 0 rss: 79Mb L: 105/6004 MS: 1 InsertRepeatedBytes-
+#60	NEW    cov: 2655 ft: 8971 corp: 57/110Kb lim: 6004 exec/s: 0 rss: 79Mb L: 128/6004 MS: 1 ChangeByte-
+#61	NEW    cov: 2657 ft: 9050 corp: 58/114Kb lim: 6004 exec/s: 0 rss: 81Mb L: 4603/6004 MS: 1 CrossOver-
+#63	NEW    cov: 2658 ft: 9143 corp: 59/119Kb lim: 6004 exec/s: 0 rss: 82Mb L: 4517/6004 MS: 2 ChangeByte-CrossOver-
+#64	NEW    cov: 2658 ft: 9144 corp: 60/121Kb lim: 6004 exec/s: 0 rss: 82Mb L: 2420/6004 MS: 1 CopyPart-
+#65	NEW    cov: 2658 ft: 9145 corp: 61/121Kb lim: 6004 exec/s: 0 rss: 82Mb L: 125/6004 MS: 1 InsertRepeatedBytes-
+#67	NEW    cov: 2658 ft: 9169 corp: 62/122Kb lim: 6004 exec/s: 0 rss: 83Mb L: 662/6004 MS: 2 CrossOver-CrossOver-
+#68	NEW    cov: 2658 ft: 9171 corp: 63/126Kb lim: 6004 exec/s: 0 rss: 84Mb L: 4224/6004 MS: 1 InsertRepeatedBytes-
+#69	NEW    cov: 2658 ft: 9178 corp: 64/128Kb lim: 6004 exec/s: 0 rss: 84Mb L: 2079/6004 MS: 1 CopyPart-
+#70	NEW    cov: 2658 ft: 9222 corp: 65/128Kb lim: 6004 exec/s: 0 rss: 84Mb L: 133/6004 MS: 1 CrossOver-
+#71	NEW    cov: 2658 ft: 9239 corp: 66/134Kb lim: 6004 exec/s: 0 rss: 86Mb L: 6004/6004 MS: 1 CrossOver-
+#72	NEW    cov: 2658 ft: 9244 corp: 67/134Kb lim: 6004 exec/s: 0 rss: 86Mb L: 106/6004 MS: 1 ChangeBinInt-
+#75	NEW    cov: 2661 ft: 9268 corp: 68/135Kb lim: 6004 exec/s: 0 rss: 87Mb L: 1020/6004 MS: 3 EraseBytes-EraseBytes-CrossOver-
+#77	NEW    cov: 2661 ft: 9269 corp: 69/135Kb lim: 6004 exec/s: 0 rss: 88Mb L: 129/6004 MS: 2 InsertByte-ChangeBit-
+#79	NEW    cov: 2661 ft: 9270 corp: 70/135Kb lim: 6004 exec/s: 0 rss: 89Mb L: 129/6004 MS: 2 CopyPart-ChangeBinInt-
+#80	NEW    cov: 2661 ft: 9280 corp: 71/135Kb lim: 6004 exec/s: 0 rss: 90Mb L: 65/6004 MS: 1 EraseBytes-
+#83	NEW    cov: 2661 ft: 9281 corp: 72/140Kb lim: 6004 exec/s: 0 rss: 91Mb L: 4342/6004 MS: 3 ChangeBinInt-InsertRepeatedBytes-ShuffleBytes-
+#84	NEW    cov: 2661 ft: 9299 corp: 73/143Kb lim: 6004 exec/s: 0 rss: 93Mb L: 3500/6004 MS: 1 CopyPart-
+#85	NEW    cov: 2661 ft: 9331 corp: 74/145Kb lim: 6004 exec/s: 0 rss: 93Mb L: 2072/6004 MS: 1 CopyPart-
+...
+Done 75659 runs in 601 second(s)
+stat::number_of_executed_units: 75659
+stat::average_exec_per_sec:     125
+stat::new_units_added:          3975
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              550
+exit=0
+Mon Nov  2 22:19:34 EST 2026
+Mon Nov  2 22:19:34 EST 2026
+crashes dir entries: 0

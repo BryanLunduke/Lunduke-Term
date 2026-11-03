@@ -49,7 +49,7 @@ gl_lib = static_library('lterm-gl', 'src/gl_effects.cpp', 'src/gl_pipeline.cpp',
 vterm_lib = static_library('lterm-vterm', 'src/vterm_session.cpp', 'src/selection.cpp', 'src/search.cpp',
   link_with : effects_lib, dependencies : [vterm_dep, util_dep, pangocairo_dep])
 
-executable('lunduke-terminal',
+lterm_exe = executable('lunduke-terminal',
   'src/main.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep],
@@ -153,3 +153,6 @@ ux_test_exe = executable('ux_test', 'tests/ux_test.cpp', 'src/terminal_view.cpp'
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
 test('ux', ux_test_exe, env : view_env, timeout : 120, is_parallel : false)
+# Default scrollback 5000; a saved scrollback-lines is kept. Runs the binary; skips without $DISPLAY.
+test('scrollback-default', find_program('sh'), args : [files('tests/scrollback_default_test.sh'), lterm_exe],
+  env : view_env, timeout : 240, is_parallel : false)

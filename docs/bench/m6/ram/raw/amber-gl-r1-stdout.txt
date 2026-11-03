@@ -1,0 +1,8 @@
+
+(lunduke-terminal:1997607): dbind-WARNING **: 21:49:34.763: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+stats-mem t=6 tabs=1 heap-arena=83632128 heap-mmap=54284288 heap-mmap-n=22 heap-inuse=133728560 heap-free=4187856 heap-releasable=184368 sb-lines=0 sb-bytes=0 glyphs=0 glyph-bytes=0 textures=9 texture-bytes=32817152 surface-bytes=8192000 stat-samples=0
+stats-mem t=11 tabs=1 heap-arena=94388224 heap-mmap=54284288 heap-mmap-n=22 heap-inuse=145745584 heap-free=2926928 heap-releasable=34752 sb-lines=10000 sb-bytes=11415200 glyphs=57 glyph-bytes=43092 textures=9 texture-bytes=32817152 surface-bytes=8192000 stat-samples=0
+stats-mem t=16 tabs=1 heap-arena=94388224 heap-mmap=54284288 heap-mmap-n=22 heap-inuse=145751408 heap-free=2921104 heap-releasable=34752 sb-lines=10000 sb-bytes=11415200 glyphs=57 glyph-bytes=43092 textures=9 texture-bytes=32817152 surface-bytes=8192000 stat-samples=0
+stats-mem t=21 tabs=1 heap-arena=94388224 heap-mmap=54284288 heap-mmap-n=22 heap-inuse=145755120 heap-free=2917392 heap-releasable=34752 sb-lines=10000 sb-bytes=11415200 glyphs=57 glyph-bytes=43092 textures=9 texture-bytes=32817152 surface-bytes=8192000 stat-samples=0
+stats-mem t=26 tabs=1 heap-arena=94388224 heap-mmap=54284288 heap-mmap-n=22 heap-inuse=145751872 heap-free=2920640 heap-releasable=34752 sb-lines=10000 sb-bytes=11415200 glyphs=57 glyph-bytes=43092 textures=9 texture-bytes=32817152 surface-bytes=8192000 stat-samples=0

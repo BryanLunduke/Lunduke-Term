@@ -1,0 +1,24 @@
+# amber-gl-1024x768-r2 fresh pid 2026678 2026-11-02 22:19:10 EST
+55c0d57cc000-7fff99bb0000 ---p 00000000 00:00 0                          [rollup]
+Rss:              187516 kB
+Pss:              153442 kB
+Pss_Dirty:         82536 kB
+Pss_Anon:          81000 kB
+Pss_File:          70906 kB
+Pss_Shmem:          1536 kB
+Shared_Clean:      45552 kB
+Shared_Dirty:       3072 kB
+Private_Clean:     57892 kB
+Private_Dirty:     81000 kB
+Referenced:       187516 kB
+Anonymous:         81000 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

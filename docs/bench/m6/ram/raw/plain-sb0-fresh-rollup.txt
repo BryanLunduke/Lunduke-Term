@@ -1,0 +1,24 @@
+# plain-sb0 fresh pid 2000386 2026-11-02 21:53:43 EST
+559ea32a8000-7fffb1d88000 ---p 00000000 00:00 0                          [rollup]
+Rss:               53124 kB
+Pss:               36244 kB
+Pss_Dirty:         12656 kB
+Pss_Anon:          10656 kB
+Pss_File:          23588 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      19484 kB
+Shared_Dirty:       4000 kB
+Private_Clean:     18984 kB
+Private_Dirty:     10656 kB
+Referenced:        53124 kB
+Anonymous:         10656 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

@@ -1,0 +1,24 @@
+# gtk-glarea-1280 fresh pid 2002657 2026-11-02 21:57:08 EST
+564263bf1000-7ffe0864a000 ---p 00000000 00:00 0                          [rollup]
+Rss:              128216 kB
+Pss:               91510 kB
+Pss_Dirty:         40720 kB
+Pss_Anon:          38720 kB
+Pss_File:          50790 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      49892 kB
+Shared_Dirty:       4000 kB
+Private_Clean:     35604 kB
+Private_Dirty:     38720 kB
+Referenced:       128216 kB
+Anonymous:         38720 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

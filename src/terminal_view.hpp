@@ -36,7 +36,7 @@ struct ViewOptions {
     std::vector<std::string> command;
     bool stats = false;             // print frame statistics on exit
     // Checkpoint B
-    long long scrollbackLines = 10000;  // clamped to 0..kMaxScrollbackLines
+    long long scrollbackLines = static_cast<long long>(kDefaultScrollbackLines);  // clamped to 0..kMaxScrollbackLines
     bool loginShell = false;
     std::string cwd;
     std::string onExit = "hold-on-error";  // close | hold | hold-on-error

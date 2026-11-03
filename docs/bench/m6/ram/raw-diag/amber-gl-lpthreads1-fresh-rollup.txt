@@ -1,0 +1,24 @@
+# amber-gl-lpthreads1 fresh pid 2003076 2026-11-02 21:57:38 EST
+5607ba764000-7fffcf718000 ---p 00000000 00:00 0                          [rollup]
+Rss:              195900 kB
+Pss:              154750 kB
+Pss_Dirty:         94944 kB
+Pss_Anon:          92944 kB
+Pss_File:          59806 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      56456 kB
+Shared_Dirty:       4000 kB
+Private_Clean:     42500 kB
+Private_Dirty:     92944 kB
+Referenced:       195900 kB
+Anonymous:         92944 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

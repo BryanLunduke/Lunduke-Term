@@ -35,7 +35,7 @@ void CpuEffects::resize(int width, int height) {
     bw_ = p_.burnInHalfRes ? hw_ : w_;
     bh_ = p_.burnInHalfRes ? hh_ : h_;
     const size_t n = static_cast<size_t>(w_) * h_ * 4;
-    src_.assign(n, 0.0f);
+    src_.assign(n, 0);
     static_.assign(n, 0.0f);
     burn_.assign(static_cast<size_t>(bw_) * bh_ * 4, 0.0f);
     down_.assign(static_cast<size_t>(hw_) * hh_ * 4, 0.0f);
@@ -75,9 +75,10 @@ void CpuEffects::buildFrame() {
     }
     if (p_.bloom > 0 && p_.frameShininess > 0) {
         for (size_t i = 0; i < static_cast<size_t>(w_) * h_; ++i)
-            if (refl[i * 4] > 0.0f) refl_.push_back(Refl{static_cast<uint32_t>(i), refl[i * 4], refl[i * 4 + 1], refl[i * 4 + 2]});
+            if (refl[i * 4] > 0.0f)
+                refl_.push_back(Refl{static_cast<uint32_t>(i), refl[i * 4], refl[i * 4 + 1], refl[i * 4 + 2],
+                                     {frame_[i * 4], frame_[i * 4 + 1], frame_[i * 4 + 2]}});
     }
-    base_ = frame_;
 }
 
 void CpuEffects::buildLut() {
@@ -113,12 +114,12 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
         pool_->parallelFor(rowEnd - rowBegin, [&](int y0, int y1) {
             for (int y = rowBegin + y0; y < rowBegin + y1; ++y) {
                 const uint8_t* s = px + static_cast<size_t>(y) * stride;
-                float* d = &src_[static_cast<size_t>(y) * w_ * 4];
+                uint8_t* d = &src_[static_cast<size_t>(y) * w_ * 4];
                 for (int x = 0; x < w_; ++x) {
-                    d[x * 4 + 0] = s[x * 4 + (bgra ? 2 : 0)] * (1.0f / 255.0f);
-                    d[x * 4 + 1] = s[x * 4 + 1] * (1.0f / 255.0f);
-                    d[x * 4 + 2] = s[x * 4 + (bgra ? 0 : 2)] * (1.0f / 255.0f);
-                    d[x * 4 + 3] = 1.0f;
+                    d[x * 4 + 0] = s[x * 4 + (bgra ? 2 : 0)];
+                    d[x * 4 + 1] = s[x * 4 + 1];
+                    d[x * 4 + 2] = s[x * 4 + (bgra ? 0 : 2)];
+                    d[x * 4 + 3] = 255;
                 }
             }
         });
@@ -133,12 +134,14 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
                 int sy0 = clampi(2 * y, 0, h_ - 1), sy1 = clampi(2 * y + 1, 0, h_ - 1);
                 for (int x = 0; x < hw_; ++x) {
                     int sx0 = clampi(2 * x, 0, w_ - 1), sx1 = clampi(2 * x + 1, 0, w_ - 1);
-                    const float* a = &src_[(static_cast<size_t>(sy0) * w_ + sx0) * 4];
-                    const float* b = &src_[(static_cast<size_t>(sy0) * w_ + sx1) * 4];
-                    const float* c = &src_[(static_cast<size_t>(sy1) * w_ + sx0) * 4];
-                    const float* d = &src_[(static_cast<size_t>(sy1) * w_ + sx1) * 4];
+                    const uint8_t* a = &src_[(static_cast<size_t>(sy0) * w_ + sx0) * 4];
+                    const uint8_t* b = &src_[(static_cast<size_t>(sy0) * w_ + sx1) * 4];
+                    const uint8_t* c = &src_[(static_cast<size_t>(sy1) * w_ + sx0) * 4];
+                    const uint8_t* d = &src_[(static_cast<size_t>(sy1) * w_ + sx1) * 4];
                     float* o = &down_[(static_cast<size_t>(y) * hw_ + x) * 4];
-                    for (int i = 0; i < 4; ++i) o[i] = 0.25f * (a[i] + b[i] + c[i] + d[i]);
+                    for (int i = 0; i < 3; ++i)
+                        o[i] = 0.25f * (byteToFloat(a[i]) + byteToFloat(b[i]) + byteToFloat(c[i]) + byteToFloat(d[i]));
+                    o[3] = 1.0f;  // 0.25 * (1 + 1 + 1 + 1), as before
                 }
             }
         });
@@ -193,11 +196,17 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
             burnLast_ = timeMs;
         }
         const float decay0 = clamp01((burnLast_ - burnPrev_) * d_.burnInTime);
-        const float* srcBuf = p_.burnInHalfRes ? down_.data() : src_.data();
+        const bool half = p_.burnInHalfRes;
         pool_->parallelFor(bh_, [&](int y0, int y1) {
+            float full[3];
             for (size_t i = static_cast<size_t>(y0) * bw_; i < static_cast<size_t>(y1) * bw_; ++i) {
                 float* acc = &burn_[i * 4];
-                const float* t = srcBuf + i * 4;
+                const float* t = full;
+                if (half) {
+                    t = &down_[i * 4];
+                } else {
+                    for (int c = 0; c < 3; ++c) full[c] = byteToFloat(src_[i * 4 + static_cast<size_t>(c)]);
+                }
                 float decay = std::max(0.0f, decay0 - acc[3]);
                 for (int c = 0; c < 3; ++c) acc[c] = clamp01(std::max(acc[c] - decay, t[c]));
                 acc[3] = rgb2grey(t[0], t[1], t[2]);
@@ -272,7 +281,7 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
                 const Refl& r = refl_[i];
                 sampleClamp<3>(bloomA_.data(), hw_, hh_, r.u, r.v, b);
                 const float g2 = rgb2grey(b[0], b[1], b[2]);
-                const float* s0 = &base_[static_cast<size_t>(r.idx) * 4];
+                const float* s0 = r.base;
                 float* o = &frame_[static_cast<size_t>(r.idx) * 4];
                 o[0] = s0[0] + r.w * std::min(std::max(fc.r * mixf(g2, b[0], chroma) * bs, 0.0f), 0.5f) * sb;
                 o[1] = s0[1] + r.w * std::min(std::max(fc.g * mixf(g2, b[1], chroma) * bs, 0.0f), 0.5f) * sb;

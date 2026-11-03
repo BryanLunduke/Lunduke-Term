@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <poll.h>
+#include <random>
 #include <string>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -505,9 +506,157 @@ static void testReports() {
     CHECK_EQ(s.takeOutput(), std::string("\x1b[?1;2c"));
 }
 
+// M6 item 6: scrollback cells are packed (16 bytes). Every field must survive the trip into the
+// history (read back through fillGrid) and back onto the screen (sb_popline on a resize).
+static std::vector<VTermScreenCell> screenRow(VtermSession& s, int row, int cols) {
+    VTermScreen* scr = vterm_obtain_screen(s.vtermForCheck());
+    std::vector<VTermScreenCell> v(static_cast<size_t>(cols));
+    for (int c = 0; c < cols; ++c) vterm_screen_get_cell(scr, VTermPos{row, c}, &v[static_cast<size_t>(c)]);
+    return v;
+}
+
+// libvterm itself (master too) does not restore two things on sb_popline: DECDWL/DECDHL (line
+// attributes it reports from its line info) and the colours of a wide character's right half
+// (chars[0] == -1). Those are left out; everything we store is compared.
+static bool sameCell(const VTermScreenCell& a, const VTermScreenCell& b) {
+    const bool rightHalf = a.chars[0] == static_cast<uint32_t>(-1);
+    for (int i = 0; i < VTERM_MAX_CHARS_PER_CELL; ++i) {
+        if (a.chars[i] != b.chars[i]) return false;
+        if (a.chars[i] == 0) break;
+    }
+    const VTermScreenCellAttrs &x = a.attrs, &y = b.attrs;
+    return a.width == b.width && x.bold == y.bold && x.underline == y.underline && x.italic == y.italic &&
+           x.blink == y.blink && x.reverse == y.reverse && x.conceal == y.conceal && x.strike == y.strike &&
+           x.font == y.font && x.small == y.small && x.baseline == y.baseline &&
+           (rightHalf || (std::memcmp(&a.fg, &b.fg, sizeof a.fg) == 0 && std::memcmp(&a.bg, &b.bg, sizeof a.bg) == 0));
+}
+
+static void testScrollbackCells() {
+    const int cols = 40;
+    // Row 0: every attribute, indexed / 256 / RGB / default colours, combining marks (1 and 5),
+    // a wide character, then the same on a DECDWL line (row 1) and a DECDHL top half (row 2).
+    const std::string row0 =
+        "\x1b[1;3;4:2;5;7;8;9;13mA\x1b[0m"
+        "\x1b[31;42mB\x1b[38;5;200;48;2;10;20;30mC\x1b[0m"
+        "e\xcc\x81"                                              // e + U+0301
+        "a\xcc\x80\xcc\x81\xcc\x82\xcc\x83\xcc\x84"              // a + 5 combining marks
+        "\xe6\xbc\xa2"                                           // U+6F22 (wide)
+        "\x1b[73mx\x1b[74my\x1b[0m\x1b[4:3mz\x1b[0m";
+    VtermSession s(4, cols);
+    s.feed(row0 + "\r\n\x1b#6\x1b[1mDW\x1b[0m\r\n\x1b#3TOP\r\n");
+    std::vector<std::vector<VTermScreenCell>> before;
+    for (int r = 0; r < 3; ++r) before.push_back(screenRow(s, r, cols));
+    // The input really sets what is compared.
+    const VTermScreenCell& A = before[0][0];
+    CHECK(A.attrs.bold && A.attrs.italic && A.attrs.underline == 2 && A.attrs.blink && A.attrs.reverse &&
+          A.attrs.conceal && A.attrs.strike && A.attrs.font == 3);
+    CHECK(VTERM_COLOR_IS_RGB(&before[0][2].bg) && VTERM_COLOR_IS_INDEXED(&before[0][2].fg));
+    CHECK(before[0][4].chars[5] != 0 && before[0][3].chars[1] != 0 && before[0][5].width == 2);
+    CHECK(before[0][7].attrs.small && before[0][7].attrs.baseline && before[0][9].attrs.underline == 3);
+    Grid gBefore;
+    s.fillGrid(gBefore, 0);
+    // Push the three rows into the history.
+    s.feed("\r\n\r\n\r\n\r\n");
+    CHECK(s.scrollbackSize() >= 3);
+    Grid gHist;
+    // History: the three rows and the empty fourth; scrolled back by 4 they are rows 0..2.
+    CHECK_EQ(s.scrollbackSize(), size_t(4));
+    s.fillGrid(gHist, 4);
+    for (int r = 0; r < 3; ++r)
+        for (int c = 0; c < cols; ++c) CHECK(gHist.at(r, c) == gBefore.at(r, c));
+    // Growing the window pulls the history back onto the screen (sb_popline).
+    s.resize(8, cols);
+    CHECK_EQ(s.scrollbackSize(), size_t(0));
+    int bad = 0;
+    for (int r = 0; r < 3; ++r) {
+        const auto after = screenRow(s, r, cols);
+        for (int c = 0; c < cols; ++c) {
+            const VTermScreenCell &x = after[static_cast<size_t>(c)], &y = before[static_cast<size_t>(r)][static_cast<size_t>(c)];
+            if (!sameCell(x, y)) {
+                ++bad;
+                if (getenv("DBG")) std::fprintf(stderr, "r%d c%d ch %x/%x w %d/%d dwl %d/%d dhl %d/%d fg %d/%d bg %d/%d\n", r, c, x.chars[0], y.chars[0], x.width, y.width, x.attrs.dwl, y.attrs.dwl, x.attrs.dhl, y.attrs.dhl, x.fg.type, y.fg.type, x.bg.type, y.bg.type);
+            }
+        }
+    }
+    CHECK_EQ(bad, 0);
+    // The packed size: 16 bytes per stored cell (VTermScreenCell is 40).
+    CHECK_EQ(VtermSession::scrollbackBytesFull(1, 100) - VtermSession::scrollbackBytesFull(1, 0), size_t(1600));
+    std::printf("scrollback cells: %d rows x %d columns round-tripped; %zu bytes per 100-column line\n", 3, cols,
+                VtermSession::scrollbackBytesFull(1, 100));
+}
+
+// M6 review: unpackCell found a cell's extra combining characters by scanning the line's whole
+// side array (quadratic in the line width). sbExtraFind is a binary search; it must return what
+// the linear scan returned, and random lines full of combining marks must come back unchanged.
+static size_t sbExtraFindLinear(const uint32_t* extra, size_t records, uint32_t col) {
+    for (size_t r = 0; r < records; ++r)
+        if (extra[r * VTERM_MAX_CHARS_PER_CELL] == col) return r;
+    return records;
+}
+
+static void testScrollbackCombiningLookup() {
+    std::mt19937 rng(20261102);
+    int mismatches = 0;
+    for (int trial = 0; trial < 3000; ++trial) {
+        std::vector<uint32_t> extra;
+        size_t records = 0;
+        for (uint32_t col = 0; col < 300; ++col) {
+            if (rng() % 4 != 0) continue;
+            extra.push_back(col);
+            for (int k = 1; k < VTERM_MAX_CHARS_PER_CELL; ++k) extra.push_back(rng());
+            ++records;
+        }
+        for (uint32_t col = 0; col <= 301; ++col)
+            mismatches += sbExtraFind(extra.data(), records, col) != sbExtraFindLinear(extra.data(), records, col);
+    }
+    CHECK_EQ(mismatches, 0);
+
+    const int rows = 6, cols = 200, lines = 300;
+    VtermSession s(rows, cols);
+    static const char* marks[] = {"\xcc\x81", "\xcc\x80", "\xcc\x82", "\xcc\x83", "\xcc\x88", "\xcd\xa3"};
+    std::vector<std::vector<std::string>> want;  // cellText: base + every combining character
+    long combining = 0;
+    for (int i = 0; i < lines; ++i) {
+        std::string line;
+        int width = 0;
+        while (width < cols - 10) {
+            const unsigned k = rng() % 10;
+            if (k == 0) line += "\x1b[" + std::to_string(31 + rng() % 7) + "m";
+            if (k == 1) {
+                line += "\xe6\xbc\xa2";  // wide
+                width += 2;
+                continue;
+            }
+            line += static_cast<char>('a' + rng() % 26);
+            const unsigned n = rng() % 7;  // 0..6 marks; libvterm keeps up to 5
+            for (unsigned m = 0; m < n; ++m) line += marks[rng() % 6];
+            ++width;
+        }
+        s.feed(line + "\x1b[0m");
+        std::vector<std::string> row(static_cast<size_t>(cols));
+        for (int c = 0; c < cols; ++c) {
+            row[static_cast<size_t>(c)] = s.cellText(i, c);
+            combining += row[static_cast<size_t>(c)].size() > 3;  // a 1-3 byte base plus at least one mark
+        }
+        want.push_back(row);
+        s.feed("\r\n");
+    }
+    for (int i = 0; i < rows; ++i) s.feed("\r\n");
+    CHECK(s.firstLine() <= 0 && s.topLine() >= lines);
+    int bad = 0;
+    for (int i = 0; i < lines; ++i)
+        for (int c = 0; c < cols; ++c) bad += s.cellText(i, c) != want[static_cast<size_t>(i)][static_cast<size_t>(c)];
+    CHECK_EQ(bad, 0);
+    CHECK(combining > lines * 50);  // the streams really are full of combining cells
+    std::printf("scrollback combining lookup: 3000 random side arrays match the linear scan; %d lines, %ld combining cells round-tripped\n",
+                lines, combining);
+}
+
 int main() {
     testReports();
     testScrollback();
+    testScrollbackCells();
+    testScrollbackCombiningLookup();
     testSelection();
     testPointToCell();
     testScale2Mapping();

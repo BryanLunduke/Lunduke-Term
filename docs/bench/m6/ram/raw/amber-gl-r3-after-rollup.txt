@@ -1,0 +1,24 @@
+# amber-gl-r3 after pid 1999076 2026-11-02 21:52:05 EST
+558461ac4000-7ffe62539000 ---p 00000000 00:00 0                          [rollup]
+Rss:              206708 kB
+Pss:              165523 kB
+Pss_Dirty:        105840 kB
+Pss_Anon:         103840 kB
+Pss_File:          59683 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      56492 kB
+Shared_Dirty:       4000 kB
+Private_Clean:     42376 kB
+Private_Dirty:    103840 kB
+Referenced:       206708 kB
+Anonymous:        103840 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

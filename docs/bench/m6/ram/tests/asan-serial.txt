@@ -1,0 +1,25 @@
+# source 2e8c4b0, build-san (address,undefined, detect_leaks=1 + tests/lsan.supp), --num-processes 1 --timeout-multiplier 4, Xvfb :44, llvmpipe, REAL
+## run 1 start 2026-11-02 22:46:53 CST, loadavg 2.14 1.91 1.87
+ 1/19 desktop-file       OK               0.01s
+ 2/19 metainfo           OK               0.02s
+ 3/19 effects            OK               1.50s
+ 4/19 governor           OK               0.01s
+ 5/19 profiles           OK               0.01s
+ 6/19 custom-profiles    OK               0.18s
+ 7/19 painter            OK               0.29s
+ 8/19 fonts              OK               0.05s
+ 9/19 vterm              OK               0.01s
+10/19 gl-match           OK              85.95s
+11/19 session            OK               0.79s
+12/19 fixes              OK               0.43s
+13/19 fuzz-regress       OK               0.03s
+14/19 unicode            OK               0.02s
+15/19 search             OK              21.30s
+16/19 view               OK             106.84s
+17/19 review             OK              69.96s
+18/19 ux                 OK              35.57s
+19/19 scrollback-default OK              17.78s
+Ok:                 19  
+Fail:               0   
+Timeout:            0   
+sanitizer reports in testlog: 0

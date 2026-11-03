@@ -1,0 +1,24 @@
+# sb5000-amber-cpu-bezel fresh pid 2263647 2026-11-02 22:40:23 CST
+5588445f9000-7fff73ebd000 ---p 00000000 00:00 0                          [rollup]
+Rss:              133112 kB
+Pss:              118100 kB
+Pss_Dirty:         93008 kB
+Pss_Anon:          91008 kB
+Pss_File:          25092 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      15216 kB
+Shared_Dirty:       4000 kB
+Private_Clean:     22888 kB
+Private_Dirty:     91008 kB
+Referenced:       133112 kB
+Anonymous:         91008 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

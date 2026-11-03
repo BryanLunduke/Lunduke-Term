@@ -1,0 +1,24 @@
+# amber-cpu fresh pid 1999761 2026-11-02 21:52:43 EST
+559883f5a000-7ffce93da000 ---p 00000000 00:00 0                          [rollup]
+Rss:              125184 kB
+Pss:              108125 kB
+Pss_Dirty:         84532 kB
+Pss_Anon:          82532 kB
+Pss_File:          23593 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      19748 kB
+Shared_Dirty:       4000 kB
+Private_Clean:     18904 kB
+Private_Dirty:     82532 kB
+Referenced:       125184 kB
+Anonymous:         82532 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

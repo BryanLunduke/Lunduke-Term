@@ -31,7 +31,7 @@ private:
     DerivedParams d_;
     std::unique_ptr<ThreadPool> pool_;
     int w_ = 0, h_ = 0, hw_ = 0, hh_ = 0;
-    std::vector<float> src_;      // RGBA float, source
+    std::vector<uint8_t> src_;    // RGBA bytes (R,G,B,255), source; read as k/255 (M6: was float, 16 B/px)
     std::vector<float> down_;             // half res RGBA: 2x2 box downsample of src_
     std::vector<float> bloomA_, bloomB_;  // half res RGBA
     std::vector<float> burn_;             // RGBA float (rgb + prev mask), full or half res
@@ -42,8 +42,9 @@ private:
     // Bezel (p_.frame): the composited premultiplied layer (static base + content reflection),
     // the pixels that carry a reflection, and per row the x spans where the layer is not empty.
     FrameGeometry geom_;
-    std::vector<float> frame_, base_;
-    struct Refl { uint32_t idx; float w, u, v; };
+    // M6: the static base of a reflecting pixel lives in its Refl (was a full copy of frame_).
+    std::vector<float> frame_;
+    struct Refl { uint32_t idx; float w, u, v; float base[3]; };
     std::vector<Refl> refl_;
     std::vector<std::vector<std::pair<int, int>>> spans_;
     void buildFrame();

@@ -1,0 +1,24 @@
+# after-amber-gl fresh pid 2171754 2026-11-02 22:38:01 EST
+559c5cbca000-7ffffe923000 ---p 00000000 00:00 0                          [rollup]
+Rss:              198184 kB
+Pss:              147518 kB
+Pss_Dirty:         91356 kB
+Pss_Anon:          89356 kB
+Pss_File:          56162 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      66256 kB
+Shared_Dirty:       4000 kB
+Private_Clean:     38572 kB
+Private_Dirty:     89356 kB
+Referenced:       198184 kB
+Anonymous:         89356 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

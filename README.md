@@ -97,7 +97,7 @@ Without them, the profiles fall back to DejaVu Sans Mono. See `docs/FONTS.md`.
 
 Options: `--profile ID`, `--effects`/`--no-effects`, `--renderer auto|gl|cpu`, `--threads N`
 (C++ fallback), `--effects-fps N` (default 20), `--max-fps N` (default 60), `--no-pause-unfocused`,
-`--font FAMILY`, `--font-px N`, `--size WxH`, `--quit-after MS`, `--stats`, `--scrollback N`,
+`--font FAMILY`, `--font-px N`, `--size WxH`, `--quit-after MS`, `--stats`, `--scrollback N` (default 5000 lines; a `scrollback-lines` already saved in settings.ini is used as is),
 `--login`, `--cwd DIR`, `--on-exit close|hold|hold-on-error`, `--hold`, `--bell visual,urgent,audible|none`,
 `--cursor-shape block|underline|bar`, `--cursor-blink`/`--no-cursor-blink`,
 `--effects-quality auto|full|reduced|static`, `--cpu-budget PCT`, `--frame`/`--no-frame`

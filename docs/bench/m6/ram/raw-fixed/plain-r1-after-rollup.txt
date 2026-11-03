@@ -1,0 +1,24 @@
+# plain-r1 after pid 2023408 2026-11-02 22:14:03 EST
+557c68200000-7ffe16f6d000 ---p 00000000 00:00 0                          [rollup]
+Rss:               58820 kB
+Pss:               41134 kB
+Pss_Dirty:         18304 kB
+Pss_Anon:          16304 kB
+Pss_File:          22830 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      20676 kB
+Shared_Dirty:       4000 kB
+Private_Clean:     17840 kB
+Private_Dirty:     16304 kB
+Referenced:        58820 kB
+Anonymous:         16304 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

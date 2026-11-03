@@ -1,0 +1,15 @@
+label                        snap        Rss      Pss Priv_Dirty  Shared_Cl
+amber-gl-1024x768            after    196952   156222      94748      56512
+amber-gl-1024x768            fresh    186492   145762      84288      56512
+amber-gl-640x400             after    174332   134629      74308      56548
+amber-gl-640x400             fresh    164316   124612      64292      56548
+amber-gl-lpthreads1          after    206524   165375     103568      56456
+amber-gl-lpthreads1          fresh    195900   154750      92944      56456
+amber-gl-softpipe            after    292980   251853     206040      56408
+amber-gl-softpipe            fresh    257536   216410     170596      56408
+amber-gl-static              after    206664   165457     103528      56532
+amber-gl-static              fresh    196024   154880      92952      56468
+gtk-glarea-1280              after    128216    91510      38720      49892
+gtk-glarea-1280              fresh    128216    91510      38720      49892
+plain-1024x768               after     62872    46425      21416      19484
+plain-1024x768               fresh     51124    34677       9668      19484

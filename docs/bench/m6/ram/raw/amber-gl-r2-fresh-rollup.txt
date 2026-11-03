@@ -1,0 +1,24 @@
+# amber-gl-r2 fresh pid 1998320 2026-11-02 21:50:42 EST
+55b849804000-7ffed1579000 ---p 00000000 00:00 0                          [rollup]
+Rss:              196308 kB
+Pss:              137532 kB
+Pss_Dirty:         95216 kB
+Pss_Anon:          93216 kB
+Pss_File:          42316 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      83276 kB
+Shared_Dirty:       4000 kB
+Private_Clean:     15816 kB
+Private_Dirty:     93216 kB
+Referenced:       196308 kB
+Anonymous:         93216 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

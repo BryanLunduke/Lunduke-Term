@@ -1,0 +1,12 @@
+
+(lunduke-terminal:2003340): dbind-WARNING **: 21:58:00.219: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+lunduke-terminal: amber, effects: GLSL on softpipe, quality reduced (software rendering)
+stats-mem t=6 tabs=1 heap-arena=32014336 heap-mmap=463249408 heap-mmap-n=1561 heap-inuse=494431552 heap-free=832192 heap-releasable=134432 sb-lines=0 sb-bytes=0 glyphs=0 glyph-bytes=0 textures=9 texture-bytes=32817152 surface-bytes=8192000 stat-samples=0
+lunduke-terminal: animation needs 122% of a core at 1 fps (1217 ms per frame); effects-quality auto -> static, retry in 10.0 s
+lunduke-terminal: amber, effects: GLSL on softpipe, quality static (software rendering)
+stats-mem t=12 tabs=1 heap-arena=63410176 heap-mmap=432496640 heap-mmap-n=1553 heap-inuse=495242016 heap-free=664800 heap-releasable=99712 sb-lines=4253 sb-bytes=772296 glyphs=0 glyph-bytes=0 textures=9 texture-bytes=32817152 surface-bytes=8192000 stat-samples=0
+stats-mem t=21 tabs=1 heap-arena=64663552 heap-mmap=432496640 heap-mmap-n=1553 heap-inuse=496541360 heap-free=618832 heap-releasable=40016 sb-lines=8348 sb-bytes=1558536 glyphs=10 glyph-bytes=7560 textures=9 texture-bytes=32817152 surface-bytes=8192000 stat-samples=0
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: amber, effects: GLSL on softpipe, quality reduced (software rendering)
+lunduke-terminal: animation needs 123% of a core at 1 fps (1227 ms per frame); effects-quality auto -> static, retry in 20.0 s
+lunduke-terminal: amber, effects: GLSL on softpipe, quality static (software rendering)

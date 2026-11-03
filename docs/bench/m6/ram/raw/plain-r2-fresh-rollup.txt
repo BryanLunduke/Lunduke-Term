@@ -1,0 +1,24 @@
+# plain-r2 fresh pid 1998661 2026-11-02 21:51:12 EST
+5631f13ff000-7fff62a25000 ---p 00000000 00:00 0                          [rollup]
+Rss:               53240 kB
+Pss:               33285 kB
+Pss_Dirty:         12844 kB
+Pss_Anon:          10844 kB
+Pss_File:          20441 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      23920 kB
+Shared_Dirty:       4000 kB
+Private_Clean:     14476 kB
+Private_Dirty:     10844 kB
+Referenced:        53240 kB
+Anonymous:         10844 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

@@ -1,0 +1,24 @@
+# plain-r3 fresh pid 2024583 2026-11-02 22:15:41 EST
+5575b2b3e000-7ffdf7784000 ---p 00000000 00:00 0                          [rollup]
+Rss:               52944 kB
+Pss:               35456 kB
+Pss_Dirty:         12660 kB
+Pss_Anon:          10660 kB
+Pss_File:          22796 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      20316 kB
+Shared_Dirty:       4000 kB
+Private_Clean:     17968 kB
+Private_Dirty:     10660 kB
+Referenced:        52944 kB
+Anonymous:         10660 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

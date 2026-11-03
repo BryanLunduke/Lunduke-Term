@@ -1,0 +1,24 @@
+# amber-gl-noeffects fresh pid 2025744 2026-11-02 22:17:42 EST
+56138e5bb000-7ffdcadf5000 ---p 00000000 00:00 0                          [rollup]
+Rss:               52676 kB
+Pss:               39838 kB
+Pss_Dirty:         12372 kB
+Pss_Anon:          10372 kB
+Pss_File:          27466 kB
+Pss_Shmem:          2000 kB
+Shared_Clean:      13452 kB
+Shared_Dirty:       4000 kB
+Private_Clean:     24852 kB
+Private_Dirty:     10372 kB
+Referenced:        52676 kB
+Anonymous:         10372 kB
+KSM:                   0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB

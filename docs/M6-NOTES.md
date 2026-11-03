@@ -49,3 +49,16 @@ Tests on head 86ee8ff (source as pushed; later commits are docs only):
 
 Left as the review asked: case-only renames on case-insensitive filesystems and the other nits.
 15 older `/tmp/lterm-ux-test-*` folders from runs before this fix are still on the box (not repo files, not deleted).
+
+## Default scrollback 5000 (PR #8 review, branch `m6-ram`, 2026-11-02, CST)
+
+Editor's order via Ted: the default scrollback is 5000 lines (was 10,000). `kDefaultScrollbackLines`
+in `src/vterm_session.hpp` feeds both `ViewOptions::scrollbackLines` and the session's initial limit;
+built-in and custom profiles carry no scrollback setting. A `scrollback-lines` already saved in
+settings.ini is read as before and never migrated or rewritten. Tests: `fixes` checks the constant
+and a new session's limit; `scrollback-default` runs the binary with no settings, with settings
+lacking the key (5000 both), and with saved 10000 and 7000 (kept; files byte-identical after the
+run). RAM with the new default: `bench/m6/ram/summary-sb5000.txt` (REAL; -1.4 to -2.5 MB after
+output against the same build at 10,000). Earlier M1–M6 notes and the RAM captures that say 10,000
+or 10000 are dated measurements and are left as they were.
+

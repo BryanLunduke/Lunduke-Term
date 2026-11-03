@@ -1,0 +1,26 @@
+# source 2e8c4b0, build-san, --num-processes 2 --timeout-multiplier 4, Xvfb :44, llvmpipe, REAL
+## run 1 start 2026-11-02 22:52:34 CST, loadavg 1.13 1.56 1.75
+ 1/19 desktop-file       OK               0.01s
+ 2/19 metainfo           OK               0.02s
+ 3/19 governor           OK               0.01s
+ 4/19 profiles           OK               0.02s
+ 5/19 custom-profiles    OK               0.17s
+ 6/19 painter            OK               0.30s
+ 7/19 fonts              OK               0.06s
+ 8/19 vterm              OK               0.02s
+ 9/19 effects            OK               1.62s
+10/19 session            OK               0.80s
+11/19 fixes              OK               0.45s
+12/19 fuzz-regress       OK               0.03s
+13/19 unicode            OK               0.02s
+14/19 search             OK              21.17s
+15/19 gl-match           OK              86.35s
+16/19 view               OK             114.56s
+17/19 review             OK              68.70s
+18/19 ux                 OK              35.31s
+19/19 scrollback-default OK              17.61s
+Ok:                 19  
+Fail:               0   
+Timeout:            0   
+sanitizer reports in testlog: 0
+end 2026-11-02 22:57:57 CST

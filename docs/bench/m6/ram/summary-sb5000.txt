@@ -1,0 +1,27 @@
+label                        snap        Rss      Pss Priv_Dirty  Shared_Cl
+head-sb10000-amber-cpu-bezel-r1 after    139492   114159      96984      29124
+head-sb10000-amber-cpu-bezel-r1 fresh    133456   108184      91012      29060
+head-sb10000-amber-cpu-bezel-r2 after    139740   114300      97028      29264
+head-sb10000-amber-cpu-bezel-r2 fresh    133592   108276      91008      29120
+sb5000-amber-cpu             after    116336   101193      74084      15416
+sb5000-amber-cpu-bezel       after    136600   121588      94496      15216
+sb5000-amber-cpu-bezel       fresh    133112   118100      91008      15216
+sb5000-amber-cpu             fresh    112732    97652      70544      15352
+sb5000-amber-gl              after    200032   141863      91948      71712
+sb5000-amber-gl              fresh    197468   139352      89448      71648
+sb5000-plain                 after     57356    32115      14868      29040
+sb5000-plain                 fresh     53156    27916      10668      29040
+
+# REAL: release build of the head with the 5000-line default (source = this commit), measured
+# 2026-11-02 22:33-22:41 CST, one run each (head-sb10000 bezel: 2 runs, --scrollback 10000), empty
+# config, 1280x800. The sb5000 amber-cpu and amber-cpu-bezel runs were repeated at 22:39-22:41 CST
+# because the first attempt was disturbed (measure.sh was edited while it ran); only the repeat is here.
+# stats-mem at t=26: sb-lines 5000 in every sb5000 run, 10000 in head-sb10000.
+#
+# Private_Dirty kB fresh / after; change vs the same profile at scrollback 10,000 (DERIVED):
+#   amber GL     89,448 / 91,948   vs final 89,356 / 93,656 (raw-fix34)   after -1.7 MB
+#   amber C++    70,544 / 74,084   vs final 70,532 / 75,940               after -1.9 MB
+#   plain        10,668 / 14,868   vs final 10,664 / 16,316               after -1.4 MB
+#   C++ + bezel  91,008 / 94,496   vs head-sb10000 91,012 / 96,984 and 91,008 / 97,028 (this dir),
+#                                  final 91,004 / 96,384 (raw-fix34)      after -2.5 MB (vs this dir)
+# Fresh is the same within 0.1 MB: no output, so no history yet.
