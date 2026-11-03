@@ -3,6 +3,8 @@
 #pragma once
 
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 
 namespace lterm {
 
@@ -31,6 +33,30 @@ inline void sampleClamp(const float* tex, int w, int h, float u, float v, float 
     for (int i = 0; i < N; ++i) {
         float top = a[i] + (b[i] - a[i]) * fx;
         float bot = c[i] + (d[i] - c[i]) * fx;
+        out[i] = top + (bot - top) * fy;
+    }
+}
+
+// tex: RGBA bytes, each tap read as k * (1/255), the value the float version would hold. N <= 3
+// here: the byte alpha is not a float alpha.
+inline float byteToFloat(uint8_t k) { return k * (1.0f / 255.0f); }
+template <int N = 3>
+inline void sampleClamp(const uint8_t* tex, int w, int h, float u, float v, float out[4]) {
+    static_assert(N <= 3, "byte textures carry no float alpha");
+    float x = u * w - 0.5f, y = v * h - 0.5f;
+    int x0 = ifloor(x), y0 = ifloor(y);
+    float fx = x - static_cast<float>(x0), fy = y - static_cast<float>(y0);
+    int x1 = clampi(x0 + 1, 0, w - 1), y1 = clampi(y0 + 1, 0, h - 1);
+    x0 = clampi(x0, 0, w - 1);
+    y0 = clampi(y0, 0, h - 1);
+    const uint8_t* a = tex + (static_cast<size_t>(y0) * w + x0) * 4;
+    const uint8_t* b = tex + (static_cast<size_t>(y0) * w + x1) * 4;
+    const uint8_t* c = tex + (static_cast<size_t>(y1) * w + x0) * 4;
+    const uint8_t* d = tex + (static_cast<size_t>(y1) * w + x1) * 4;
+    for (int i = 0; i < N; ++i) {
+        const float fa = byteToFloat(a[i]), fb = byteToFloat(b[i]), fc = byteToFloat(c[i]), fd = byteToFloat(d[i]);
+        float top = fa + (fb - fa) * fx;
+        float bot = fc + (fd - fc) * fx;
         out[i] = top + (bot - top) * fy;
     }
 }

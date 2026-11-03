@@ -1,0 +1,17 @@
+# C++ effects output hashes, 640x400, 6 parameter sets x 4 frames (bezel, rgbShift, full-res burn-in, bloom off).
+# old = src at 094697e (master + fixes 1-2; cpu_effects.cpp unchanged from dc3b544), new = fix 3+4. g++ -O2, built as in build-exact.sh.
+## old
+set 0: bb3fef50a95070ed
+set 1: f58e5139b06be4b6
+set 2: 5256bdc1cb041d78
+set 3: 4383600ac5c8053c
+set 4: 2ebf0d9ee7af54c4
+set 5: bc52e6f9205cc731
+## new
+set 0: bb3fef50a95070ed
+set 1: f58e5139b06be4b6
+set 2: 5256bdc1cb041d78
+set 3: 4383600ac5c8053c
+set 4: 2ebf0d9ee7af54c4
+set 5: bc52e6f9205cc731
+## cmp: identical
