@@ -1,0 +1,17 @@
+# M6 item 2 root-cause experiments (REAL, Xvfb :44, llvmpipe, release ux_test, src at dc3b544 = unfixed)
+# Numbers: bright pixels (max channel >= 110) of the 640x400 = 256000-pixel window: amber / Ctrl+Shift+E off / profile plain
+GDK_GL unset              gl: 17192 / 256000 / 256000   cpu: 16623 / 13945 / 6419   -> bug, GL path only
+GDK_GL=software-draw-surface gl: 16700 / 13945 / 6419   cpu: 17227 / 13945 / 6419   -> no bug
+GDK_GL=software-draw-gl   gl: 17192 / 256000 / 256000   -> bug
+unrealize GtkGLArea on leaving GL mode (gtk_widget_unrealize): gl 17192 / 256000 / 256000 -> bug (paint context stays on the toplevel)
+gdk_window_ensure_native on the DrawingArea: broke both paths (rejected)
+queue_draw / resize after switching: still all background
+# Reading GTK 3.24.49 gdk/gdkwindow.c (gdk_window_begin/end_paint_internal) and gdk/x11/gdkglcontext-x11.c:
+# once a GtkGLArea is realized the toplevel keeps a gl_paint_context, so every later frame is composited
+# with GL, and the cairo paint surface (an xlib surface) is read with GLX_EXT_texture_from_pixmap
+# (gdk_x11_gl_context_texture_from_surface). GDK_GL=software-draw-surface disables exactly that read and
+# removes the bug, so the read path is the culprit. The non-GL path does a cairo_paint from the paint
+# surface (which flushes it); the GL path does not flush it. Flushing the target after our blit in
+# TerminalView::onDraw (cairo_surface_flush(cairo_get_target(cr))) fixes it: see item2-ux-with-fix.txt.
+# DERIVED/caveat: why exactly cairo-xlib leaves the image-surface blit unsubmitted (SHM/deferred upload) is
+# inferred, not traced inside cairo.

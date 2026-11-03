@@ -609,6 +609,12 @@ bool TerminalView::onDraw(const Cairo::RefPtr<Cairo::Context>& cr) {
     cairo_pattern_set_filter(cairo_get_source(c), CAIRO_FILTER_NEAREST);
     cairo_paint(c);
     cairo_restore(c);
+    // Once a GtkGLArea has been realized in this toplevel, GDK composites every later frame
+    // through GL, reading the cairo paint surface back with GLX_EXT_texture_from_pixmap
+    // without flushing it first. cairo-xlib may still hold this blit (an image-surface
+    // upload) unsubmitted, so the frame shows only the theme background (M6 item 2:
+    // Plain profile / Ctrl+Shift+E blank after GL). Flush it to the X server here.
+    cairo_surface_flush(cairo_get_target(c));
     return true;
 }
 

@@ -144,3 +144,8 @@ review_test_exe = executable('review_test', 'tests/review_test.cpp', 'src/termin
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
 test('review', review_test_exe, env : view_env, timeout : 120, is_parallel : false)
+# M6 PR A: context menu, plain rendering, settings font size, custom profiles. Skips without $DISPLAY.
+ux_test_exe = executable('ux_test', 'tests/ux_test.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp',
+  include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
+  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
+test('ux', ux_test_exe, env : view_env, timeout : 120, is_parallel : false)
