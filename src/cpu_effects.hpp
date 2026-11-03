@@ -32,12 +32,23 @@ private:
     std::unique_ptr<ThreadPool> pool_;
     int w_ = 0, h_ = 0, hw_ = 0, hh_ = 0;
     std::vector<uint8_t> src_;    // RGBA bytes (R,G,B,255), source; read as k/255 (M6: was float, 16 B/px)
-    std::vector<float> down_;             // half res RGBA: 2x2 box downsample of src_
-    std::vector<float> bloomA_, bloomB_;  // half res RGBA
+    // Half res RGB (perf step 3: no alpha, nothing reads one): the 2x2 box downsample of src_, then
+    // (after the burn-in has read it) the bloom; bloomB_ is the blur's horizontal pass.
+    std::vector<float> down_;
+    std::vector<float> bloomB_;
     std::vector<float> burn_;             // RGBA float (rgb + prev mask), full or half res
     int bw_ = 0, bh_ = 0;                 // burn-in buffer size
     std::vector<float> static_;   // RGBA float, static pass output
-    std::vector<float> warp_;     // per pixel: staticCoords.u, .v, distance, inScreen
+    // Perf step 3: the screen-local coordinates before the barrel warp (separable), per column / row.
+    std::vector<float> colLu_, rowLv_;
+    // Source uv (su, sv) and warped screen-local uv (lu, lv) of pixel (x, y); mirrors screenCoords().
+    void warpAt(int x, int y, float& su, float& sv, float& lu, float& lv) const {
+        lu = colLu_[static_cast<size_t>(x)];
+        lv = rowLv_[static_cast<size_t>(y)];
+        if (d_.curvature != 0.0f) barrel(lu, lv, d_.curvature, lu, lv);
+        su = geom_.ix + lu * (1.0f - 2.0f * geom_.ix);
+        sv = geom_.iy + lv * (1.0f - 2.0f * geom_.iy);
+    }
     std::vector<float> weights_;
     // Bezel (p_.frame): the composited premultiplied layer (static base + content reflection),
     // the pixels that carry a reflection, and per row the x spans where the layer is not empty.

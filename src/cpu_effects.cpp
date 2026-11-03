@@ -38,8 +38,7 @@ void CpuEffects::resize(int width, int height) {
     src_.assign(n, 0);
     static_.assign(n, 0.0f);
     burn_.assign(static_cast<size_t>(bw_) * bh_ * 4, 0.0f);
-    down_.assign(static_cast<size_t>(hw_) * hh_ * 4, 0.0f);
-    bloomA_.assign(down_.size(), 0.0f);
+    down_.assign(static_cast<size_t>(hw_) * hh_ * 3, 0.0f);
     bloomB_.assign(down_.size(), 0.0f);
     haveBurn_ = false;
     buildLut();
@@ -82,26 +81,21 @@ void CpuEffects::buildFrame() {
 }
 
 void CpuEffects::buildLut() {
+    // Perf step 3: no per-pixel warp table (was 4 floats per pixel, 16 MB at 1280x800). Before the
+    // barrel warp, the screen-local coordinate is separable (lu depends on x only, lv on y only), so
+    // only those are kept; warpAt() applies the barrel per pixel exactly as screenCoords() does, so
+    // the coordinates are bit-identical to the table's.
     geom_ = frameGeometry(p_, w_, h_);
-    warp_.assign(static_cast<size_t>(w_) * h_ * 4, 0.0f);
-    pool_->parallelFor(h_, [&](int y0, int y1) {
-        for (int y = y0; y < y1; ++y) {
-            float v = (y + 0.5f) / h_;
-            for (int x = 0; x < w_; ++x) {
-                float u = (x + 0.5f) / w_;
-                float* o = &warp_[(static_cast<size_t>(y) * w_ + x) * 4];
-                float su, sv, lu, lv;
-                screenCoords(u, v, geom_, d_.curvature, su, sv, lu, lv);
-                // Distance from the centre of the (unwarped) glass: noise and ambient light.
-                float cx = 0.5f - (u - geom_.ix) / (1.0f - 2.0f * geom_.ix);
-                float cy = 0.5f - (v - geom_.iy) / (1.0f - 2.0f * geom_.iy);
-                o[0] = su;
-                o[1] = sv;
-                o[2] = std::sqrt(cx * cx + cy * cy);
-                o[3] = std::min(step(0.0f, lu) - step(1.0f, lu), step(0.0f, lv) - step(1.0f, lv));
-            }
-        }
-    });
+    colLu_.resize(w_);
+    rowLv_.resize(h_);
+    for (int x = 0; x < w_; ++x) {
+        const float u = (x + 0.5f) / w_;
+        colLu_[x] = (u - geom_.ix) / (1.0f - 2.0f * geom_.ix);
+    }
+    for (int y = 0; y < h_; ++y) {
+        const float v = (y + 0.5f) / h_;
+        rowLv_[y] = (v - geom_.iy) / (1.0f - 2.0f * geom_.iy);
+    }
 }
 
 void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, float timeMs, int rowBegin,
@@ -138,53 +132,17 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
                     const uint8_t* b = &src_[(static_cast<size_t>(sy0) * w_ + sx1) * 4];
                     const uint8_t* c = &src_[(static_cast<size_t>(sy1) * w_ + sx0) * 4];
                     const uint8_t* d = &src_[(static_cast<size_t>(sy1) * w_ + sx1) * 4];
-                    float* o = &down_[(static_cast<size_t>(y) * hw_ + x) * 4];
+                    float* o = &down_[(static_cast<size_t>(y) * hw_ + x) * 3];
                     for (int i = 0; i < 3; ++i)
                         o[i] = 0.25f * (byteToFloat(a[i]) + byteToFloat(b[i]) + byteToFloat(c[i]) + byteToFloat(d[i]));
-                    o[3] = 1.0f;  // 0.25 * (1 + 1 + 1 + 1), as before
                 }
             }
         });
     }
-    // Bloom: separable Gaussian with transparent border, down_ -> B -> A.
-    if (p_.bloom > 0) {
-        const int R = p_.bloomRadiusHalfRes;
-        // horizontal: A -> B
-        pool_->parallelFor(hh_, [&](int y0, int y1) {
-            for (int y = y0; y < y1; ++y) {
-                const float* row = &down_[static_cast<size_t>(y) * hw_ * 4];
-                for (int x = 0; x < hw_; ++x) {
-                    float acc[4] = {0, 0, 0, 0};
-                    for (int k = -R; k <= R; ++k) {
-                        int sx = x + k;
-                        if (sx < 0 || sx >= hw_) continue;
-                        float wk = weights_[k < 0 ? -k : k];
-                        const float* s = row + static_cast<size_t>(sx) * 4;
-                        for (int i = 0; i < 4; ++i) acc[i] += wk * s[i];
-                    }
-                    float* o = &bloomB_[(static_cast<size_t>(y) * hw_ + x) * 4];
-                    for (int i = 0; i < 4; ++i) o[i] = acc[i];
-                }
-            }
-        });
-        // vertical: B -> A
-        pool_->parallelFor(hh_, [&](int y0, int y1) {
-            for (int y = y0; y < y1; ++y) {
-                float* o = &bloomA_[static_cast<size_t>(y) * hw_ * 4];
-                std::fill(o, o + hw_ * 4, 0.0f);
-                for (int k = -R; k <= R; ++k) {
-                    int sy = y + k;
-                    if (sy < 0 || sy >= hh_) continue;
-                    float wk = weights_[k < 0 ? -k : k];
-                    const float* s = &bloomB_[static_cast<size_t>(sy) * hw_ * 4];
-                    for (int i = 0; i < hw_ * 4; ++i) o[i] += wk * s[i];
-                }
-            }
-        });
-    }
-    lastBloomMs = msSince(t0);
+    const double downMs = msSince(t0);
 
-    // 2. burn-in feedback (source space, pointwise).
+    // 2. burn-in feedback (source space, pointwise). Perf step 3: before the blur, which now
+    // overwrites down_ with the bloom (the half-res burn-in reads the plain downsample).
     t0 = Clock::now();
     if (p_.burnIn > 0) {
         if (!haveBurn_) {
@@ -203,7 +161,7 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
                 float* acc = &burn_[i * 4];
                 const float* t = full;
                 if (half) {
-                    t = &down_[i * 4];
+                    t = &down_[i * 3];
                 } else {
                     for (int c = 0; c < 3; ++c) full[c] = byteToFloat(src_[i * 4 + static_cast<size_t>(c)]);
                 }
@@ -215,6 +173,46 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
     }
     lastBurnMs = msSince(t0);
 
+    // Bloom: separable Gaussian with transparent border, down_ -> bloomB_ -> down_ (RGB: nothing
+    // reads a bloom alpha).
+    t0 = Clock::now();
+    if (p_.bloom > 0) {
+        const int R = p_.bloomRadiusHalfRes;
+        // horizontal: down_ -> B
+        pool_->parallelFor(hh_, [&](int y0, int y1) {
+            for (int y = y0; y < y1; ++y) {
+                const float* row = &down_[static_cast<size_t>(y) * hw_ * 3];
+                for (int x = 0; x < hw_; ++x) {
+                    float acc[3] = {0, 0, 0};
+                    for (int k = -R; k <= R; ++k) {
+                        int sx = x + k;
+                        if (sx < 0 || sx >= hw_) continue;
+                        float wk = weights_[k < 0 ? -k : k];
+                        const float* s = row + static_cast<size_t>(sx) * 3;
+                        for (int i = 0; i < 3; ++i) acc[i] += wk * s[i];
+                    }
+                    float* o = &bloomB_[(static_cast<size_t>(y) * hw_ + x) * 3];
+                    for (int i = 0; i < 3; ++i) o[i] = acc[i];
+                }
+            }
+        });
+        // vertical: B -> down_ (every row of B is complete, so down_ can be overwritten)
+        pool_->parallelFor(hh_, [&](int y0, int y1) {
+            for (int y = y0; y < y1; ++y) {
+                float* o = &down_[static_cast<size_t>(y) * hw_ * 3];
+                std::fill(o, o + hw_ * 3, 0.0f);
+                for (int k = -R; k <= R; ++k) {
+                    int sy = y + k;
+                    if (sy < 0 || sy >= hh_) continue;
+                    float wk = weights_[k < 0 ? -k : k];
+                    const float* s = &bloomB_[static_cast<size_t>(sy) * hw_ * 3];
+                    for (int i = 0; i < hw_ * 3; ++i) o[i] += wk * s[i];
+                }
+            }
+        });
+    }
+    lastBloomMs = downMs + msSince(t0);
+
     // 3. static pass.
     t0 = Clock::now();
     const Rgb fc = p_.fontColor, bg = p_.backgroundColor;
@@ -225,8 +223,8 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
         for (int y = y0; y < y1; ++y) {
             for (int x = 0; x < w_; ++x) {
                 const size_t idx = static_cast<size_t>(y) * w_ + x;
-                const float* lut = &warp_[idx * 4];
-                const float cu = lut[0], cv = lut[1];
+                float cu, cv, lu, lv;
+                warpAt(x, y, cu, cv, lu, lv);
                 sampleClamp<3>(src_.data(), w_, h_, cu, cv, t);
                 if (shift != 0.0f) {  // CRT rbgShift
                     sampleClamp<3>(src_.data(), w_, h_, cu + shift, cv, rc);
@@ -255,7 +253,7 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
                 float o1 = mixf(bg.g, fg, g * mask);
                 float o2 = mixf(bg.b, fb, g * mask);
                 if (p_.bloom > 0) {
-                    sampleClamp<3>(bloomA_.data(), hw_, hh_, cu, cv, b);
+                    sampleClamp<3, 3>(down_.data(), hw_, hh_, cu, cv, b);
                     const float bg2 = rgb2grey(b[0], b[1], b[2]);
                     float br = fc.r * mixf(bg2, b[0], chroma);
                     float bgc = fc.g * mixf(bg2, b[1], chroma);
@@ -279,7 +277,7 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
             float b[4];
             for (int i = i0; i < i1; ++i) {
                 const Refl& r = refl_[i];
-                sampleClamp<3>(bloomA_.data(), hw_, hh_, r.u, r.v, b);
+                sampleClamp<3, 3>(down_.data(), hw_, hh_, r.u, r.v, b);
                 const float g2 = rgb2grey(b[0], b[1], b[2]);
                 const float* s0 = r.base;
                 float* o = &frame_[static_cast<size_t>(r.idx) * 4];
@@ -311,6 +309,7 @@ void CpuEffects::renderTo(float timeMs, uint8_t* out, int stride, PixelOrder ord
         std::vector<float> rowf(frame ? static_cast<size_t>(w_) * 3 : 0);  // unquantised, for the bezel
         for (int y = y0; y < y1; ++y) {
             const float v = (y + 0.5f) / h_;
+            const float cy = 0.5f - rowLv_[y];
             float dx = 0.0f;
             if (p_.horizontalSync != 0.0f) {
                 dx = std::sin((v + timeMs * 0.001f) * fu.hsyncFreq) * fu.hsyncScale;
@@ -323,9 +322,12 @@ void CpuEffects::renderTo(float timeMs, uint8_t* out, int stride, PixelOrder ord
             }
             uint8_t* orow = out + static_cast<size_t>(y) * stride;
             for (int x = 0; x < w_; ++x) {
-                const size_t idx = static_cast<size_t>(y) * w_ + x;
-                const float* lut = &warp_[idx * 4];
-                const float su = lut[0], sv = lut[1], dist = lut[2], inScreen = lut[3];
+                float su, sv, lu, lv;
+                warpAt(x, y, su, sv, lu, lv);
+                // Distance from the centre of the (unwarped) glass: noise and ambient light.
+                const float cx = 0.5f - colLu_[x];
+                const float dist = std::sqrt(cx * cx + cy * cy);
+                const float inScreen = std::min(step(0.0f, lu) - step(1.0f, lu), step(0.0f, lv) - step(1.0f, lv));
                 const float u = (x + 0.5f) / w_ + dx;
                 if (useNoise) sampleRepeat(noise, kNoiseSize, kNoiseSize, snx * u + fu.noiseOffsetX,
                                            sny * v + fu.noiseOffsetY, nt);

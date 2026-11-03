@@ -17,19 +17,20 @@ inline int ifloor(float x) {
 }
 inline float ffloor(float x) { return static_cast<float>(ifloor(x)); }
 
-// tex: RGBA float. Writes the first N channels (N <= 4).
-template <int N = 4>
+// tex: float, C channels per texel (RGBA by default). Writes the first N channels (N <= C).
+template <int N = 4, int C = 4>
 inline void sampleClamp(const float* tex, int w, int h, float u, float v, float out[4]) {
+    static_assert(N <= C, "N channels of a C-channel texture");
     float x = u * w - 0.5f, y = v * h - 0.5f;
     int x0 = ifloor(x), y0 = ifloor(y);
     float fx = x - static_cast<float>(x0), fy = y - static_cast<float>(y0);
     int x1 = clampi(x0 + 1, 0, w - 1), y1 = clampi(y0 + 1, 0, h - 1);
     x0 = clampi(x0, 0, w - 1);
     y0 = clampi(y0, 0, h - 1);
-    const float* a = tex + (static_cast<size_t>(y0) * w + x0) * 4;
-    const float* b = tex + (static_cast<size_t>(y0) * w + x1) * 4;
-    const float* c = tex + (static_cast<size_t>(y1) * w + x0) * 4;
-    const float* d = tex + (static_cast<size_t>(y1) * w + x1) * 4;
+    const float* a = tex + (static_cast<size_t>(y0) * w + x0) * C;
+    const float* b = tex + (static_cast<size_t>(y0) * w + x1) * C;
+    const float* c = tex + (static_cast<size_t>(y1) * w + x0) * C;
+    const float* d = tex + (static_cast<size_t>(y1) * w + x1) * C;
     for (int i = 0; i < N; ++i) {
         float top = a[i] + (b[i] - a[i]) * fx;
         float bot = c[i] + (d[i] - c[i]) * fx;
