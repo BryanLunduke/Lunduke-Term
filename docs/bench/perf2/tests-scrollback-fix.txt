@@ -1,0 +1,36 @@
+scrollback-default test fix (PR #10 review nit 1): stty-size polling instead of a fixed sleep 1
+=============================================================================================
+All numbers REAL (measured on the box, 2026-11-03 CST). No GPU (llvmpipe/CPU renderer).
+Display: own Xvfb :63 (1920x1200x24) + xfwm4 --compositor=off. Script: tests/scrollback_default_test.sh
+at ce8cbc4, run directly with the meson view_env variables (ASAN/LSAN/UBSAN_OPTIONS, LIBGL_ALWAYS_SOFTWARE=1)
+and the settle bound meson passes (3000 ms release, 10000 ms sanitized).
+
+Chosen approach: polling. A fixed --size does not help: the size change the old sleep 1 covered
+is not the window manager's but the terminal's own first allocation: the pty starts at 24x80
+(terminal_view.cpp:74) and becomes 41x127 (1280x800 default window) ~50 ms later; 41-24 = 17,
+the 17 lines that went missing. Probe (release, 3 runs, stty size every 50 ms for 2 s): 1 sample
+24 80, then 39 samples 41 127; no later resize by xfwm4 seen.
+
+Build dirs: build (release, bundled/patched libvterm), build-sys (release, -Dlibvterm=system = stock
+0.3.3), build-san / build-san-sys (debug, -Db_sanitize=address,undefined, bundled / system).
+
+Repeat runs, serial, 20 each (each run = 4 checks: 5000, 5000, 10000, 7000 + 2 file-unchanged cmp):
+  new patched release serial: 20/20 passed
+  new stock release serial: 20/20 passed
+  new patched asan serial: 20/20 passed
+  new stock asan serial: 20/20 passed
+  Every check got the wanted sb-lines value (80/80 per build kind); the size settled at 41 127 in
+  every check, after 411-520 ms (wall clock, includes the 300 ms stability window); the
+  "never changed" fallback was never taken.
+  Wall time per run: release 10-11 s, ASan 18-23 s, except three runs that took 135-264 s and
+  still passed (stock release runs 17 and 20, stock ASan run 2): each check is under a 60 s
+  timeout, so the time went outside the terminal runs; cause not found (box-wide stall?).
+
+First version (a189688, wall-clock bound), discarded: patched ASan serial 19/20. The failing run:
+  check 2 reported "timeout: terminal size still changing after 52020 ms (last 41 127)", i.e.
+  one poll of the loop took ~52 s (the size was already 41 127); the other 3 checks of that run
+  passed. ce8cbc4 bounds the wait by poll count (settle-ms / 100) so one stalled poll no longer
+  ends the wait. With the first version also: patched release 20/20, stock release 20/20, stock
+  ASan 5/5 (stopped there to switch versions).
+
+Not done: repeat runs under extra CPU load, and the old fixed-sleep version (not measured).
