@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # try.sh TAG : rebuild release, render, compare vs master
 set -e
 tag=$1; cd /workspace/lunduke-term-perf3; ninja -C build -j2 > /workspace/perf3-work/b-$tag.log 2>&1 || { tail -20 /workspace/perf3-work/b-$tag.log; exit 1; }

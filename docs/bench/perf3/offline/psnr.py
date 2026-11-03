@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 # psnr.py DIR_A [DIR_B]: per config, CPU vs GL PSNR in A (and B), and A vs B per back-end.
 import sys, os, glob, math
 import numpy as np

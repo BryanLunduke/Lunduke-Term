@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 import re,glob,statistics as st,os
 R='/workspace/perf3-work/measure/raw'
 def pd(f):

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # perf3 copy of tools/m2-shot.sh: BIN DISPLAY OUT.png ARGS...  (fixed text, static quality, own display)
 bin=$1; disp=$2; out=$3; shift 3
 export DISPLAY=$disp LIBGL_ALWAYS_SOFTWARE=1

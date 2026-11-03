@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Perf step 3 before/after: own Xvfb :93 + xfwm4, 1280x800, amber GL and amber CPU,
 # 3 interleaved rounds (before/after on odd rounds, after/before on even rounds).
 # BEFORE = master 6283674 release build, AFTER = perf-step3 release build (copied binaries).

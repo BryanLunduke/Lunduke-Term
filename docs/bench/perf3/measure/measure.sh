@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # perf3 copy of perf1-work/measure.sh. Changes: paths; the terminal gets --quit-after so it exits
 # cleanly and prints its --stats line (median tick / effects-source / paint ms); the process is
 # only killed if it has not exited 60 s after the planned quit.

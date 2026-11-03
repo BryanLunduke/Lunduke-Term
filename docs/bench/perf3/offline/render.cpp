@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // perf3 scratch: render the gl-match configurations on CPU and GL, write raw RGBA per config.
 #include "cpu_effects.hpp"
 #include "gl_effects.hpp"

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 cd /workspace/lunduke-term-perf3
 [ -e /tmp/.X11-unix/X94 ] && { echo ":94 busy"; exit 1; }
 Xvfb :94 -screen 0 1920x1200x24 +extension GLX +render -noreset >/dev/null 2>&1 & XP=$!; sleep 2

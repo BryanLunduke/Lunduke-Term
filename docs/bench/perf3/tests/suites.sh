@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # perf3 copy of perf1-work/suites.sh: own Xvfb :94 (no WM needed by the tests), 27 tests with appstreamcli.
 cd /workspace/lunduke-term-perf3
 [ -e /tmp/.X11-unix/X94 ] && { echo "display :94 exists, not mine"; exit 1; }

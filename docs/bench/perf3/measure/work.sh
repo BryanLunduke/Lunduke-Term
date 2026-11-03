@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # runs inside the terminal: waits for a go file, runs fixed outputs, logs ns timings
 lab=$1; d=/tmp/perf3-run
 while [ ! -e $d/$lab.go ]; do sleep 0.2; done
