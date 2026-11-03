@@ -16,6 +16,7 @@
 #include <vector>
 #include <signal.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <algorithm>
 #include <cmath>
 
@@ -278,6 +279,12 @@ static void testFontZoom() {
     const int P = settled([&] { return v->autoFontPx(); });
     const int cols0 = settled([&] { return v->session().cols(); });
     CHECK(P > 0 && v->fontPxInUse() == P);
+    // PR #9 review: the zoom steps print no renderer line (stderr goes to a file meanwhile).
+    const std::string errPath = home + "/zoom-stderr.txt";
+    std::fflush(stderr);
+    const int savedErr = dup(2);
+    const int errFd = open(errPath.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0600);
+    if (errFd >= 0) dup2(errFd, 2);
     CHECK(key(GDK_KEY_equal, C, P + 1) && v->fontPxInUse() == P + 1);
     CHECK(key(GDK_KEY_plus, CS, P + 2) && v->fontPxInUse() == P + 2);  // Ctrl++ (Shift+= on US layouts)
     CHECK(key(GDK_KEY_KP_Add, C, P + 3) && v->fontPxInUse() == P + 3);
@@ -288,6 +295,15 @@ static void testFontZoom() {
     CHECK(v->options().fontPx == 0 && w.options().fontPx == 0);  // zoom is no font-px override
     CHECK(key(GDK_KEY_0, C, P) && v->fontPxInUse() == P && v->fontZoomPx() == 0);
     CHECK(v->session().cols() == cols0);
+    std::fflush(stderr);
+    if (errFd >= 0) {
+        dup2(savedErr, 2);
+        close(errFd);
+    }
+    close(savedErr);
+    const std::string zoomErr = fileText(errPath);
+    if (!zoomErr.empty()) std::fputs(zoomErr.c_str(), stderr);  // whatever was printed, as it came
+    CHECK(zoomErr.find("lunduke-terminal: plain") == std::string::npos);
     std::printf("font zoom: plain %d px, %d cols; Ctrl+= Ctrl++ KP+ -> %d px, %d cols; Ctrl+- KP- Ctrl+0 -> %d px, "
                 "%d cols\n", P, cols0, P + 3, colsBig, v->fontPxInUse(), v->session().cols());
     v->zoomFont(-1000);

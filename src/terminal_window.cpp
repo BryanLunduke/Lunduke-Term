@@ -336,7 +336,15 @@ TerminalView* TerminalWindow::newTab(bool first) {
     v->signalBell.connect([this] {
         if (!is_active()) set_urgency_hint(true);
     });
-    v->signalBackend.connect([](const std::string& b) { std::fprintf(stderr, "lunduke-terminal: %s\n", b.c_str()); });
+    // PR #9 review: only a changed line is printed, so the font zoom (which rebuilds the painter
+    // and re-runs chooseMode()) does not repeat the renderer line on every step. It starts from
+    // the line the view had when it was created (emitted before this connect, so not printed,
+    // as before).
+    v->signalBackend.connect([last = v->backendName()](const std::string& b) mutable {
+        if (b == last) return;
+        last = b;
+        std::fprintf(stderr, "lunduke-terminal: %s\n", b.c_str());
+    });
     v->signalSearchChanged.connect([this, v] {
         if (v == currentView()) updateSearchStatus();
     });
