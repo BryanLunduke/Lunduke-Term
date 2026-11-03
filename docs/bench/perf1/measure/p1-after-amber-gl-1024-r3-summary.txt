@@ -1,0 +1,10 @@
+startup_map_ms 509
+startup_child_ms 521
+geom Window 4194307   Position: 0,0 (screen: 0)   Geometry: 1024x768 
+idle_cpu_pct_30s 10.4
+work_cpu_s 14.1
+seq 5028
+cat 805
+yes 4000
+done
+idle_cpu_pct_after_30s 1.5

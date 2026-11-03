@@ -1,0 +1,9 @@
+# p1-after-plain-1024-r3 after 07:24:12
+Rss:               54524 kB
+Pss:               30429 kB
+Shared_Clean:      29372 kB
+Private_Clean:      8876 kB
+Private_Dirty:     13204 kB
+Anonymous:         13204 kB
+GLmaps 0
+Threads 4
