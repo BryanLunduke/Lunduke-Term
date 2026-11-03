@@ -3,9 +3,11 @@
 // profile labels. Needs an X display; skipped without one.
 #include "sanitizer.hpp"
 #include "terminal_view.hpp"
+#include "custom_profiles.hpp"
 #include "terminal_window.hpp"
 
 #include <gtkmm.h>
+#include <glib/gstdio.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -14,6 +16,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <algorithm>
+#include <cmath>
 
 using namespace lterm;
 
@@ -91,6 +94,21 @@ static long brightPixels(Gtk::Window& w, int minLevel = 110) {
     return count;
 }
 
+// $LTERM_SHOT_DIR set: saves a window as PNG there (the PR's screenshots).
+static void shot(Gtk::Window& w, const char* name) {
+    const char* dir = std::getenv("LTERM_SHOT_DIR");
+    if (!dir || !*dir) return;
+    pump(300);
+    auto gw = w.get_window();
+    if (!gw) return;
+    GdkPixbuf* pb = gdk_pixbuf_get_from_window(gw->gobj(), 0, 0, gw->get_width(), gw->get_height());
+    if (!pb) return;
+    const std::string path = std::string(dir) + "/" + name + ".png";
+    gdk_pixbuf_save(pb, path.c_str(), "png", nullptr, nullptr);
+    g_object_unref(pb);
+    std::printf("screenshot %s\n", path.c_str());
+}
+
 static const char* kText = "for i in 1 2 3 4 5 6 7 8 9 10 11 12; do echo HELLO-PLAIN-TEST-$i; done; exec sleep 60";
 
 // ---- item 2: plain / effects off must render the text ----
@@ -117,6 +135,7 @@ static void testPlainRenders(const char* renderer) {
     CHECK(!w.view->effectsOn());
     pump(800);
     const long plain = brightPixels(w.win);
+    shot(w.win, (std::string("plain-after-amber-") + renderer).c_str());
     const long total = static_cast<long>(w.win.get_window()->get_width()) * w.win.get_window()->get_height();
     std::printf("plain render (%s; %s): bright pixels of %ld: amber %ld, Ctrl+Shift+E off %ld, profile plain %ld\n",
                 renderer, backend.c_str(), total, fx, off, plain);
@@ -265,6 +284,146 @@ static void testContextMenuWindow() {
     if (w.settingsDialog()) w.settingsDialog()->response(Gtk::RESPONSE_CLOSE);
 }
 
+// ---- item 4: custom profiles through the Settings dialog ----
+static void testCustomProfilesUi() {
+    setCustomProfiles({});
+    const std::string dir = customProfilesDir();
+    ViewOptions o;
+    o.profile = "amber";
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    TerminalWindow w(o);
+    w.settingsFile = "/dev/null";
+    w.set_default_size(800, 500);
+    w.show();
+    TerminalView* v = w.newTab(true);
+    pump(300);
+    w.showSettings();
+    pump(200);
+    SettingsDialog* d = w.settingsDialog();
+    CHECK(d && v);
+    if (!d || !v) return;
+    // A built-in is read-only: only New and Copy.
+    CHECK(d->profile.get_active_id() == "amber");
+    CHECK(!d->editProfile.get_sensitive() && !d->renameProfile.get_sensitive() && !d->deleteProfile.get_sensitive());
+    CHECK(d->copyProfile.get_sensitive() && d->newProfile.get_sensitive());
+    shot(*d, "settings-builtin");
+    // Names are checked: a bad or taken name saves nothing.
+    std::string suggested;
+    for (const char* bad : {"a/b", "Amber", ""}) {
+        d->askNameHook = [&, bad](const std::string&, const std::string& s) {
+            suggested = s;
+            return std::string(bad);
+        };
+        d->copyProfile.clicked();
+        pump(50);
+        CHECK(customProfiles().empty());
+    }
+    CHECK(suggested == "Amber (copy)");
+    CHECK(d->status.get_text().find("Profile not saved") != Glib::ustring::npos);
+    // Copy to custom profile: a file, in the list, active in the tab, editor open.
+    d->askNameHook = [](const std::string&, const std::string&) { return std::string("Mine"); };
+    d->copyProfile.clicked();
+    pump(200);
+    CHECK(g_file_test((dir + "/Mine.ini").c_str(), G_FILE_TEST_EXISTS));
+    CHECK(d->profile.get_active_id() == "custom:Mine" && d->profile.get_active_text() == "Mine");
+    CHECK(v->profile().id == "custom:Mine" && v->effectsOn());
+    CHECK(d->editProfile.get_sensitive() && d->renameProfile.get_sensitive() && d->deleteProfile.get_sensitive());
+    CHECK(d->editor && d->editor->get_visible());
+    if (!d->editor) return;
+    ProfileEditor& e = *d->editor;
+    CHECK(e.toggles.size() == 11);
+    CHECK(e.toggles.at("bloom")->on.get_active());
+    // Switch effects off and on, adjust them, change colours, font and bezel.
+    e.toggles.at("bloom")->on.set_active(false);
+    CHECK(!e.toggles.at("bloom")->value.get_sensitive());
+    e.toggles.at("jitter")->value.set_value(0.9);
+    e.toggles.at("rgb-shift")->on.set_active(true);
+    e.toggles.at("rgb-shift")->value.set_value(0.4);
+    e.scanlines.set_active(true);
+    e.scanlinePeriod.set_value(5);
+    e.brightness.set_value(0.7);
+    Gdk::RGBA red;
+    red.set_rgba(1, 0, 0, 1);
+    e.fg.set_rgba(red);
+    e.palette[4]->set_rgba(red);
+    e.fonts.set_text("DejaVu Sans Mono:18; Monospace");
+    e.fontPx.set_value(20);
+    e.frame.set_active(true);
+    e.frameSize.set_value(33);
+    e.pages.set_current_page(2);
+    shot(e, "profile-editor-effects");
+    e.pages.set_current_page(0);
+    shot(e, "profile-editor-text");
+    e.response(Gtk::RESPONSE_OK);
+    pump(300);
+    const Profile* m = findProfile("custom:Mine");
+    CHECK(m && m->fx.bloom == 0.0f && std::abs(m->fx.jitter - 0.9f) < 1e-4f && std::abs(m->fx.rgbShift - 0.4f) < 1e-4f);
+    CHECK(m && m->fx.rasterization == 1 && m->fx.scanlinePeriod == 5.0f && std::abs(m->fx.brightness - 0.7f) < 1e-4f);
+    CHECK(m && m->fg == (Color8{255, 0, 0}) && m->palette[4] == (Color8{255, 0, 0}));
+    CHECK(m && m->fonts.size() == 2 && m->fonts[0].family == "DejaVu Sans Mono" && m->fonts[0].px == 18 && m->fontPx == 20);
+    CHECK(m && m->fx.frame && m->fx.frameSize == 33.0f);
+    CHECK(v->profile().fx.bloom == 0.0f && v->profile().fx.frame && v->autoFontPx() == 18);  // the tab follows
+    CHECK(d->fontPx.get_value_as_int() == 18);
+    std::printf("custom profile saved: bloom %.2f jitter %.2f rgb-shift %.2f scanlines %d font %s:%d frame %d\n",
+                m ? m->fx.bloom : -1.0f, m ? m->fx.jitter : -1.0f, m ? m->fx.rgbShift : -1.0f, m ? m->fx.rasterization : -1,
+                m && !m->fonts.empty() ? m->fonts[0].family.c_str() : "?", m && !m->fonts.empty() ? m->fonts[0].px : -1,
+                m ? static_cast<int>(m->fx.frame) : -1);
+    shot(*d, "settings-custom");
+    // Survives a restart: reload from disk, a new window picks it by id.
+    {
+        const Profile before = *findProfile("custom:Mine");
+        setCustomProfiles({});
+        CHECK(!findProfile("custom:Mine"));
+        reloadCustomProfiles();
+        const Profile* r = findProfile("custom:Mine");
+        CHECK(r && r->fx.jitter == before.fx.jitter && r->fx.bloom == 0.0f && r->fg == before.fg && r->fonts.size() == 2);
+        ViewOptions o2 = o;
+        o2.profile = "custom:Mine";
+        TerminalWindow w2(o2);
+        w2.settingsFile = "/dev/null";
+        w2.show();
+        TerminalView* v2 = w2.newTab(true);
+        pump(300);
+        CHECK(v2 && v2->profile().id == "custom:Mine" && v2->profile().fx.frame);
+        w2.showSettings();
+        pump(100);
+        CHECK(w2.settingsDialog() && w2.settingsDialog()->profile.get_active_text() == "Mine");
+        if (w2.settingsDialog()) w2.settingsDialog()->response(Gtk::RESPONSE_CLOSE);
+        if (v2) w2.closeTab(v2);
+        pump(100);
+    }
+    // Rename: the file moves, the tab follows.
+    d->askNameHook = [](const std::string&, const std::string&) { return std::string("Renamed"); };
+    d->renameProfile.clicked();
+    pump(200);
+    CHECK(!g_file_test((dir + "/Mine.ini").c_str(), G_FILE_TEST_EXISTS));
+    CHECK(g_file_test((dir + "/Renamed.ini").c_str(), G_FILE_TEST_EXISTS));
+    CHECK(d->profile.get_active_id() == "custom:Renamed" && v->profile().id == "custom:Renamed");
+    // Delete: asked first; the tab goes back to the default profile.
+    d->confirmDeleteHook = [](const std::string&) { return false; };
+    d->deleteProfile.clicked();
+    pump(100);
+    CHECK(findProfile("custom:Renamed"));
+    d->confirmDeleteHook = [](const std::string&) { return true; };
+    d->deleteProfile.clicked();
+    pump(200);
+    CHECK(!findProfile("custom:Renamed") && !g_file_test((dir + "/Renamed.ini").c_str(), G_FILE_TEST_EXISTS));
+    CHECK(d->profile.get_active_id() == kDefaultProfile && v->profile().id == kDefaultProfile);
+    CHECK(d->profile.get_model()->children().size() == builtinProfiles().size());
+    // New: Plain's values under a new name.
+    d->askNameHook = [](const std::string&, const std::string& s) { return s; };
+    d->newProfile.clicked();
+    pump(200);
+    CHECK(d->profile.get_active_id() == "custom:My profile" && !v->effectsOn());
+    if (d->editor) d->editor->response(Gtk::RESPONSE_CANCEL);
+    d->confirmDeleteHook = [](const std::string&) { return true; };
+    d->deleteProfile.clicked();
+    pump(100);
+    CHECK(customProfiles().empty());
+    d->response(Gtk::RESPONSE_CLOSE);
+    g_rmdir(dir.c_str());
+}
+
 int main(int argc, char** argv) {
     if (!std::getenv("DISPLAY") && !std::getenv("WAYLAND_DISPLAY")) {
         std::printf("ux_test: no display, skipped\n");
@@ -280,6 +439,7 @@ int main(int argc, char** argv) {
     testSettingsFontPx();
     testContextMenu();
     testContextMenuWindow();
+    testCustomProfilesUi();
     if (failures) std::printf("%d failure(s)\n", failures);
     else std::printf("ux_test: all passed\n");
     return failures ? 1 : 0;
