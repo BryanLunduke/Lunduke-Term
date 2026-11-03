@@ -1,14 +1,12 @@
 # perf step 2 status
 
 Done and committed: bundled libvterm 0.3.3 + patches 0001/0002, REP regression test, t/ suite,
-differential tests (meson + long runs), feed/dump comparison, coverage, licensing/docs,
-test suites round 1 (tests-round1.txt) and round 2 (tests-round2.txt), libFuzzer 120 s (fuzz.txt).
+differential tests (meson + long runs), feed/dump comparison, coverage, licensing/docs, test
+suites round 1 and 2, libFuzzer 120 s (fuzz.txt), measurement (measure/TABLE.md).
 
-OPEN: scrollback-default fails with patch 0002 (not a load flake; reproducible at load 4-5, the
-WM alive; stock bundled and 0001-only builds pass). sb-lines ends 17 short = a 17-row window
-growth after the last scrollback push pops 17 lines that the 5000-line cap had already dropped
-at the front. Hypothesis: timing (0002 finishes the 12000 lines before the WM's late resize),
-not a content difference (differential tests clean). Probe: /workspace/perf2-work/sbprobe.sh.
+scrollback-default with 0002: a timing race in the test (WM resize vs. faster output), fixed in
+f37aba0 (the test waits 1 s for the window to settle); scrollback-default.txt has the probe and 4/4
+passes (3 release, 1 ASan).
 
-Running: measurement matrix (/workspace/perf2-work/measure/matrix.sh, own Xvfb :82 + xfwm4).
-Left: probe the scrollback-default failure, measurement table, PR body.
+Running: round 3 at HEAD, full release (2 procs) + ASan/UBSan+LSan parallel (2 procs), own Xvfb :83
+(/workspace/perf2-work/round3.sh -> /workspace/perf2-work/round3.log). When done: tests-round3.txt.
