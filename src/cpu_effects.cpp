@@ -36,7 +36,7 @@ void CpuEffects::resize(int width, int height) {
     bh_ = p_.burnInHalfRes ? hh_ : h_;
     const size_t n = static_cast<size_t>(w_) * h_ * 4;
     src_.assign(n, 0);
-    static_.assign(n, 0.0f);
+    static_.assign(static_cast<size_t>(w_) * h_ * 3, 0.0f);
     burn_.assign(static_cast<size_t>(bw_) * bh_ * 4, 0.0f);
     down_.assign(static_cast<size_t>(hw_) * hh_ * 3, 0.0f);
     bloomB_.assign(down_.size(), 0.0f);
@@ -262,11 +262,10 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
                     o1 += std::min(std::max(bgc * d_.bloomStrength, 0.0f), 0.5f);
                     o2 += std::min(std::max(bb * d_.bloomStrength, 0.0f), 0.5f);
                 }
-                float* o = &static_[idx * 4];
+                float* o = &static_[idx * 3];
                 o[0] = o0 * d_.screenBrightness;
                 o[1] = o1 * d_.screenBrightness;
                 o[2] = o2 * d_.screenBrightness;
-                o[3] = 1.0f;
             }
         }
     });
@@ -339,7 +338,7 @@ void CpuEffects::renderTo(float timeMs, uint8_t* out, int stride, PixelOrder ord
                 float color = 0.0001f;
                 if (p_.staticNoise != 0.0f) color += nt[3] * noiseAmount * (1.0f - dist * 1.3f);
                 color += glow;
-                sampleClamp<3>(static_.data(), w_, h_, tu, tv, t);
+                sampleClamp<3, 3>(static_.data(), w_, h_, tu, tv, t);
                 if (p_.burnIn != 0.0f) {
                     sampleClamp<3>(burn_.data(), bw_, bh_, su, sv, b);
                     float br = 0.65f * (b[0] - fu.burnInDecay);

@@ -38,7 +38,10 @@ private:
     std::vector<float> bloomB_;
     std::vector<float> burn_;             // RGBA float (rgb + prev mask), full or half res
     int bw_ = 0, bh_ = 0;                 // burn-in buffer size
-    std::vector<float> static_;   // RGBA float, static pass output
+    // Static pass output, RGB float (perf step 3: was RGBA, 16 B per pixel, now 12; nothing reads the
+    // alpha). 16-bit fixed point (6 B) was measured and cost up to 0.2 dB of GL-vs-CPU PSNR, taking
+    // the worst configuration below the bar (docs/bench/perf3), so the values stay floats.
+    std::vector<float> static_;
     // Perf step 3: the screen-local coordinates before the barrel warp (separable), per column / row.
     std::vector<float> colLu_, rowLv_;
     // Source uv (su, sv) and warped screen-local uv (lu, lv) of pixel (x, y); mirrors screenCoords().
