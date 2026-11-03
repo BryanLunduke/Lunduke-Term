@@ -67,6 +67,9 @@ const Profile* findProfile(const std::string& id);
 // the built-ins. Built-ins are never replaced by these: ids differ ("custom:NAME").
 const std::vector<Profile>& customProfiles();
 void setCustomProfiles(std::vector<Profile> v);
+// Ctrl+Shift+P: the profile after `id` in the list order (built-ins, then custom profiles),
+// wrapping round; an unknown id gives the first built-in.
+std::string nextProfileId(const std::string& id);
 
 // Raises c towards white until rgb2grey(c) >= minGrey (keeps the hue for chroma profiles).
 // Colours that are (almost) black are left alone so "black on colour" stays black.
