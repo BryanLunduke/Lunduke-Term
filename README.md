@@ -110,7 +110,7 @@ A press on the bezel neither selects nor is reported to the application; a drag 
 glass clamps to the edge cells.
 Right-click opens a menu with Copy (greyed out without a selection), Paste and Settings; when the
 application uses the mouse, Shift+right-click opens it.
-Keys: F11 toggles fullscreen (Shift/Ctrl/Alt+F11 still reach the program). Font zoom: Ctrl+= or Ctrl++ (also keypad +)
+Keys: F11 toggles fullscreen (Shift/Ctrl/Alt/Super+F11 still reach the program). Font zoom: Ctrl+= or Ctrl++ (also keypad +)
 makes the font 1 px bigger, Ctrl+- (keypad -) 1 px smaller, Ctrl+0 (keypad 0) goes back to the profile's size, or to the
 `--font-px`/Settings size if one is set; the zoom is per tab, is not saved (the Settings font size field and "Save as default"
 ignore it) and starts again at 0 when the profile or the font size is changed. Ctrl+Shift+E toggles effects, Ctrl+Shift+P cycles the profiles (built-in, then custom), Ctrl+Shift+C/V copy/paste,

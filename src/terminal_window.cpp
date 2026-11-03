@@ -533,8 +533,11 @@ bool TerminalWindow::handleKey(GdkEventKey* ev) {
     const guint mods = ev->state & (GDK_CONTROL_MASK | GDK_SHIFT_MASK | GDK_MOD1_MASK);
     const guint k = gdk_keyval_to_lower(ev->keyval);
     // Perf step 1: F11 toggles fullscreen (as in GNOME Terminal); it is no longer sent to the
-    // program. Shift/Ctrl/Alt+F11 still are.
-    if (mods == 0 && ev->keyval == GDK_KEY_F11) {
+    // program. Shift/Ctrl/Alt/Super+F11 still are (PR #9 review: Super, Hyper and Meta are in
+    // this mask; X11 reports Super as MOD4 and GDK adds the virtual SUPER bit).
+    const guint fsMods = ev->state & (GDK_CONTROL_MASK | GDK_SHIFT_MASK | GDK_MOD1_MASK | GDK_MOD4_MASK |
+                                      GDK_SUPER_MASK | GDK_HYPER_MASK | GDK_META_MASK);
+    if (fsMods == 0 && ev->keyval == GDK_KEY_F11) {
         toggleFullscreen();
         return true;
     }

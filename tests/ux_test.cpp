@@ -206,6 +206,17 @@ static void testFullscreenKey() {
     GdkEventKey e = keyEv(GDK_KEY_F11, 0);
     GdkEventKey shifted = keyEv(GDK_KEY_F11, GDK_SHIFT_MASK);
     CHECK(!w.handleKey(&shifted));  // Shift+F11 goes to the program
+    // PR #9 review: Super+F11 too, whether GDK reports Super as MOD4, the virtual SUPER bit or both.
+    for (guint super : {guint(GDK_MOD4_MASK), guint(GDK_SUPER_MASK), guint(GDK_MOD4_MASK | GDK_SUPER_MASK)}) {
+        GdkEventKey s = keyEv(GDK_KEY_F11, super);
+        CHECK(!w.handleKey(&s));
+    }
+    for (guint m : {guint(GDK_CONTROL_MASK), guint(GDK_MOD1_MASK)}) {
+        GdkEventKey s = keyEv(GDK_KEY_F11, m);
+        CHECK(!w.handleKey(&s));
+    }
+    // NumLock (MOD2) is not a modifier here: F11 with NumLock on still toggles (checked below).
+    GdkEventKey numlock = keyEv(GDK_KEY_F11, GDK_MOD2_MASK);
     CHECK(!w.fullscreenState());
     CHECK(w.handleKey(&e));
     const bool on = waitFor([&] { return w.fullscreenState(); }, 3000);
@@ -215,7 +226,7 @@ static void testFullscreenKey() {
         return;
     }
     const int fw = w.get_width(), fh = w.get_height();
-    CHECK(w.handleKey(&e));
+    CHECK(w.handleKey(&numlock));
     const bool off = waitFor([&] { return !w.fullscreenState(); }, 3000);
     CHECK(off);
     pump(200);
