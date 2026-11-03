@@ -9,18 +9,23 @@ Each buffer now has a ring offset, ringtop[]. Logical row 0 is stored at physica
 ringtop. getcell() adds the offset, so everything that goes through getcell() (glyphs, erase,
 get_cell, get_text, scrollback push, attrs) sees the same logical screen as before. A
 whole-screen scroll up (full width, from row `downward` to the last row) only advances the
-offset; the vacated rows are erased by erase_internal() as before. Partial scrolls (scroll
-regions, side margins, scroll down) keep the row-by-row memmove, which already goes through
-getcell(). resize_buffer() indexes the buffer directly, so it first linearizes it
-(ringtop = 0). Scrollback pushes still happen before the rotation, exactly as before.
+offset, and copies the old bottom rows (usually 1) into the vacated ones, so the cell buffer
+holds exactly what stock holds: erasing resets only chars[0] and the pen, and stock's
+get_cell() shows the rest of chars[] after a right-half marker. The vacated rows are then
+erased by erase_internal() as before. Partial scrolls (scroll regions, side margins, scroll
+down) keep the row-by-row memmove, which already goes through getcell(). resize_buffer()
+indexes the buffer directly, so it first linearizes it (ringtop = 0). Scrollback pushes still
+happen before the rotation, exactly as before.
 
 Output (screen cells, cursor, scrollback lines, damage/moverect callbacks) is unchanged. This
-is checked against stock 0.3.3 by tests/libvterm_diff (randomised streams with scroll regions,
-REP, wide and combining characters, altscreen, reflow and resizes) and by libvterm's own
-t/ suite.
+is checked against stock 0.3.3 by tests/libvterm_diff.c (meson test libvterm-diff; randomised
+streams with scroll regions, REP, wide and combining characters, altscreen, reflow and
+resizes) and by libvterm's own t/ suite.
 
 Based on the prototype in the performance review (lv-ring); this version keeps the offset
-per buffer, linearizes at the start of resize_buffer(), and guards rows == 0.
+per buffer, linearizes at the start of resize_buffer(), guards rows == 0, and copies the
+vacated rows' old contents (without that, the differential test found right-half cells
+reporting other code points than stock).
 
 Local patch for Lunduke Terminal; not sent upstream.
 
@@ -67,7 +72,7 @@ Local patch for Lunduke Terminal; not sent upstream.
  }
  
  static ScreenCell *alloc_buffer(VTermScreen *screen, int rows, int cols)
-@@ -237,6 +262,17 @@
+@@ -237,6 +262,28 @@
    int cols = src.end_col - src.start_col;
    int downward = src.start_row - dest.start_row;
  
@@ -76,16 +81,27 @@ Local patch for Lunduke Terminal; not sent upstream.
 +     src.end_row == screen->rows && dest.end_row == screen->rows - downward) {      // whole height
 +    /* Whole-screen scroll up: rotate instead of moving every row. The rows that were at the
 +     * top are now the bottom `downward` rows; the caller erases them (erase_internal), as it
-+     * erases the vacated rows after the memmove below. */
++     * erases the vacated rows after the memmove below.
++     * The memmove leaves the bottom rows holding what they held before, and erasing resets only
++     * chars[0] and the pen: the rest of chars[] stays and get_cell() shows it after a wide
++     * glyph's right-half marker (-1) lands there. So give the vacated rows those same contents
++     * (`downward` rows, usually 1, instead of rows - downward); the buffer then holds exactly
++     * what stock holds. In ascending j every source row is read before it is overwritten. */
 +    int idx = screen->buffer == screen->buffers[BUFIDX_ALTSCREEN] ? BUFIDX_ALTSCREEN : BUFIDX_PRIMARY;
-+    screen->ringtop[idx] = (screen->ringtop[idx] + downward) % screen->rows;
++    int rows = screen->rows, top = screen->ringtop[idx];
++    size_t rowcells = (size_t)screen->cols;
++    for(int j = 0; j < downward; j++)
++      memcpy(screen->buffer + rowcells * ((top + j) % rows),
++             screen->buffer + rowcells * ((top + rows - downward + j) % rows),
++             sizeof(ScreenCell) * rowcells);
++    screen->ringtop[idx] = (top + downward) % rows;
 +    return 1;
 +  }
 +
    int init_row, test_row, inc_row;
    if(downward < 0) {
      init_row = dest.end_row - 1;
-@@ -514,6 +550,7 @@
+@@ -514,6 +561,7 @@
  
  static void resize_buffer(VTermScreen *screen, int bufidx, int new_rows, int new_cols, bool active, VTermStateFields *statefields)
  {
@@ -93,7 +109,7 @@ Local patch for Lunduke Terminal; not sent upstream.
    int old_rows = screen->rows;
    int old_cols = screen->cols;
  
-@@ -886,6 +923,7 @@
+@@ -886,6 +934,7 @@
    screen->cbdata    = NULL;
  
    screen->buffers[BUFIDX_PRIMARY] = alloc_buffer(screen, rows, cols);
