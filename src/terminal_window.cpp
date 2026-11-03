@@ -579,7 +579,7 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     // the window's close button), never on a live spin-button change.
     signal_hide().connect([this] { win_.commitScrollbackLimits(); });
 
-    for (const auto& p : builtinProfiles()) profile.append(p.id, p.label + (p.id == kDefaultProfile ? "  (default)" : ""));
+    for (const auto& p : builtinProfiles()) profile.append(p.id, p.label);
     // Monospaced families that are installed, plus the profile's own choice.
     font.append("", "Profile font");
     {
