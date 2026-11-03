@@ -346,6 +346,39 @@ static void testFontZoom() {
     d->response(Gtk::RESPONSE_CLOSE);
 }
 
+// PR #9 review: a base size outside 6..96 px steps 1 px toward the range instead of jumping
+// to a limit, and zoom never moves it further out.
+static void testZoomOutOfRange() {
+    using V = TerminalView;
+    CHECK(V::zoomedFontPx(16, 0) == 16 && V::zoomedFontPx(16, 3) == 19 && V::zoomedFontPx(16, -100) == V::kMinZoomPx);
+    CHECK(V::zoomedFontPx(16, 1000) == V::kMaxZoomPx);
+    CHECK(V::zoomedFontPx(120, 0) == 120 && V::zoomedFontPx(120, 1) == 120 && V::zoomedFontPx(120, -1) == 119);
+    CHECK(V::zoomedFontPx(120, -1000) == V::kMinZoomPx);
+    CHECK(V::zoomedFontPx(4, 0) == 4 && V::zoomedFontPx(4, -1) == 4 && V::zoomedFontPx(4, 1) == 5);
+    CHECK(V::zoomedFontPx(4, 1000) == V::kMaxZoomPx);
+    const int waitMs = ltermWaitMs(3000, 10000);
+    for (int base : {120, 4}) {
+        ViewOptions o;
+        o.profile = "plain";
+        o.fontPx = base;
+        o.command = {"/bin/sh", "-c", "exec sleep 30"};
+        Win w(o, 900, 500);
+        TerminalView* v = w.view;
+        v->start();
+        waitFor([&] { return v->session().cols() > 0; }, waitMs);
+        CHECK(v->fontPxInUse() == base);
+        v->zoomFont(base > V::kMaxZoomPx ? 1 : -1);  // further out: no change
+        CHECK(v->fontPxInUse() == base && v->fontZoomPx() == 0);
+        v->zoomFont(base > V::kMaxZoomPx ? -1 : 1);  // one step toward the range, not to its limit
+        const int stepped = v->fontPxInUse();
+        CHECK(stepped == (base > V::kMaxZoomPx ? base - 1 : base + 1));
+        GdkEventKey zero = keyEv(GDK_KEY_0, GDK_CONTROL_MASK);
+        CHECK(v->testKey(&zero) && v->fontPxInUse() == base && v->fontZoomPx() == 0);
+        std::printf("zoom from an out-of-range base: %d px -> further out %d px, toward the range %d px, Ctrl+0 %d px\n",
+                    base, base, stepped, v->fontPxInUse());
+    }
+}
+
 // ---- item 1: right-click menu ----
 static bool menuShown(TerminalView& v) { return v.contextMenu().get_visible(); }
 static void closeMenu(TerminalView& v) {
@@ -852,6 +885,7 @@ int main(int argc, char** argv) {
     testSettingsFontPx();
     testFullscreenKey();
     testFontZoom();
+    testZoomOutOfRange();
     testContextMenu();
     testContextMenuWindow();
     testSelectionHasText();

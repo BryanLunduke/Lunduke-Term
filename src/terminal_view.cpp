@@ -419,7 +419,7 @@ void TerminalView::applyProfile() {
         std::fprintf(stderr, "lunduke-terminal: font '%s' is not monospaced\n", pick.family.c_str());
     autoFontPx_ = pick.px;
     const int base = opts_.fontPx > 0 ? opts_.fontPx : pick.px;
-    const int px = zoomPx_ != 0 ? std::clamp(base + zoomPx_, kMinZoomPx, kMaxZoomPx) : base;
+    const int px = zoomedFontPx(base, zoomPx_);
     fontPxInUse_ = px;
     painter_.reset(new GridPainter(pick.family, px, scale_));  // px stays logical
     applyColors();
@@ -1632,9 +1632,9 @@ void TerminalView::setFont(const std::string& family, int px) {
 void TerminalView::zoomFont(int steps) {
     const int base = opts_.fontPx > 0 ? opts_.fontPx : autoFontPx_;
     if (base <= 0 || steps == 0) return;
-    const int cur = std::clamp(base + zoomPx_, kMinZoomPx, kMaxZoomPx);
-    const int want = std::clamp(cur + steps, kMinZoomPx, kMaxZoomPx);
-    if (want == cur) return;  // at the limit
+    const int cur = zoomedFontPx(base, zoomPx_);
+    const int want = zoomedFontPx(base, cur - base + steps);
+    if (want == cur) return;  // at the limit (or a base outside the range, stepped further out)
     zoomPx_ = want - base;
     applyProfile();
     chooseMode();
