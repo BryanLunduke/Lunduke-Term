@@ -41,7 +41,8 @@ public:
     // Effects tick into `fbo` (0 = default framebuffer) at (0,0,width,height). flipY for window
     // framebuffers (GtkGLArea); false for the internal FBO that readPixels() reads.
     void render(float timeMs, unsigned fbo, bool flipY);
-    // Effects tick into the internal output FBO and read it back as RGBA8, row 0 = top.
+    // Effects tick into the internal output FBO and read it back as RGBA8, row 0 = top. The output
+    // texture/FBO are allocated on the first call (per size); the window never needs them.
     void renderToMemory(float timeMs, uint8_t* out);
     void release();  // deletes every GL object this pipeline owns
     // Review item 3: frees the size-dependent textures/FBOs (nearly all of the memory) and keeps

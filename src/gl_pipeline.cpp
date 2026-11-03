@@ -187,13 +187,13 @@ void GlPipeline::resize(int width, int height) {
     texBloomB_ = makeTex(hw_, hh_, kSizedFmt, true, false);
     for (int i = 0; i < 2; ++i) texBurn_[i] = makeTex(bw_, bh_, kSizedFmt, true, false);
     texStatic_ = makeTex(w_, h_, kSizedFmt, true, false);
-    texOut_ = makeTex(w_, h_, GL_RGBA8, false, false);
+    // texOut_/fboOut_ (RGBA8, w x h) are only read back by renderToMemory() (headless tests and
+    // benchmarks); the window renders to the GtkGLArea framebuffer, so they are made on first use.
     fboDown_ = makeFbo(texDown_);
     fboBloomA_ = makeFbo(texBloomA_);
     fboBloomB_ = makeFbo(texBloomB_);
     for (int i = 0; i < 2; ++i) fboBurn_[i] = makeFbo(texBurn_[i]);
     fboStatic_ = makeFbo(texStatic_);
-    fboOut_ = makeFbo(texOut_);
     haveBurn_ = false;
     geom_ = frameGeometry(p_, w_, h_);
     if (p_.frame) {
@@ -383,6 +383,10 @@ void GlPipeline::render(float timeMs, unsigned fbo, bool flipY) {
 
 void GlPipeline::renderToMemory(float timeMs, uint8_t* out) {
     if (!ok_ || !texSrc_) return;
+    if (!texOut_) {  // freed with the other sized objects by resize()/setParams()/releaseSized()
+        texOut_ = makeTex(w_, h_, GL_RGBA8, false, false);
+        fboOut_ = makeFbo(texOut_);
+    }
     render(timeMs, fboOut_, false);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glReadPixels(0, 0, w_, h_, GL_RGBA, GL_UNSIGNED_BYTE, out);
