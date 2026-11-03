@@ -70,3 +70,50 @@ Skipped:            0
 Timeout:            0   
 exit 0 | 11:33:22 | load 4.56 4.33 4.51 | Xvfb :84 alive (pid 2697376), xfwm4 alive (pid 2697390)
 == 2026-11-03 11:33:22 CST asan-parallel | HEAD 776892a | load 4.56 4.33 4.51 | Xvfb :84 alive (pid 2697376), xfwm4 alive (pid 2697390)
+ 1/27 desktop-file         OK                0.01s
+ 2/27 metainfo             OK                0.02s
+ 3/27 governor             OK                0.01s
+ 4/27 profiles             OK                0.01s
+ 5/27 custom-profiles      OK                0.17s
+ 6/27 painter              OK                0.30s
+ 7/27 fonts                OK                0.05s
+ 8/27 vterm                OK                0.02s
+ 9/27 effects              OK                1.71s
+10/27 session              OK                0.88s
+11/27 fixes                OK                0.51s
+12/27 fuzz-regress         OK                0.05s
+13/27 libvterm-rep         OK                0.03s
+14/27 unicode              OK                0.02s
+15/27 search               OK               22.56s
+16/27 gl-match             OK               94.68s
+17/27 view                 OK              125.02s
+18/27 review               OK              484.29s
+19/27 ux                   OK               47.35s
+20/27 scrollback-default   OK               21.37s
+21/27 libvterm-pristine    OK                0.23s
+22/27 cli                  OK                0.48s
+23/27 libvterm-t-patched   OK                1.66s
+24/27 libvterm-t-stock     OK                1.69s
+25/27 libvterm-diff        OK               55.07s
+26/27 libvterm-diff-repfix OK               57.21s
+27/27 libvterm-feed-diff   OK              168.97s
+Ok:                 27  
+Fail:               0   
+Skipped:            0   
+Timeout:            0   
+exit 0 | 11:50:01 | load 4.37 4.68 4.55 | Xvfb :84 alive (pid 2697376), xfwm4 alive (pid 2697390)
+stopped own xfwm4 2697390, Xvfb 2697376 11:50:02
+== 2026-11-03 11:50:02 CST fuzz | load 4.37 4.68 4.55
+-- replay REP reproducer, bundled patched fuzz build:
+exit 0: Executed tests/data/fuzz/crash-46ca723d-libvterm-rep.bin in 22 ms
+-- replay tests/data/fuzz/* on the patched build:
+exit 0: Done 3 runs in 0 second(s) 
+-- libFuzzer 60 s (patched): 11:50:14
+exit 0 11:51:15: Done 10192 runs in 61 second(s) 
+stat::number_of_executed_units: 10192
+stat::average_exec_per_sec:     167
+stat::new_units_added:          1424
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              466
+crashes: 0
+ALL DONE 2026-11-03 11:51:15 CST
