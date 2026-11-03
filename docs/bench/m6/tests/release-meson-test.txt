@@ -1,0 +1,33 @@
+Mon Nov  2 21:06:16 EST 2026
+ninja: Entering directory `/workspace/lunduke-term-m6/build'
+[1/4] Compiling C++ object review_test.p/src_terminal_view.cpp.o
+[2/4] Linking target review_test
+[3/4] Compiling C++ object view_test.p/src_terminal_view.cpp.o
+[4/4] Linking target view_test
+ 1/18 desktop-file    OK               0.01s
+ 2/18 metainfo        OK               0.04s
+ 3/18 governor        OK               0.00s
+ 4/18 profiles        OK               0.00s
+ 5/18 custom-profiles OK               0.01s
+ 6/18 painter         OK               0.13s
+ 7/18 fonts           OK               0.04s
+ 8/18 vterm           OK               0.00s
+ 9/18 effects         OK               0.24s
+10/18 session         OK               0.08s
+11/18 fixes           OK               0.39s
+12/18 fuzz-regress    OK               0.01s
+13/18 unicode         OK               0.01s
+14/18 search          OK               0.90s
+15/18 gl-match        OK              12.36s
+16/18 view            OK              99.62s
+17/18 review          OK              38.76s
+18/18 ux              OK              13.45s
+
+Ok:                 18  
+Expected Fail:      0   
+Fail:               0   
+Unexpected Pass:    0   
+Skipped:            0   
+Timeout:            0   
+
+Full log written to /workspace/lunduke-term-m6/build/meson-logs/testlog.txt
