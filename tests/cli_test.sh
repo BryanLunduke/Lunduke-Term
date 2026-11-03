@@ -48,8 +48,12 @@ has "$tmp/bad.err" "unknown option --no-such-option"
 has "$tmp/bad.err" "--help"
 [ -s "$tmp/bad.out" ] && { echo "unknown option wrote to stdout"; fail=1; }
 
-"$bin" --renderer bogus > /dev/null 2> "$tmp/bad2.err"
-expect "--renderer bogus" 2 $?
+# PR #9 review: the README says an unknown option and a bad value for these four exit 2.
+for opt in --renderer --on-exit --cursor-shape --effects-quality; do
+    "$bin" $opt bogus > /dev/null 2> "$tmp/bad2.err"
+    expect "$opt bogus" 2 $?
+    has "$tmp/bad2.err" "$opt must be"
+done
 
 [ "$fail" = 0 ] && echo "cli: ok"
 exit $fail
