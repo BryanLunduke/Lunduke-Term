@@ -12,6 +12,9 @@
  *   MODE a: stock vs patched. REP never repeats a wide glyph, and the screen is never 1 column
  *           wide (a wide glyph there or REP of one at the margin crash stock 0.3.3: patch 0001).
  *   MODE b: everything, including those (stock + 0001 vs all patches).
+ * Or: libvterm_diff ROWS COLS f < FILE feeds FILE (LF as CRLF, like a tty with onlcr) in 4 KiB
+ *   writes, logging the same way with a screen dump every 256 writes (the source/`seq` dump
+ *   comparison; scrollback kept to 1000 lines).
  *
  * The stream also avoids the other stock libvterm bugs that the session guards against
  * (docs/FUZZING.md): never more than 16 CSI arguments (F1) or 9 digits (F2), REP only right after
@@ -471,25 +474,52 @@ static void step(void) {
   if (chance(40)) flush_input();
 }
 
+static void feed_file(void) {
+  static char in[4096], tmp[8192];
+  size_t n;
+  long writes = 0;
+  while ((n = fread(in, 1, sizeof in, stdin)) > 0) {
+    size_t m = 0;
+    for (size_t i = 0; i < n; i++) {
+      if (in[i] == '\n') tmp[m++] = '\r';
+      tmp[m++] = in[i];
+    }
+    vterm_input_write(vt, tmp, m);
+    if (++writes % 256 == 0) dump("feed");
+  }
+}
+
 int main(int argc, char **argv) {
-  if (argc != 4 || (argv[3][0] != 'a' && argv[3][0] != 'b')) {
-    fprintf(stderr, "usage: %s SEED STEPS a|b\n", argv[0]);
+  if (argc != 4 || (argv[3][0] != 'a' && argv[3][0] != 'b' && argv[3][0] != 'f')) {
+    fprintf(stderr, "usage: %s SEED STEPS a|b  or  %s ROWS COLS f < FILE\n", argv[0], argv[0]);
     return 2;
   }
-  const unsigned long long seed = strtoull(argv[1], NULL, 10);
-  const long steps = strtol(argv[2], NULL, 10);
   mode = argv[3][0];
-  rng_state = seed * 0x2545F4914F6CDD1Dull + 1;
   out = stdout;
   static char obuf[1 << 20];
   setvbuf(out, obuf, _IOFBF, sizeof obuf);
-
-  rows = chance(20) ? rr(1, 5) : rr(5, 45);
-  cols = chance(20) ? rr(mode == 'a' ? 2 : 1, 8) : rr(8, 110);
-  reflow = chance(50);
-  altscreen_ok = !reflow;  /* F17 */
-  int merge = rn(4);
-  sb_limit = chance(20) ? 0 : (chance(50) ? rr(1, 50) : 100000);
+  unsigned long long seed = 0;
+  long steps = 0;
+  int merge = VTERM_DAMAGE_SCROLL;
+  if (mode == 'f') {
+    rng_state = 1;
+    rows = atoi(argv[1]);
+    cols = atoi(argv[2]);
+    if (rows < 1 || cols < 2) return 2;
+    reflow = 1;
+    altscreen_ok = 0;
+    sb_limit = 1000;
+  } else {
+    seed = strtoull(argv[1], NULL, 10);
+    steps = strtol(argv[2], NULL, 10);
+    rng_state = seed * 0x2545F4914F6CDD1Dull + 1;
+    rows = chance(20) ? rr(1, 5) : rr(5, 45);
+    cols = chance(20) ? rr(mode == 'a' ? 2 : 1, 8) : rr(8, 110);
+    reflow = chance(50);
+    altscreen_ok = !reflow;  /* F17 */
+    merge = rn(4);
+    sb_limit = chance(20) ? 0 : (chance(50) ? rr(1, 50) : 100000);
+  }
   fprintf(out, "seed %llu mode %c %dx%d reflow %d altscreen %d merge %d sb %d\n", seed, mode, rows, cols, reflow,
           altscreen_ok, merge, sb_limit);
 
@@ -503,6 +533,7 @@ int main(int argc, char **argv) {
   if (altscreen_ok) vterm_screen_enable_altscreen(scr, 1);
   vterm_screen_reset(scr, 1);
 
+  if (mode == 'f') feed_file();
   for (long i = 0; i < steps; i++) {
     if (i % 64 == 0) fprintf(out, "-- step %ld\n", i);
     step();

@@ -234,4 +234,8 @@ if get_option('libvterm') == 'bundled'
     args : [files('tools/libvterm_diff_run.py'), lv_diff_exe['repfix'], lv_diff_exe['patched'],
             'b', '1', '100', '2000', '--timeout', '300'],
     timeout : 900, env : test_env)
+  # The same check on real output: the repo's sources and `seq 1 50000` at four window sizes.
+  test('libvterm-feed-diff', files('tools/libvterm_feed_diff.sh'),
+    args : [lv_diff_exe['stock'], lv_diff_exe['patched'], meson.current_source_dir(), '50000'],
+    timeout : 600, env : test_env)
 endif
