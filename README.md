@@ -100,7 +100,7 @@ Options: `--profile ID`, `--effects`/`--no-effects`, `--renderer auto|gl|cpu`, `
 `--font FAMILY`, `--font-px N`, `--size WxH`, `--quit-after MS`, `--stats`, `--scrollback N` (default 5000 lines; a `scrollback-lines` already saved in settings.ini is used as is),
 `--login`, `--cwd DIR`, `--on-exit close|hold|hold-on-error`, `--hold`, `--bell visual,urgent,audible|none`,
 `--cursor-shape block|underline|bar`, `--cursor-blink`/`--no-cursor-blink`,
-`--effects-quality auto|full|reduced|static`, `--cpu-budget PCT`, `--frame`/`--no-frame`
+`--effects-quality auto|full|reduced|static`, `--cpu-budget PCT` (software rendering only, percent of one core, default 15, 0 = off), `--frame`/`--no-frame`
 (bezel; amber/green/green-scanlines/vintage/paper-white only, ignored with a warning elsewhere), `--frame-size PX`
 (logical px, default 28), `--frame-color #RRGGBB`, `--frame-shininess 0..1` (reflection and
 highlights), `--rgb-shift X` (CRT `rbgShift`, 0 = off), `-T/--title TEXT`, `-e COMMAND...`.

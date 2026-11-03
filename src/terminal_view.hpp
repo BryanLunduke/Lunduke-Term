@@ -29,7 +29,8 @@ struct ViewOptions {
     // Software rendering only: tick slower until the animation uses at most this fraction of
     // one core. M3: measured as the process CPU time spent painting the effects frame (so
     // llvmpipe's or the C++ fallback's threads count, terminal output does not). 0: no governor.
-    double cpuBudget = 0.25;
+    // Perf step 1 (review): 0.15 (was 0.25 from M2 to M6).
+    double cpuBudget = 0.15;
     bool pauseWhenUnfocused = true; // stop the animation (not content updates) when inactive
     std::string fontFamily;         // empty: the profile's
     int fontPx = 0;                 // 0: the profile's
