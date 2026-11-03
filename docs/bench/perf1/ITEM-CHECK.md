@@ -12,4 +12,5 @@ For each order item: where it is in the code, and which test covers it.
 | 6 | Uniform locations cached after link | X-macro lists in `gl_pipeline.hpp`. `lookUpUniforms()` runs once in the constructor after the programs link, and every draw uses `loc_`. | gl-match: 69 `glGetUniformLocation` calls in the constructor, 0 across 50 resizes, frames and readback. PSNR lines are identical to master. |
 
 Ctrl+0 resets to the configured size: the profile's size, or the --font-px/Settings override when one is set.
-Plain F11 and Ctrl+- are no longer sent to the program (Ctrl+- used to send 0x1f).
+Plain F11 and Ctrl+- are no longer sent to the program. On master 21eff10, F11 sent ESC[23~ and Ctrl+- sent ESC[45;5u
+(checked with xdotool on a master build). Ctrl+_ (Ctrl+Shift+-) still sends 0x1f (^_), so readline/Emacs undo keeps working.

@@ -1376,7 +1376,7 @@ bool TerminalView::onKey(GdkEventKey* ev) {
     }
     // Perf step 1: font zoom. Ctrl+= and Ctrl++ (Shift+= on most layouts, or the keypad +)
     // bigger, Ctrl+- (or keypad -) smaller, Ctrl+0 (or keypad 0) back to the configured size.
-    // These are taken from the program (Ctrl+- used to send 0x1f, ^_).
+    // These are taken from the program (on master Ctrl+- sent ESC[45;5u; Ctrl+_ still sends 0x1f, ^_).
     if (mods == GDK_CONTROL_MASK || mods == ctrlShift) {
         switch (ev->keyval) {
         case GDK_KEY_equal: case GDK_KEY_plus: case GDK_KEY_KP_Add: zoomFont(1); return true;
