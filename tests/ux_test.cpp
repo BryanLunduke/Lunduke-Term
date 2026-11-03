@@ -250,25 +250,43 @@ static void testFontZoom() {
     pump(300);
     CHECK(v);
     if (!v) return;
-    auto key = [&](guint keyval, guint state) {
+    // PR #9 review: under load (parallel suite, busy box) the window can still be mapping or
+    // resizing when the test starts, so each check first waits, with the ltermWaitMs() bounds,
+    // until the font size and the grid have settled instead of reading them after a fixed sleep.
+    // Only a failing case waits the whole bound.
+    const int waitMs = ltermWaitMs(3000, 10000);
+    auto settled = [&](const std::function<int()>& f) {
+        // the same value twice, 150 ms apart (or the bound ran out)
+        int last = f();
+        for (int t = 0; t < waitMs; t += 150) {
+            pump(150);
+            const int now = f();
+            if (now == last) return now;
+            last = now;
+        }
+        return last;
+    };
+    auto key = [&](guint keyval, guint state, int wantPx) {
         GdkEventKey e = keyEv(keyval, state);
         const bool taken = v->testKey(&e);
-        pump(60);
+        waitFor([&] { return v->fontPxInUse() == wantPx; }, waitMs);
+        settled([&] { return v->session().cols(); });
         return taken;
     };
     const guint C = GDK_CONTROL_MASK, CS = GDK_CONTROL_MASK | GDK_SHIFT_MASK;
-    const int P = v->autoFontPx();
-    const int cols0 = v->session().cols();
+    waitFor([&] { return v->autoFontPx() > 0 && v->session().cols() > 0; }, waitMs);
+    const int P = settled([&] { return v->autoFontPx(); });
+    const int cols0 = settled([&] { return v->session().cols(); });
     CHECK(P > 0 && v->fontPxInUse() == P);
-    CHECK(key(GDK_KEY_equal, C) && v->fontPxInUse() == P + 1);
-    CHECK(key(GDK_KEY_plus, CS) && v->fontPxInUse() == P + 2);  // Ctrl++ (Shift+= on US layouts)
-    CHECK(key(GDK_KEY_KP_Add, C) && v->fontPxInUse() == P + 3);
+    CHECK(key(GDK_KEY_equal, C, P + 1) && v->fontPxInUse() == P + 1);
+    CHECK(key(GDK_KEY_plus, CS, P + 2) && v->fontPxInUse() == P + 2);  // Ctrl++ (Shift+= on US layouts)
+    CHECK(key(GDK_KEY_KP_Add, C, P + 3) && v->fontPxInUse() == P + 3);
     const int colsBig = v->session().cols();
     CHECK(colsBig < cols0);  // bigger cells, fewer columns in the same window
-    CHECK(key(GDK_KEY_minus, C) && v->fontPxInUse() == P + 2);
-    CHECK(key(GDK_KEY_KP_Subtract, C) && v->fontPxInUse() == P + 1);
+    CHECK(key(GDK_KEY_minus, C, P + 2) && v->fontPxInUse() == P + 2);
+    CHECK(key(GDK_KEY_KP_Subtract, C, P + 1) && v->fontPxInUse() == P + 1);
     CHECK(v->options().fontPx == 0 && w.options().fontPx == 0);  // zoom is no font-px override
-    CHECK(key(GDK_KEY_0, C) && v->fontPxInUse() == P && v->fontZoomPx() == 0);
+    CHECK(key(GDK_KEY_0, C, P) && v->fontPxInUse() == P && v->fontZoomPx() == 0);
     CHECK(v->session().cols() == cols0);
     std::printf("font zoom: plain %d px, %d cols; Ctrl+= Ctrl++ KP+ -> %d px, %d cols; Ctrl+- KP- Ctrl+0 -> %d px, "
                 "%d cols\n", P, cols0, P + 3, colsBig, v->fontPxInUse(), v->session().cols());
@@ -276,13 +294,13 @@ static void testFontZoom() {
     CHECK(v->fontPxInUse() == TerminalView::kMinZoomPx);
     v->zoomFont(1000);
     CHECK(v->fontPxInUse() == TerminalView::kMaxZoomPx);
-    CHECK(key(GDK_KEY_KP_0, C) && v->fontPxInUse() == P);
+    CHECK(key(GDK_KEY_KP_0, C, P) && v->fontPxInUse() == P);
 
     // M6 Settings font size: the field still shows the profile's size while zoomed, "Save as
     // default" writes no font-px, an override from the field replaces the zoom, and Ctrl+0 then
     // goes back to that override; a profile change starts at the new profile's size.
-    key(GDK_KEY_equal, C);
-    key(GDK_KEY_equal, C);
+    key(GDK_KEY_equal, C, P + 1);
+    key(GDK_KEY_equal, C, P + 2);
     GdkEventKey s = keyEv(GDK_KEY_S, CS);
     CHECK(w.handleKey(&s));
     pump(100);
@@ -296,14 +314,14 @@ static void testFontZoom() {
     const std::string text = fileText(saved);
     CHECK(!text.empty() && text.find("font-px") == std::string::npos);
     d->fontPx.set_value(30);
-    pump(200);
+    waitFor([&] { return v->fontPxInUse() == 30; }, waitMs);
     CHECK(w.options().fontPx == 30 && v->fontPxInUse() == 30 && v->fontZoomPx() == 0);
-    CHECK(key(GDK_KEY_equal, C) && v->fontPxInUse() == 31 && w.options().fontPx == 30);
+    CHECK(key(GDK_KEY_equal, C, 31) && v->fontPxInUse() == 31 && w.options().fontPx == 30);
     CHECK(d->fontPx.get_value_as_int() == 30);
-    CHECK(key(GDK_KEY_0, C) && v->fontPxInUse() == 30);
-    key(GDK_KEY_minus, C);
+    CHECK(key(GDK_KEY_0, C, 30) && v->fontPxInUse() == 30);
+    key(GDK_KEY_minus, C, 29);
     d->profile.set_active_id("amber");
-    pump(200);
+    waitFor([&] { return v->profile().id == "amber" && v->fontZoomPx() == 0; }, waitMs);
     const int amberPx = v->autoFontPx();
     std::printf("font zoom + settings: field %d px while zoomed (saved without font-px: %s); override 30 -> Ctrl+= 31 "
                 "-> Ctrl+0 30; amber after zoom: %d px (profile %d px)\n",
