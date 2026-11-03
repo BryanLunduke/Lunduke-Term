@@ -37,3 +37,36 @@ Skipped:            0
 Timeout:            0   
 exit 0 | 11:19:39 | load 4.14 4.60 4.84 | Xvfb :84 alive (pid 2697376), xfwm4 alive (pid 2697390)
 == 2026-11-03 11:19:39 CST asan-serial | HEAD 17163b7 | load 4.14 4.60 4.84 | Xvfb :84 alive (pid 2697376), xfwm4 alive (pid 2697390)
+ 1/27 desktop-file         OK                0.01s
+ 2/27 metainfo             OK                0.01s
+ 3/27 effects              OK                1.74s
+ 4/27 governor             OK                0.01s
+ 5/27 profiles             OK                0.01s
+ 6/27 custom-profiles      OK                0.18s
+ 7/27 painter              OK                0.31s
+ 8/27 fonts                OK                0.07s
+ 9/27 vterm                OK                0.02s
+10/27 gl-match             OK              135.91s
+11/27 session              OK                0.91s
+12/27 fixes                OK                0.49s
+13/27 fuzz-regress         OK                0.10s
+14/27 libvterm-rep         OK                0.03s
+15/27 unicode              OK                0.03s
+16/27 search               OK               22.00s
+17/27 view                 OK              131.56s
+18/27 review               OK               72.82s
+19/27 ux                   OK               44.69s
+20/27 scrollback-default   OK               21.01s
+21/27 cli                  OK                0.30s
+22/27 libvterm-pristine    OK                0.01s
+23/27 libvterm-t-patched   OK                1.57s
+24/27 libvterm-t-stock     OK                1.47s
+25/27 libvterm-diff        OK               48.99s
+26/27 libvterm-diff-repfix OK              165.93s
+27/27 libvterm-feed-diff   OK              172.47s
+Ok:                 27  
+Fail:               0   
+Skipped:            0   
+Timeout:            0   
+exit 0 | 11:33:22 | load 4.56 4.33 4.51 | Xvfb :84 alive (pid 2697376), xfwm4 alive (pid 2697390)
+== 2026-11-03 11:33:22 CST asan-parallel | HEAD 776892a | load 4.56 4.33 4.51 | Xvfb :84 alive (pid 2697376), xfwm4 alive (pid 2697390)
