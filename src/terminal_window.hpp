@@ -23,6 +23,10 @@ std::string settingsPath();  // $XDG_CONFIG_HOME/lunduke-terminal/settings.ini
 bool saveSettings(const ViewOptions& o, const std::string& path, std::string* error = nullptr,
                   std::string* warning = nullptr);
 
+// PR #7 review: when settings.ini's [terminal] profile is `deletedId` (a custom profile that was
+// just deleted), sets it to the default (amber), keeping every other key. True if it changed.
+bool resetDeletedDefaultProfile(const std::string& path, const std::string& deletedId, std::string* error = nullptr);
+
 class SettingsDialog;
 
 class TerminalWindow : public Gtk::Window {

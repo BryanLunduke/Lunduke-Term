@@ -70,6 +70,25 @@ bool saveSettings(const ViewOptions& o, const std::string& path, std::string* er
     }
 }
 
+bool resetDeletedDefaultProfile(const std::string& path, const std::string& deletedId, std::string* error) {
+    if (!Glib::file_test(path, Glib::FILE_TEST_IS_REGULAR)) return false;
+    try {
+        Glib::KeyFile kf;
+        kf.load_from_file(path, Glib::KEY_FILE_KEEP_COMMENTS);
+        if (!kf.has_group("terminal") || !kf.has_key("terminal", "profile") ||
+            kf.get_string("terminal", "profile") != deletedId)
+            return false;
+        kf.set_string("terminal", "profile", kDefaultProfile);
+        Glib::file_set_contents(path, kf.to_data());  // atomic, like saveSettings
+        return true;
+    } catch (const Glib::Error& e) {
+        // An unreadable settings.ini is left alone; at start-up an unknown profile falls back to
+        // the default anyway.
+        if (error) *error = e.what();
+        return false;
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 
 TerminalWindow::TerminalWindow(const ViewOptions& opts, const std::string& title)
@@ -836,6 +855,12 @@ void SettingsDialog::deleteCurrentProfile() {
     win_.profilesChanged(id, kDefaultProfile);
     fillProfiles(kDefaultProfile);
     changed();
+    // PR #7 review: the deleted profile was the saved default: settings.ini goes back to amber.
+    std::string resetErr;
+    if (resetDeletedDefaultProfile(win_.settingsFile, id, &resetErr))
+        status.set_text("Deleted. The saved default profile is " + std::string(kDefaultProfile) + " again.");
+    else if (!resetErr.empty())
+        status.set_text("Deleted, but " + win_.settingsFile + " could not be updated: " + resetErr);
 }
 
 void SettingsDialog::updateFrameSensitivity() {
