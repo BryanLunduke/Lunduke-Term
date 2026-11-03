@@ -109,7 +109,7 @@ A press on the bezel neither selects nor is reported to the application; a drag 
 glass clamps to the edge cells.
 Right-click opens a menu with Copy (greyed out without a selection), Paste and Settings; when the
 application uses the mouse, Shift+right-click opens it.
-Keys: Ctrl+Shift+E toggles effects, Ctrl+Shift+P cycles the profiles (built-in, then custom), Ctrl+Shift+C/V copy/paste,
+Keys: F11 toggles fullscreen (Shift/Ctrl/Alt+F11 still reach the program), Ctrl+Shift+E toggles effects, Ctrl+Shift+P cycles the profiles (built-in, then custom), Ctrl+Shift+C/V copy/paste,
 Shift+PgUp/PgDn/Home/End scroll back, Shift+Insert or middle-click pastes PRIMARY, Shift bypasses
 mouse reporting. Tabs: Ctrl+Shift+T opens a tab (in the current tab's working directory),
 Ctrl+Shift+W closes it (asking first if a program other than the shell runs in it), Ctrl+PgUp/PgDn switch (wrapping); the tab bar shows only with two or more

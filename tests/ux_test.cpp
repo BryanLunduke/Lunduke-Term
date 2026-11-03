@@ -193,6 +193,36 @@ static void testSettingsFontPx() {
     d->response(Gtk::RESPONSE_CLOSE);
 }
 
+// ---- perf step 1: F11 toggles fullscreen ----
+static void testFullscreenKey() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    TerminalWindow w(o);
+    w.settingsFile = "/dev/null";
+    w.show();
+    w.newTab(true);
+    pump(300);
+    GdkEventKey e = keyEv(GDK_KEY_F11, 0);
+    GdkEventKey shifted = keyEv(GDK_KEY_F11, GDK_SHIFT_MASK);
+    CHECK(!w.handleKey(&shifted));  // Shift+F11 goes to the program
+    CHECK(!w.fullscreenState());
+    CHECK(w.handleKey(&e));
+    const bool on = waitFor([&] { return w.fullscreenState(); }, 3000);
+    if (!on) {
+        // Without a window manager nobody answers _NET_WM_STATE_FULLSCREEN (plain xvfb-run).
+        std::printf("fullscreen: F11 handled, no window manager answered: state not checked\n");
+        return;
+    }
+    const int fw = w.get_width(), fh = w.get_height();
+    CHECK(w.handleKey(&e));
+    const bool off = waitFor([&] { return !w.fullscreenState(); }, 3000);
+    CHECK(off);
+    pump(200);
+    std::printf("fullscreen: F11 -> fullscreen %dx%d, F11 again -> %s %dx%d\n", fw, fh, off ? "windowed" : "STILL FULLSCREEN",
+                w.get_width(), w.get_height());
+}
+
 // ---- item 1: right-click menu ----
 static bool menuShown(TerminalView& v) { return v.contextMenu().get_visible(); }
 static void closeMenu(TerminalView& v) {
@@ -697,6 +727,7 @@ int main(int argc, char** argv) {
     testPlainRenders("gl");
     testPlainRenders("cpu");
     testSettingsFontPx();
+    testFullscreenKey();
     testContextMenu();
     testContextMenuWindow();
     testSelectionHasText();

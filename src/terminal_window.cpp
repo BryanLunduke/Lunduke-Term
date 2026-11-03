@@ -169,6 +169,7 @@ TerminalWindow::TerminalWindow(const ViewOptions& opts, const std::string& title
     });
     signal_window_state_event().connect([this](GdkEventWindowState* e) {
         iconified_ = (e->new_window_state & (GDK_WINDOW_STATE_ICONIFIED | GDK_WINDOW_STATE_WITHDRAWN)) != 0;
+        fullscreen_ = (e->new_window_state & GDK_WINDOW_STATE_FULLSCREEN) != 0;
         updateVisibility();
         return false;
     });
@@ -521,9 +522,22 @@ void TerminalWindow::updateSearchStatus() {
 
 // ---- keys ----
 
+void TerminalWindow::toggleFullscreen() {
+    // The window manager confirms with a window-state event (fullscreen_); ask for the opposite
+    // of what it last reported.
+    if (fullscreen_) unfullscreen();
+    else fullscreen();
+}
+
 bool TerminalWindow::handleKey(GdkEventKey* ev) {
     const guint mods = ev->state & (GDK_CONTROL_MASK | GDK_SHIFT_MASK | GDK_MOD1_MASK);
     const guint k = gdk_keyval_to_lower(ev->keyval);
+    // Perf step 1: F11 toggles fullscreen (as in GNOME Terminal); it is no longer sent to the
+    // program. Shift/Ctrl/Alt+F11 still are.
+    if (mods == 0 && ev->keyval == GDK_KEY_F11) {
+        toggleFullscreen();
+        return true;
+    }
     if (mods == (GDK_CONTROL_MASK | GDK_SHIFT_MASK)) {
         switch (k) {
         case GDK_KEY_t: newTab(); return true;

@@ -79,6 +79,9 @@ public:
     std::string settingsFile;  // where "Save as default" writes (tests point it elsewhere)
 
     bool handleKey(GdkEventKey* ev);  // window shortcuts; public for the tests
+    // Perf step 1: F11. fullscreenState() is what the window manager last reported.
+    void toggleFullscreen();
+    bool fullscreenState() const { return fullscreen_; }
 
     // M4 item 4: after tabs close, glibc keeps the freed GL (llvmpipe) memory in the main arena
     // (RSS stayed ~480 MB with one tab). closeTab schedules one malloc_trim(0), trimDelayMs after
@@ -128,7 +131,7 @@ private:
     Gtk::Label count_;
     std::vector<std::unique_ptr<Tab>> tabs_;
     std::unique_ptr<SettingsDialog> settings_;
-    bool iconified_ = false, obscured_ = false, mapped_ = false;
+    bool iconified_ = false, obscured_ = false, mapped_ = false, fullscreen_ = false;
     bool closing_ = false;
     bool closingTab_ = false;
     unsigned long nextTabId_ = 1;

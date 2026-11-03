@@ -27,6 +27,7 @@ for opt in --help -h; do
     has "$tmp/help.out" "milliseconds"
     has "$tmp/help.out" "--version"
     has "$tmp/help.out" "Ctrl+Shift+T"
+    has "$tmp/help.out" "F11"
     [ -s "$tmp/help.err" ] && { echo "$opt wrote to stderr:"; cat "$tmp/help.err"; fail=1; }
 done
 # --help wins wherever it is before -e, even after a value option.
