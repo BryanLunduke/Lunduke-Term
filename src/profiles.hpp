@@ -60,8 +60,13 @@ inline constexpr const char* kDefaultProfile = "amber";
 const std::vector<Profile>& builtinProfiles();
 // The installed font this profile will use (falls back along `fonts`, then to Monospace).
 FontPick profileFont(const Profile& p);
-// nullptr when unknown.
+// Built-in or custom (M6 item 4); nullptr when unknown. The pointer stays valid until the
+// custom profiles change (setCustomProfiles).
 const Profile* findProfile(const std::string& id);
+// M6 item 4: the user's own profiles (custom_profiles.hpp loads and saves them), listed after
+// the built-ins. Built-ins are never replaced by these: ids differ ("custom:NAME").
+const std::vector<Profile>& customProfiles();
+void setCustomProfiles(std::vector<Profile> v);
 
 // Raises c towards white until rgb2grey(c) >= minGrey (keeps the hue for chroma profiles).
 // Colours that are (almost) black are left alone so "black on colour" stays black.

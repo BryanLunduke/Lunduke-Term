@@ -12,6 +12,7 @@ epoxy_dep = dependency('epoxy')
 egl_dep = dependency('egl')
 threads_dep = dependency('threads')
 fontconfig_dep = dependency('fontconfig')
+glib_dep = dependency('glib-2.0')
 util_dep = meson.get_compiler('cpp').find_library('util')
 
 inc = include_directories('src')
@@ -39,8 +40,8 @@ view_env.set('LIBGL_ALWAYS_SOFTWARE', '1')
 effects_lib = static_library('lterm-effects',
   'src/effects.cpp', 'src/cpu_effects.cpp', 'src/thread_pool.cpp',
   'src/grid_painter.cpp', 'src/synthetic_frame.cpp', 'src/profiles.cpp',
-  'src/font_resolve.cpp', 'src/effects_governor.cpp',
-  dependencies : [pangocairo_dep, threads_dep, fontconfig_dep])
+  'src/font_resolve.cpp', 'src/effects_governor.cpp', 'src/custom_profiles.cpp',
+  dependencies : [pangocairo_dep, threads_dep, fontconfig_dep, glib_dep])
 
 gl_lib = static_library('lterm-gl', 'src/gl_effects.cpp', 'src/gl_pipeline.cpp',
   link_with : effects_lib, dependencies : [epoxy_dep, egl_dep])
@@ -106,6 +107,9 @@ test('governor', executable('governor_test', 'tests/governor_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]), env : test_env)
 test('profiles', executable('profiles_test', 'tests/profiles_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]), env : test_env)
+# M6 item 4: custom profile files (round trip, corrupt files, rename/delete, names, built-ins read-only).
+test('custom-profiles', executable('custom_profiles_test', 'tests/custom_profiles_test.cpp',
+  include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep, glib_dep]), env : test_env)
 test('painter', executable('painter_test', 'tests/painter_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]), env : test_env)
 test('fonts', executable('fonts_test', 'tests/fonts_test.cpp',

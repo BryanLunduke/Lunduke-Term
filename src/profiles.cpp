@@ -403,8 +403,21 @@ FontPick profileFont(const Profile& p) {
     return f;
 }
 
+namespace {
+std::vector<Profile>& customRegistry() {
+    static std::vector<Profile> v;
+    return v;
+}
+}  // namespace
+
+const std::vector<Profile>& customProfiles() { return customRegistry(); }
+
+void setCustomProfiles(std::vector<Profile> v) { customRegistry() = std::move(v); }
+
 const Profile* findProfile(const std::string& id) {
     for (const auto& p : builtinProfiles())
+        if (p.id == id) return &p;
+    for (const auto& p : customRegistry())
         if (p.id == id) return &p;
     return nullptr;
 }
