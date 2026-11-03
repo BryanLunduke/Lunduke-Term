@@ -16,6 +16,7 @@ box has **no GPU**: every GL result is Mesa llvmpipe on Xvfb. Times are EST.
 
 - Release `meson test -C build`: **18/18 OK** at f01c307 (`bench/m6/tests/release-meson-test.txt`; new tests `custom-profiles` and `ux`).
 - ASan/UBSan with leak checking (`build-san`, `tests/lsan.supp`): serial **2 × 18/18 OK**, parallel (2 processes) **1 × 18/18 OK** at f01c307 (`asan-serial.txt`, `asan-parallel.txt`). No leak or UBSan reports.
+- Re-run on the pushed head 4ec60e4 (no source change since f01c307; only docs and outputs): release **18/18 OK**, ASan/UBSan serial **2 × 18/18 OK**, parallel **1 × 18/18 OK**, no leak or UBSan reports (`release-final-4ec60e4.txt`, `asan-serial-final-4ec60e4.txt`, `asan-parallel-final-4ec60e4.txt`, 21:30–21:48 EST).
 - Timing and the frame governor were not touched, so the 10-run view loop was not repeated.
 - `src/vterm_session.cpp` is unchanged, so no fuzz run.
 
