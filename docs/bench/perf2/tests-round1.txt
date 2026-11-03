@@ -28,7 +28,7 @@ exit 0 | 10:20:40 | load 4.78 5.17 11.60 | Xvfb :82 alive (pid 2593866), xfwm4 a
 stopped own xfwm4 2593902, Xvfb 2593866; done 10:20:41
 
 ## failures and analysis
-release: scrollback-default FAIL (sb-lines 17 short) at load 150-185; passes alone on branch and on master -> load flake, rerun below.
+release: scrollback-default FAIL (sb-lines 17 short) at load 150-185; (round-1 guess: load flake) -> WRONG, see tests-round2.txt: reproducible at load 4-5, follows patch 0002.
 asan-serial + asan-parallel: libvterm-t-patched/-stock FAIL in t/10state_putglyph.test = LeakSanitizer:
   stock libvterm 0.3.3 vterm_state_free never frees the selection buffer (only the t/ harness sets it).
   Fixed in f8430ac by tests/lsan-libvterm-t.supp (leak:vterm_state_set_selection_callbacks); both t/ suites pass in build-san.
