@@ -7,6 +7,12 @@ project('lunduke-terminal', 'cpp',
 
 gtkmm_dep = dependency('gtkmm-3.0', version : '>=3.24')
 pangocairo_dep = dependency('pangocairo')
+# Tests label their timing output with the build kind (tests/sanitizer.hpp). Before any target
+# (the bundled libvterm below): meson allows project arguments only there.
+if get_option('b_sanitize') != 'none'
+  add_project_arguments('-DLTERM_SANITIZED_BUILD=1', language : 'cpp')
+endif
+
 # libvterm: bundled by default (third_party/README.md): the pristine 0.3.3 source plus the patches
 # in third_party/libvterm-patches, applied at build time to a copy in the build directory.
 # -Dlibvterm=system uses the installed libvterm instead (no patches).
@@ -39,11 +45,6 @@ glib_dep = dependency('glib-2.0')
 util_dep = meson.get_compiler('cpp').find_library('util')
 
 inc = include_directories('src')
-
-# Tests label their timing output with the build kind (tests/sanitizer.hpp).
-if get_option('b_sanitize') != 'none'
-  add_project_arguments('-DLTERM_SANITIZED_BUILD=1', language : 'cpp')
-endif
 
 # Every test runs with leak checking on (only matters for ASan-instrumented binaries: all of
 # build-san, and view_test in any build). tests/lsan.supp lists third-party caches only.
