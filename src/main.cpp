@@ -11,7 +11,8 @@
 //                    [--frame-shininess 0..1] [--rgb-shift 0..1]
 //                    [-T|--title TITLE] [--list-profiles] [-h|--help] [--version] [-e COMMAND ARGS...]
 // --quit-after is in milliseconds. --help/--version print to stdout and exit 0; an unknown
-// option or a bad value exits 2.
+// option exits 2, and so does a bad --renderer, --on-exit, --cursor-shape or --effects-quality
+// value (other values are not checked).
 // Settings (optional): $XDG_CONFIG_HOME/lunduke-terminal/settings.ini, group [terminal], keys
 // profile, effects (true/false), renderer, threads, effects-fps, max-fps, pause-unfocused,
 // effects-quality, cpu-budget (percent of one core, software rendering only, 0 = off),

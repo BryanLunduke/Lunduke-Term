@@ -104,7 +104,8 @@ Options: `--profile ID`, `--effects`/`--no-effects`, `--renderer auto|gl|cpu`, `
 (bezel; amber/green/green-scanlines/vintage/paper-white only, ignored with a warning elsewhere), `--frame-size PX`
 (logical px, default 28), `--frame-color #RRGGBB`, `--frame-shininess 0..1` (reflection and
 highlights), `--rgb-shift X` (CRT `rbgShift`, 0 = off), `-T/--title TEXT`, `-e COMMAND...`, `-h/--help` (all options and keys), `--version`.
-An unknown option or a bad value exits with status 2.
+An unknown option exits with status 2, and so does a bad value for `--renderer`, `--on-exit`, `--cursor-shape`
+or `--effects-quality`; other option values are not checked.
 A press on the bezel neither selects nor is reported to the application; a drag that leaves the
 glass clamps to the edge cells.
 Right-click opens a menu with Copy (greyed out without a selection), Paste and Settings; when the
