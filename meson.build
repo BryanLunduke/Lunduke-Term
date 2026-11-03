@@ -22,7 +22,8 @@ lv_sources = files(lv_dir / 'src/encoding.c', lv_dir / 'src/keyboard.c', lv_dir 
   lv_dir / 'src/vterm.c')
 lv_inc = include_directories(lv_dir / 'include', lv_dir / 'src')
 lv_series = files('third_party/libvterm-patches/series')
-lv_patches = []  # in series order
+lv_patches = files(  # in series order
+  'third_party/libvterm-patches/0001-screen-rep-wide-glyph-at-right-margin.patch')
 lv_c_opts = ['c_std=c99', 'warning_level=1']  # upstream builds with -std=c99 -Wall
 if get_option('libvterm') == 'system'
   vterm_dep = dependency('vterm', version : '>=0.3')
@@ -152,6 +153,10 @@ test('fixes', executable('fixes_test', 'tests/fixes_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
   timeout : 60, env : test_env)
 test('fuzz-regress', executable('fuzz_regress_test', 'tests/fuzz_regress_test.cpp',
+  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
+  timeout : 60, env : test_env)
+# third_party/libvterm-patches/0001: REP of a wide glyph at the right margin (fuzz crash 46ca723d).
+test('libvterm-rep', executable('libvterm_rep_test', 'tests/libvterm_rep_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
   timeout : 60, env : test_env)
 test('unicode', executable('unicode_test', 'tests/unicode_test.cpp',

@@ -1,2 +1,3 @@
 # Applied in this order to third_party/libvterm (0.3.3) by tools/libvterm_patch.py.
 # Keep in step with lv_patches in meson.build.
+0001-screen-rep-wide-glyph-at-right-margin.patch

@@ -1,0 +1,16 @@
+# libvterm patch 0001 (REP of a wide glyph at the right margin). REAL, 2026-11-03 08:02 CST, this box.
+# Input: tests/data/fuzz/crash-46ca723d-libvterm-rep.bin (from origin/m6-ram docs/bench/m6/ram/fuzz/,
+# 631 bytes). Not reported upstream.
+
+## Fuzz harness (tools/fuzz/build.sh, clang 19, libFuzzer+ASan+UBSan) against stock libvterm 0.3.3
+$ LTERM_FUZZ_TRACE=1 ./vterm_fuzz crash-46ca723d-libvterm-rep.bin   -> exit 1
+/workspace/lterm-tools/src/libvterm-0.3.3/src/screen.c:190:46: runtime error: member access within null pointer of type 'ScreenCell'
+SUMMARY: UndefinedBehaviorSanitizer: undefined-behavior /workspace/lterm-tools/src/libvterm-0.3.3/src/screen.c:190:46 
+(The trace it printed is case 3 of tests/libvterm_rep_test.cpp.)
+
+## tests/libvterm_rep_test.cpp
+stock 0.3.3, release (-O2), linked by hand          -> exit 139 (SIGSEGV)
+stock 0.3.3, ASan/UBSan                             -> exit 1: third_party/libvterm/src/screen.c:190:55: runtime error: member access within null pointer of type 'struct ScreenCell'
+stock 0.3.3, ASan/UBSan, case 3 (fuzz trace) only   -> exit 1: third_party/libvterm/src/screen.c:190:55: runtime error: member access within null pointer of type 'struct ScreenCell'
+bundled + 0001, release (build/)                    -> exit 0 "libvterm REP regression OK"
+bundled + 0001, ASan/UBSan (build-san/)             -> exit 0 "libvterm REP regression OK"

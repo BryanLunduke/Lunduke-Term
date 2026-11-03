@@ -24,5 +24,10 @@
   longer fits stops the build. `-Dlibvterm=system` builds against the installed libvterm
   (>= 0.3) instead, without the patches.
 - **Patches** (`third_party/libvterm-patches/`, in `series` order; each file says what it changes
-  and why): none yet.
+  and why):
+  - `0001-screen-rep-wide-glyph-at-right-margin.patch`: REP (`CSI b`) of a wide glyph can start
+    the glyph in the last column; stock `putglyph()` then writes the right half through a NULL
+    cell (`screen.c:190`) and damages one column past the screen. The patch stops at the margin
+    and clamps the damage rect. Found by `tools/fuzz/vterm_fuzz`
+    (`tests/data/fuzz/crash-46ca723d-libvterm-rep.bin`); test `libvterm-rep`.
 - Local changes only; nothing has been sent upstream.
