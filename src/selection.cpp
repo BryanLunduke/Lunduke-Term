@@ -93,6 +93,30 @@ bool wideJumpGap(const LineSource& src, long line, int col, long end) {
 
 std::string Selection::text(const LineSource& src) const { return text(src, start_.line, end_.line); }
 
+bool Selection::hasText(const LineSource& src) const {
+    if (!active_) return false;
+    const int cols = src.cols();
+    for (long l = start_.line; l <= end_.line; ++l) {
+        const bool soft = src.wrapped(l) && l != end_.line;
+        if (!soft && l != end_.line) return true;  // text() adds a newline after this line
+        const int c0 = l == start_.line ? start_.col : 0;
+        const int c1 = l == end_.line ? end_.col : cols - 1;
+        for (int c = c0; c <= c1 && c < cols; ++c) {
+            uint32_t cp[8];
+            int w = 1;
+            const int n = src.cellChars(l, c, cp, 8, &w);
+            if (w == 0) continue;
+            bool blank = true;
+            for (int i = 0; i < n; ++i) blank = blank && cp[i] == ' ';
+            if (!blank) return true;
+            // Soft-wrapped rows keep their blanks, except the gap a wrapped wide character left;
+            // the last row's trailing blanks are trimmed.
+            if (soft && !(n == 0 && wideJumpGap(src, l, c, src.endLine()))) return true;
+        }
+    }
+    return false;
+}
+
 std::string Selection::text(const LineSource& src, long from, long to) const {
     std::string out;
     if (!active_) return out;
