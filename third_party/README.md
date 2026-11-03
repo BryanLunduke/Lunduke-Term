@@ -33,7 +33,17 @@
   - `0002-screen-ring-rotation-for-full-screen-scroll.patch`: a whole-screen scroll up (every
     line of `seq`, `cat`, ...) moved every remaining row of the cell buffer. Each buffer now has
     a row offset (`ringtop`) that `getcell()` adds, and such a scroll only advances it; partial
-    scrolls are unchanged, and `resize_buffer()` puts the rows back in order first. Output is
-    meant to be byte-identical to stock: tests `libvterm-t-patched` (upstream's `t/` suite) and
-    `libvterm-diff` (randomised stock vs patched comparison).
+    scrolls are unchanged, and `resize_buffer()` puts the rows back in order first. The vacated
+    rows get the old bottom rows' contents, as stock's move leaves them, because erasing keeps
+    `chars[1..]` and `get_cell()` can show them. Output is byte-identical to stock: tests
+    `libvterm-t-patched` (upstream's `t/` suite), `libvterm-diff` and `libvterm-diff-repfix`
+    (randomised escape-sequence streams, stock vs patched) and `libvterm-feed-diff` (sources and
+    `seq`); long runs in `docs/bench/perf2/`.
+- **Test-only builds:** `vterm-stock` (pristine `screen.c`) and `vterm-repfix` (0001 only) are
+  built for those tests and are not linked into the program.
+- **Stock bugs the patches do not fix** (both builds have them; the session guards against them,
+  `docs/FUZZING.md`): F1–F3, F7, F9, F10, F15, F17, and two found by the differential test: a
+  double-width line on a 1-column screen writes through a NULL cell, and more than 5 combining
+  marks after one base (or marks starting a later write after the cursor moved) make a width-0
+  glyph that REP repeats forever (an F7 variant).
 - Local changes only; nothing has been sent upstream.

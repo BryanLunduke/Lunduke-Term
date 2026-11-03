@@ -173,9 +173,12 @@ test('fuzz-regress', executable('fuzz_regress_test', 'tests/fuzz_regress_test.cp
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
   timeout : 60, env : test_env)
 # third_party/libvterm-patches/0001: REP of a wide glyph at the right margin (fuzz crash 46ca723d).
-test('libvterm-rep', executable('libvterm_rep_test', 'tests/libvterm_rep_test.cpp',
-  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
-  timeout : 60, env : test_env)
+# The system libvterm has the bug (that is the patch), so only with the bundled one.
+if get_option('libvterm') == 'bundled'
+  test('libvterm-rep', executable('libvterm_rep_test', 'tests/libvterm_rep_test.cpp',
+    include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
+    timeout : 60, env : test_env)
+endif
 test('unicode', executable('unicode_test', 'tests/unicode_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
   timeout : 60, env : test_env)

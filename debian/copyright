@@ -14,11 +14,11 @@ License: CC0-1.0
  found in "/usr/share/common-licenses/CC0-1.0".
 
 Files: third_party/libvterm/*
-Copyright: 2008-2023 Paul Evans <leonerd@leonerd.org.uk>
+Copyright: 2008 Paul Evans <leonerd@leonerd.org.uk>
 License: MIT
 
 Files: third_party/libvterm/src/unicode.c
-Copyright: 2008-2023 Paul Evans <leonerd@leonerd.org.uk>
+Copyright: 2008 Paul Evans <leonerd@leonerd.org.uk>
            2007 Markus Kuhn (wcwidth tables)
 License: MIT and Kuhn-permissive
 
