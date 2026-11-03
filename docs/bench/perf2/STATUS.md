@@ -1,12 +1,10 @@
 # perf step 2 status
 
-Done and committed: bundled libvterm 0.3.3 + patches 0001/0002, REP regression test, t/ suite,
-differential tests (meson + long runs), feed/dump comparison, coverage, licensing/docs, test
-suites round 1 and 2, libFuzzer 120 s (fuzz.txt), measurement (measure/TABLE.md).
+Done and committed through 7a9e688: bundled libvterm 0.3.3 + patches 0001/0002, tests, differential
+runs, fuzzing, measurement vs 21eff10 (measure/TABLE.md), test rounds 1-3.
 
-scrollback-default with 0002: a timing race in the test (WM resize vs. faster output), fixed in
-f37aba0 (the test waits 1 s for the window to settle); scrollback-default.txt has the probe and 4/4
-passes (3 release, 1 ASan).
+118ba52: merged origin/master f2b96d1 (perf step 1, PR #9). Conflicts in meson.build, docs/TESTING.md
+and tests/scrollback_default_test.sh; both sides were kept.
 
-Running: round 3 at HEAD, full release (2 procs) + ASan/UBSan+LSan parallel (2 procs), own Xvfb :83
-(/workspace/perf2-work/round3.sh -> /workspace/perf2-work/round3.log). When done: tests-round3.txt.
+Running (/workspace/perf2-work/merged.sh): re-measure vs f2b96d1 (own Xvfb :84), then release,
+ASan serial, ASan parallel, libFuzzer 60 s. Results go to tests-merged.txt and measure-merged/.
