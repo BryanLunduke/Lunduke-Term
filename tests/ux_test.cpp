@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <functional>
 #include <string>
+#include <vector>
 #include <signal.h>
 #include <unistd.h>
 #include <algorithm>
@@ -21,6 +22,7 @@
 using namespace lterm;
 
 static int failures = 0;
+static std::string home;  // XDG_CONFIG_HOME of this run (removed at the end)
 #define CHECK(cond)                                                              \
     do {                                                                         \
         if (!(cond)) {                                                           \
@@ -284,6 +286,262 @@ static void testContextMenuWindow() {
     if (w.settingsDialog()) w.settingsDialog()->response(Gtk::RESPONSE_CLOSE);
 }
 
+// ---- PR #7 review: the Copy item asks Selection::hasText (no text built) ----
+// Cells: ' ' blank (""), 'S' a literal space, 'W' left half of a wide char, 'w' its right half,
+// anything else itself. Counts every cell read.
+struct FakeLines : LineSource {
+    std::vector<std::string> rows;
+    std::vector<bool> wrap;
+    mutable long reads = 0;
+    int cols() const override { return rows.empty() ? 0 : static_cast<int>(rows[0].size()); }
+    long firstLine() const override { return 0; }
+    long endLine() const override { return static_cast<long>(rows.size()); }
+    std::string cellText(long l, int c) const override {
+        ++reads;
+        const char ch = rows[l][c];
+        if (ch == ' ' || ch == 'w') return "";
+        if (ch == 'S') return " ";
+        if (ch == 'W') return "\xe6\xbc\xa2";
+        return std::string(1, ch);
+    }
+    int cellWidth(long l, int c) const override { return rows[l][c] == 'w' ? 0 : 1; }
+    bool wrapped(long l) const override { return wrap[l]; }
+};
+
+static void testSelectionHasText() {
+    FakeLines f;
+    std::srand(7);
+    long mismatches = 0, cases = 0;
+    const char cells[] = {' ', ' ', ' ', ' ', 'S', 'a', 'W'};
+    for (int round = 0; round < 400; ++round) {
+        const int nrows = 1 + std::rand() % 4, ncols = 2 + std::rand() % 5;
+        f.rows.assign(nrows, std::string());
+        f.wrap.assign(nrows, false);
+        for (int r = 0; r < nrows; ++r) {
+            std::string row;
+            while (static_cast<int>(row.size()) < ncols) {
+                char ch = cells[std::rand() % (round % 3 == 0 ? 7 : 5)];  // mostly blanks
+                if (ch == 'W') {
+                    if (static_cast<int>(row.size()) + 2 > ncols) ch = ' ';
+                    else {
+                        row += "Ww";
+                        continue;
+                    }
+                }
+                row += ch;
+            }
+            f.rows[r] = row;
+            f.wrap[r] = std::rand() % 2;
+        }
+        for (int k = 0; k < 20; ++k) {
+            SelPos a{std::rand() % nrows, std::rand() % ncols}, b{std::rand() % nrows, std::rand() % ncols};
+            Selection s;
+            s.begin(f, a, SelectMode::Char);
+            s.extend(f, b);
+            ++cases;
+            if (s.hasText(f) != !s.text(f).empty()) ++mismatches;
+        }
+    }
+    CHECK(mismatches == 0);
+    // Cheap: a 5,000-line selection with text in its first cell reads one cell, not 400,000.
+    f.rows.assign(5000, std::string(80, 'x'));
+    f.wrap.assign(5000, true);  // soft-wrapped: hasText has to look at the first cell
+    Selection big;
+    big.begin(f, SelPos{0, 0}, SelectMode::Char);
+    big.extend(f, SelPos{4999, 79});
+    f.reads = 0;
+    CHECK(big.hasText(f));
+    const long hasReads = f.reads;
+    f.reads = 0;
+    CHECK(!big.text(f).empty());
+    const long textReads = f.reads;
+    CHECK(hasReads <= 2 && textReads >= 400000);
+    std::printf("selection hasText: %ld random cases agree with !text().empty() (%ld mismatches); 5000x80 "
+                "selection: hasText read %ld cell(s), text() %ld\n", cases, mismatches, hasReads, textReads);
+}
+
+// ---- PR #7 review: Ctrl+Shift+P cycles through the custom profiles too ----
+static void testProfileCycle() {
+    setCustomProfiles({});
+    const std::string dir = customProfilesDir();
+    std::string err;
+    for (const char* n : {"Cycle A", "Cycle B"}) {
+        Profile p = *findProfile("green");
+        p.id = customProfileId(n);
+        CHECK(saveCustomProfile(dir, p, &err));
+    }
+    const auto& b = builtinProfiles();
+    ViewOptions o;
+    o.profile = b.back().id;  // the last built-in
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    Win w(o);
+    TerminalView& v = *w.view;
+    CHECK(v.start());
+    std::vector<std::string> seen{v.profile().id};
+    const size_t total = b.size() + 2;
+    for (size_t i = 0; i < total; ++i) {
+        GdkEventKey e = keyEv(GDK_KEY_P, GDK_CONTROL_MASK | GDK_SHIFT_MASK);
+        CHECK(v.testKey(&e));
+        pump(20);
+        seen.push_back(v.profile().id);
+    }
+    std::string order;
+    for (const auto& id : seen) order += (order.empty() ? "" : " > ") + id;
+    std::printf("profile cycle: %s\n", order.c_str());
+    // last built-in > Cycle A > Cycle B > first built-in > ... > last built-in
+    CHECK(seen.size() == total + 1);
+    CHECK(seen[1] == "custom:Cycle A" && seen[2] == "custom:Cycle B" && seen[3] == b.front().id);
+    CHECK(seen.back() == b.back().id);
+    CHECK(nextProfileId("custom:Cycle B") == b.front().id && nextProfileId("custom:Nope") == b.front().id);
+    setCustomProfiles({});
+    CHECK(nextProfileId(b.back().id) == b.front().id);  // no custom profiles: built-ins only
+    reloadCustomProfiles();
+    for (const char* n : {"custom:Cycle A", "custom:Cycle B"}) CHECK(deleteCustomProfile(dir, n, &err));
+    CHECK(customProfiles().empty());
+}
+
+static std::string fileText(const std::string& path) {
+    char* d = nullptr;
+    gsize n = 0;
+    std::string s = g_file_get_contents(path.c_str(), &d, &n, nullptr) ? std::string(d, n) : std::string("<none>");
+    g_free(d);
+    return s;
+}
+
+// ---- PR #7 review: a profile file skipped as broken is never written over from the dialog ----
+static void testBrokenProfileFileKept() {
+    const std::string dir = customProfilesDir();
+    g_mkdir_with_parents(dir.c_str(), 0700);
+    const std::string badColor = dir + "/badcolor.ini", broken = dir + "/broken.ini";
+    const std::string badText = "[profile]\nforeground=#nothex\n", brokenText = "[profile\nhand-edited\n";
+    g_file_set_contents(badColor.c_str(), badText.c_str(), -1, nullptr);
+    g_file_set_contents(broken.c_str(), brokenText.c_str(), -1, nullptr);
+    setCustomProfiles({});
+    std::vector<std::string> warn;
+    reloadCustomProfiles(&warn);
+    CHECK(warn.size() == 2 && customProfiles().empty());
+    ViewOptions o;
+    o.profile = "amber";
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    TerminalWindow w(o);
+    w.settingsFile = "/dev/null";
+    w.show();
+    TerminalView* v = w.newTab(true);
+    pump(200);
+    w.showSettings();
+    pump(100);
+    SettingsDialog* d = w.settingsDialog();
+    CHECK(d && v);
+    if (!d || !v) return;
+    std::string err;
+    // The name dialog's own check refuses it with the reason (OK stays disabled there).
+    CHECK(!validateProfileName("badcolor", &err, "", dir) && err.find("could not be loaded") != std::string::npos);
+    // New and Copy onto the skipped names.
+    d->askNameHook = [](const std::string&, const std::string&) { return std::string("badcolor"); };
+    d->newProfile.clicked();
+    pump(100);
+    CHECK(d->status.get_text().find("Profile not saved") != Glib::ustring::npos &&
+          d->status.get_text().find("badcolor.ini") != Glib::ustring::npos);
+    d->askNameHook = [](const std::string&, const std::string&) { return std::string("Broken"); };
+    d->copyProfile.clicked();
+    pump(100);
+    CHECK(d->status.get_text().find("broken.ini") != Glib::ustring::npos);
+    CHECK(customProfiles().empty());
+    // Rename a real custom profile onto a skipped name.
+    d->askNameHook = [](const std::string&, const std::string&) { return std::string("Real"); };
+    d->copyProfile.clicked();
+    pump(200);
+    if (d->editor) d->editor->response(Gtk::RESPONSE_CANCEL);
+    CHECK(d->profile.get_active_id() == "custom:Real");
+    d->askNameHook = [](const std::string&, const std::string&) { return std::string("broken"); };
+    d->renameProfile.clicked();
+    pump(100);
+    std::printf("broken profile file: rename status '%s'\n", d->status.get_text().c_str());
+    CHECK(d->status.get_text().find("Not renamed") != Glib::ustring::npos);
+    CHECK(findProfile("custom:Real") && !findProfile("custom:broken") && v->profile().id == "custom:Real");
+    CHECK(fileText(badColor) == badText && fileText(broken) == brokenText);  // byte-identical
+    d->confirmDeleteHook = [](const std::string&) { return true; };
+    d->deleteProfile.clicked();
+    pump(100);
+    CHECK(customProfiles().empty());
+    CHECK(fileText(badColor) == badText && fileText(broken) == brokenText);
+    d->response(Gtk::RESPONSE_CLOSE);
+    if (v) w.closeTab(v);
+    pump(100);
+    g_unlink(badColor.c_str());
+    g_unlink(broken.c_str());
+}
+
+// ---- PR #7 review: deleting the custom profile saved as the default resets settings.ini ----
+static void testDeleteSavedDefault() {
+    setCustomProfiles({});
+    const std::string dir = customProfilesDir();
+    const std::string ini = "/tmp/lterm-ux-test-" + std::to_string(getpid()) + "/settings-default-test.ini";
+    ViewOptions o;
+    o.profile = "amber";
+    o.command = {"/bin/sh", "-c", "exec sleep 30"};
+    TerminalWindow w(o);
+    w.settingsFile = ini;
+    w.show();
+    TerminalView* v = w.newTab(true);
+    pump(200);
+    w.showSettings();
+    pump(100);
+    SettingsDialog* d = w.settingsDialog();
+    CHECK(d && v);
+    if (!d || !v) return;
+    d->askNameHook = [](const std::string&, const std::string&) { return std::string("Saved"); };
+    d->copyProfile.clicked();
+    pump(200);
+    if (d->editor) d->editor->response(Gtk::RESPONSE_CANCEL);
+    d->save.clicked();  // "Save as default": profile=custom:Saved
+    pump(50);
+    // Keys the dialog does not own are kept.
+    std::string text = fileText(ini);
+    text += "\n[other]\nkeep=yes\n";
+    g_file_set_contents(ini.c_str(), text.c_str(), -1, nullptr);
+    CHECK(text.find("profile=custom:Saved") != std::string::npos);
+    // A second custom profile, deleted while Saved is the default: settings.ini is untouched.
+    d->askNameHook = [](const std::string&, const std::string&) { return std::string("Other"); };
+    d->copyProfile.clicked();
+    pump(200);
+    if (d->editor) d->editor->response(Gtk::RESPONSE_CANCEL);
+    d->confirmDeleteHook = [](const std::string&) { return true; };
+    d->deleteProfile.clicked();
+    pump(100);
+    CHECK(fileText(ini) == text);
+    // Delete the saved default: settings.ini says amber again, the rest is kept.
+    d->profile.set_active_id("custom:Saved");
+    pump(100);
+    d->deleteProfile.clicked();
+    pump(100);
+    const std::string after = fileText(ini);
+    std::printf("delete saved default: settings.ini profile line now '%s'\n",
+                after.find("profile=amber") != std::string::npos ? "profile=amber" : "?");
+    CHECK(after.find("profile=amber") != std::string::npos && after.find("custom:Saved") == std::string::npos);
+    CHECK(after.find("keep=yes") != std::string::npos && after.find("scrollback-lines=") != std::string::npos);
+    CHECK(customProfiles().empty());
+    d->response(Gtk::RESPONSE_CLOSE);
+    if (v) w.closeTab(v);
+    pump(100);
+    g_unlink(ini.c_str());
+}
+
+// Removes the test's XDG_CONFIG_HOME (PR #7 review). Only this test's own /tmp folder.
+static void removeTree(const std::string& path) {
+    if (path.rfind("/tmp/lterm-ux-test-", 0) != 0) return;
+    if (GDir* d = g_dir_open(path.c_str(), 0, nullptr)) {
+        while (const char* n = g_dir_read_name(d)) {
+            const std::string child = path + "/" + n;
+            if (g_file_test(child.c_str(), G_FILE_TEST_IS_DIR) && !g_file_test(child.c_str(), G_FILE_TEST_IS_SYMLINK))
+                removeTree(child);
+            else g_unlink(child.c_str());
+        }
+        g_dir_close(d);
+    }
+    g_rmdir(path.c_str());
+}
+
 // ---- item 4: custom profiles through the Settings dialog ----
 static void testCustomProfilesUi() {
     setCustomProfiles({});
@@ -431,7 +689,9 @@ int main(int argc, char** argv) {
     }
     signal(SIGPIPE, SIG_IGN);
     setenv("SHELL", "/bin/sh", 1);
-    setenv("XDG_CONFIG_HOME", ("/tmp/lterm-ux-test-" + std::to_string(getpid())).c_str(), 1);
+    home = "/tmp/lterm-ux-test-" + std::to_string(getpid());
+    setenv("XDG_CONFIG_HOME", home.c_str(), 1);
+    std::atexit([] { removeTree(home); });  // also when a check aborts the run (exit paths)
     auto app = Gtk::Application::create(argc, argv, "org.lunduke.TerminalUxTest", Gio::APPLICATION_NON_UNIQUE);
     app->register_application();
     testPlainRenders("gl");
@@ -439,7 +699,15 @@ int main(int argc, char** argv) {
     testSettingsFontPx();
     testContextMenu();
     testContextMenuWindow();
+    testSelectionHasText();
     testCustomProfilesUi();
+    testProfileCycle();
+    testBrokenProfileFileKept();
+    testDeleteSavedDefault();
+    removeTree(home);
+    const bool left = g_file_test(home.c_str(), G_FILE_TEST_EXISTS);
+    CHECK(!left);
+    std::printf("ux_test: config folder %s %s\n", home.c_str(), left ? "LEFT BEHIND" : "removed");
     if (failures) std::printf("%d failure(s)\n", failures);
     else std::printf("ux_test: all passed\n");
     return failures ? 1 : 0;
