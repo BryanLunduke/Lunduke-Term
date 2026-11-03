@@ -1,0 +1,106 @@
+# Perf step 1 test runs at 72a3225 (code identical to 8a9fef7 + the scrollback test fix), Xvfb :71 + xfwm4, llvmpipe
+# meson test --no-rebuild --timeout-multiplier 4; build = release, build-san = debug + address,undefined (leak check on)
+
+## release-serial
+ 1/20 desktop-file OK 0.01s
+ 2/20 metainfo OK 0.05s
+ 3/20 effects OK 0.22s
+ 4/20 governor OK 0.01s
+ 5/20 profiles OK 0.01s
+ 6/20 custom-profiles OK 0.09s
+ 7/20 painter OK 0.11s
+ 8/20 fonts OK 0.03s
+ 9/20 vterm OK 0.01s
+10/20 gl-match OK 11.35s
+11/20 session OK 0.15s
+12/20 fixes OK 0.39s
+13/20 fuzz-regress OK 0.01s
+14/20 unicode OK 0.01s
+15/20 search OK 0.81s
+16/20 view OK 99.06s
+17/20 review OK 38.59s
+18/20 ux OK 18.17s
+19/20 scrollback-default OK 8.45s
+20/20 cli OK 0.10s
+Ok:                 20  
+Fail:               0   
+Skipped:            0   
+Timeout:            0   
+
+## release-parallel
+ 1/20 desktop-file OK 0.01s
+ 2/20 metainfo OK 0.01s
+ 3/20 governor OK 0.00s
+ 4/20 profiles OK 0.00s
+ 5/20 custom-profiles OK 0.09s
+ 6/20 painter OK 0.08s
+ 7/20 fonts OK 0.02s
+ 8/20 vterm OK 0.00s
+ 9/20 effects OK 0.21s
+10/20 session OK 0.13s
+11/20 fixes OK 0.39s
+12/20 fuzz-regress OK 0.01s
+13/20 unicode OK 0.00s
+14/20 search OK 0.82s
+15/20 gl-match OK 11.19s
+16/20 view OK 101.69s
+17/20 review OK 38.70s
+18/20 ux OK 18.14s
+19/20 scrollback-default OK 8.43s
+20/20 cli OK 0.11s
+Ok:                 20  
+Fail:               0   
+Skipped:            0   
+Timeout:            0   
+
+## asan-serial
+ 1/20 desktop-file OK 0.00s
+ 2/20 metainfo OK 0.01s
+ 3/20 effects OK 1.58s
+ 4/20 governor OK 0.01s
+ 5/20 profiles OK 0.02s
+ 6/20 custom-profiles OK 0.18s
+ 7/20 painter OK 0.30s
+ 8/20 fonts OK 0.06s
+ 9/20 vterm OK 0.03s
+10/20 gl-match OK 513.27s
+11/20 session OK 0.88s
+12/20 fixes OK 0.48s
+13/20 fuzz-regress OK 0.05s
+14/20 unicode OK 0.05s
+15/20 search OK 22.16s
+16/20 view OK 125.72s
+17/20 review OK 73.33s
+18/20 ux OK 43.05s
+19/20 scrollback-default OK 18.13s
+20/20 cli OK 0.21s
+Ok:                 20  
+Fail:               0   
+Skipped:            0   
+Timeout:            0   
+
+## asan-parallel
+ 1/20 desktop-file OK 0.01s
+ 2/20 metainfo OK 0.03s
+ 3/20 governor OK 0.01s
+ 4/20 profiles OK 0.02s
+ 5/20 custom-profiles OK 0.18s
+ 6/20 painter OK 0.32s
+ 7/20 fonts OK 0.07s
+ 8/20 vterm OK 0.02s
+ 9/20 effects OK 1.61s
+10/20 session OK 1.03s
+11/20 fixes OK 0.45s
+12/20 fuzz-regress OK 0.03s
+13/20 unicode OK 0.03s
+14/20 search OK 21.85s
+15/20 gl-match OK 89.65s
+16/20 view OK 465.39s
+17/20 review OK 70.62s
+18/20 ux OK 43.08s
+19/20 scrollback-default OK 18.00s
+20/20 cli OK 0.21s
+Ok:                 20  
+Fail:               0   
+Skipped:            0   
+Timeout:            0   
