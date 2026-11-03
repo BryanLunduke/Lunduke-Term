@@ -10,10 +10,12 @@ tmp=$(mktemp -d /tmp/lterm-sbdefault.XXXXXX) || exit 1
 trap 'rm -rf "$tmp"' EXIT
 fail=0
 
-# Prints the last sb-lines= value of a run that prints 12000 lines, then exits.
+# Prints the last sb-lines= value of a run that prints 12000 lines, then exits. Lines with tabs=0
+# are skipped: when the tab has closed, a stats tick can still fire before the window goes (seen
+# under ASan, slower teardown) and reports sb-lines=0 for no tab.
 run() {
     XDG_CONFIG_HOME=$1 timeout 60 "$bin" --profile plain --renderer cpu --stats-every 1 --on-exit close \
-        -e sh -c 'seq 1 12000; sleep 2' 2>&1 | sed -n 's/^stats-mem .* sb-lines=\([0-9]*\) .*/\1/p' | tail -n 1
+        -e sh -c 'seq 1 12000; sleep 2' 2>&1 | sed -n 's/^stats-mem .* tabs=[1-9][0-9]* .* sb-lines=\([0-9]*\) .*/\1/p' | tail -n 1
 }
 check() {  # name config-dir expected
     got=$(run "$2")
