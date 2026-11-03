@@ -178,7 +178,9 @@ void GlPipeline::resize(int width, int height) {
     hh_ = std::max(1, h_ / 2);
     bw_ = p_.burnInHalfRes ? hw_ : w_;
     bh_ = p_.burnInHalfRes ? hh_ : h_;
-    texSrc_ = makeTex(w_, h_, kSizedFmt, true, false);
+    // M6 item 6: the source is uploaded from an 8-bit Cairo image (glTexSubImage2D, GL_UNSIGNED_BYTE), so
+    // an 8-bit texture holds it exactly; a half-float one cost 4 more bytes per pixel (4 MB at 1280x800).
+    texSrc_ = makeTex(w_, h_, GL_RGBA8, true, false);
     texDown_ = makeTex(hw_, hh_, kSizedFmt, true, false);
     texBloomA_ = makeTex(hw_, hh_, kSizedFmt, true, false);
     texBloomB_ = makeTex(hw_, hh_, kSizedFmt, true, false);
