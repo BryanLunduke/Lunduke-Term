@@ -27,9 +27,14 @@ the operations of one input. That is how the findings below were minimised; the 
 After every operation, and after every byte of a byte-at-a-time feed, the harness runs the
 differential check described below.
 
-libvterm itself is compiled into the fuzzer from the Debian 0.3.3 source, with the same ASan,
-UBSan and coverage instrumentation, so bugs inside libvterm show up as well. Debian's
-0.3.3-3 has no patches, so this is the code the system `libvterm0` runs.
+libvterm itself is compiled into the fuzzer with the same ASan, UBSan and coverage
+instrumentation, so bugs inside libvterm show up as well. Since perf step 2 that is the bundled
+`third_party/libvterm` with `third_party/libvterm-patches` applied (what the program links;
+`tools/fuzz/build.sh` uses `tools/libvterm_patch.py` like meson does). `LIBVTERM_STOCK=1
+tools/fuzz/build.sh` leaves `screen.c` unpatched: that is stock 0.3.3, byte-identical to Debian's
+orig tarball, and Debian's 0.3.3-3 has no patches, so it is the code the system `libvterm0` runs.
+Runs before perf step 2 used the Debian source in `/workspace/lterm-tools/src/libvterm-0.3.3`
+(the same files).
 
 ## Differential check: the guard against libvterm's parser
 
@@ -64,8 +69,7 @@ What it does not cover:
   digits) are checked only by the regression tests.
 - The UTF-8 decoder state (a partial character between reads) lives in libvterm's state layer,
   not the parser, and is not compared. The guard's `lastCp_` for REP is not compared either.
-- It needs libvterm's internal header, so it runs only in the fuzz build. The meson tests use the
-  system libvterm0; there, `tests/fuzz_regress_test.cpp` checks `guardState()` at fixed points
+- It needs libvterm's internal header, so it runs only in the fuzz build. In the meson tests, `tests/fuzz_regress_test.cpp` checks `guardState()` at fixed points
   and the visible effect of each finding instead.
 - It catches a disagreement only on inputs the fuzzer produces. It is a check, not a proof.
 
@@ -200,6 +204,13 @@ about 275 s of fuzzing (DERIVED) before its stall.
 
 - Only the session/parser layer is fuzzed. The GL path, GTK widgets and the PTY/fork code are
   not fuzzed; the view tests and vttest cover those.
-- libvterm's own bugs are mitigated in front of it, not fixed in it. A program linking the system
-  libvterm0 directly still has F1, F3, F7, F8, F9, F10, F15 and F17 (F12, F13, F14 and F16 are guard bugs; the libvterm behaviour behind them is F1/F7 and the OSC-number overflow).
+- libvterm's own bugs are mitigated in front of it, not fixed in it, with two exceptions in the
+  bundled copy: patch 0001 fixes the REP crash (fuzz crash 46ca723d) and with it F8's NULL write.
+  A program linking the system libvterm0 directly still has F1, F3, F7, F8, F9, F10, F15 and F17
+  (F12, F13, F14 and F16 are guard bugs; the libvterm behaviour behind them is F1/F7 and the
+  OSC-number overflow). The bundled copy keeps all of those except F8. Two more stock bugs were
+  found by `tests/libvterm_diff.c` and are not reachable through a session (at least 2 columns,
+  REP guarded by `lastCp_`): a double-width line on a 1-column screen, and a width-0 glyph made
+  of combining marks that REP then repeats forever (F7 again). None of these were reported
+  upstream.
 - The run lengths are short: about 20 minutes on the M4 head and 11 minutes on the M5 head, at about 110 exec/s with ASan+UBSan. Longer runs could well find more.
