@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# LeakSanitizer suppressions for libvterm's own t/ suite only (meson tests libvterm-t-*).
+# Stock 0.3.3 leak, in both builds: vterm_state_set_selection_callbacks() allocates the selection
+# buffer and vterm_state_free() never frees it (16 bytes per harness run in build-san). Upstream's
+# t/harness.c calls it; Lunduke Terminal does not (no selection callbacks in src/), so the program
+# never makes this allocation and this file is not used by the other tests. Not reported upstream.
+leak:vterm_state_set_selection_callbacks

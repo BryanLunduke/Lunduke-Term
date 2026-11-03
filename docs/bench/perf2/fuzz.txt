@@ -1,0 +1,48 @@
+# libFuzzer (REAL, 2026-11-03 10:36-10:39 CST), harness tools/fuzz, bundled libvterm with 0001+0002 applied, clang -fsanitize=fuzzer,address,undefined
+# note: an extra GUI test run (:83) overlapped 10:36:50-10:37:59, so exec/s is lower than an idle box would give
+== 2026-11-03 10:36:50 CST fuzz | load 4.35 4.70 7.15
+-- replay REP reproducer, stock fuzz build (/workspace/perf2-work/fuzz-stock/vterm_fuzz):
+exit 1: /workspace/lterm-tools/src/libvterm-0.3.3/src/screen.c:190:46: runtime error: member access within null pointer of type 'ScreenCell'
+-- replay REP reproducer, bundled patched fuzz build:
+exit 0: Executed tests/data/fuzz/crash-46ca723d-libvterm-rep.bin in 23 ms
+-- replay tests/data/fuzz/* on the patched build:
+exit 0: Done 3 runs in 0 second(s) 
+-- libFuzzer 120 s (patched): 10:37:01
+exit 0 10:39:03: Done 15100 runs in 121 second(s) 
+stat::number_of_executed_units: 15100
+stat::average_exec_per_sec:     124
+stat::new_units_added:          1767
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              462
+
+## files
+-- rep-stock.txt (tail)
+    #9 0x555dc66e85a6 in main ??:?
+    #10 0x7f712303fca7 in __libc_init_first ??:?
+    #11 0x7f712303fd64 in __libc_start_main ??:?
+    #12 0x555dc66b05a0 in _start ??:?
+
+SUMMARY: UndefinedBehaviorSanitizer: undefined-behavior /workspace/lterm-tools/src/libvterm-0.3.3/src/screen.c:190:46 
+-- rep-patched.txt (tail)
+Running: tests/data/fuzz/crash-46ca723d-libvterm-rep.bin
+Executed tests/data/fuzz/crash-46ca723d-libvterm-rep.bin in 23 ms
+***
+*** NOTE: fuzzing was not performed, you have only
+***       executed the target code on a fixed set of inputs.
+***
+-- replay-all.txt (tail)
+INFO:        1 files found in tests/data/fuzz
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: seed corpus: files: 1 min: 631b max: 631b total: 631b rss: 38Mb
+#3	INITED cov: 1149 ft: 1150 corp: 1/631b exec/s: 0 rss: 49Mb
+#3	DONE   cov: 1149 ft: 1150 corp: 1/631b lim: 631 exec/s: 0 rss: 49Mb
+Done 3 runs in 0 second(s)
+-- run.txt (tail)
+Done 15100 runs in 121 second(s)
+stat::number_of_executed_units: 15100
+stat::average_exec_per_sec:     124
+stat::new_units_added:          1767
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              462
+
+crashes dir: 0 files

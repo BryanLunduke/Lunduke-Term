@@ -1,0 +1,66 @@
+# Test suites, round 3 (REAL, 2026-11-03 10:55-11:09 CST), after f37aba0 (scrollback-default fix); code = HEAD (later commits are docs only)
+# own Xvfb :83 1280x1024x24 + xfwm4 --compositor=off; --num-processes 2; --timeout-multiplier 4; /workspace/perf2-work/round3.sh
+
+== 2026-11-03 10:55:13 CST release | HEAD 1e1df59 | load 3.71 3.84 4.91 | Xvfb :83 alive, xfwm4 alive
+ 1/26 desktop-file         OK                0.01s
+ 2/26 metainfo             OK                0.01s
+ 3/26 governor             OK                0.00s
+ 4/26 profiles             OK                0.00s
+ 5/26 custom-profiles      OK                0.10s
+ 6/26 painter              OK                0.10s
+ 7/26 fonts                OK                0.02s
+ 8/26 vterm                OK                0.01s
+ 9/26 effects              OK                0.26s
+10/26 session              OK                0.15s
+11/26 fixes                OK                0.39s
+12/26 fuzz-regress         OK                0.01s
+13/26 libvterm-rep         OK                0.01s
+14/26 unicode              OK                0.00s
+15/26 search               OK                0.92s
+16/26 gl-match             OK               15.19s
+17/26 view                 OK              101.96s
+18/26 review               OK               39.35s
+19/26 ux                   OK               16.00s
+20/26 scrollback-default   OK               12.49s
+21/26 libvterm-pristine    OK                0.03s
+22/26 libvterm-t-patched   OK                0.95s
+23/26 libvterm-t-stock     OK                0.94s
+24/26 libvterm-diff        OK               10.58s
+25/26 libvterm-diff-repfix OK               11.08s
+26/26 libvterm-feed-diff   OK               34.36s
+Ok:                 26  
+Fail:               0   
+Timeout:            0   
+exit 0 | 10:59:04 | load 4.42 4.12 4.79 | Xvfb :83 alive, xfwm4 alive
+== 2026-11-03 10:59:04 CST asan-parallel | HEAD 06dd50c | load 4.42 4.12 4.79 | Xvfb :83 alive, xfwm4 alive
+ 1/26 desktop-file         OK                0.01s
+ 2/26 metainfo             OK                0.01s
+ 3/26 governor             OK                0.01s
+ 4/26 profiles             OK                0.05s
+ 5/26 custom-profiles      OK                0.24s
+ 6/26 painter              OK                0.37s
+ 7/26 fonts                OK                0.13s
+ 8/26 vterm                OK                0.13s
+ 9/26 effects              OK                1.85s
+10/26 session              OK                1.06s
+11/26 fixes                OK                0.60s
+12/26 fuzz-regress         OK                0.15s
+13/26 libvterm-rep         OK                0.12s
+14/26 unicode              OK                0.16s
+15/26 search               OK               23.72s
+16/26 gl-match             OK               96.59s
+17/26 view                 OK              126.66s
+18/26 review               OK               73.77s
+19/26 ux                   OK               39.71s
+20/26 scrollback-default   OK               22.71s
+21/26 libvterm-pristine    OK                0.01s
+22/26 libvterm-t-stock     OK                1.79s
+23/26 libvterm-t-patched   OK                1.89s
+24/26 libvterm-diff        OK               54.04s
+25/26 libvterm-diff-repfix OK               56.46s
+26/26 libvterm-feed-diff   OK              204.94s
+Ok:                 26  
+Fail:               0   
+Timeout:            0   
+exit 0 | 11:09:26 | load 4.67 4.92 4.96 | Xvfb :83 alive, xfwm4 alive
+stopped own xfwm4 2677043 Xvfb 2676405 11:09:27

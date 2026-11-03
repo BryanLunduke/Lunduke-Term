@@ -1,0 +1,45 @@
+From: Lunduke Journal <bryan@lunduke.com>
+Subject: [PATCH 1/2] screen: do not dereference NULL when a wide glyph lands in the last column
+
+REP (CSI Ps b) repeats the last printed character without the wrap check that normal text
+gets, so repeating a double-width character can put it in the last column. putglyph() then
+marks the right half with getcell(row, cols)->chars[0] = -1. getcell() returns NULL for a
+column off the screen, so this is a NULL dereference (UBSan: screen.c:190:46 "member access
+within null pointer of type 'ScreenCell'"; a crash without sanitizers). Reproducer:
+tests/data/fuzz/crash-46ca723d-libvterm-rep.bin (found by tools/fuzz/vterm_fuzz);
+test: tests/libvterm_rep_test.cpp.
+
+Fix: skip right-half cells that are off the screen and clip the damage rectangle to the
+screen width. Inputs that do not reach this case produce exactly what stock 0.3.3 produces.
+Vim's bundled libvterm uses the same break-on-NULL check in this loop.
+
+Local patch for Lunduke Terminal; not sent upstream.
+
+--- a/src/screen.c
++++ b/src/screen.c
+@@ -186,8 +186,14 @@
+   if(i < VTERM_MAX_CHARS_PER_CELL)
+     cell->chars[i] = 0;
+ 
+-  for(int col = 1; col < info->width; col++)
+-    getcell(screen, pos.row, pos.col + col)->chars[0] = (uint32_t)-1;
++  for(int col = 1; col < info->width; col++) {
++    ScreenCell *gap = getcell(screen, pos.row, pos.col + col);
++    if(!gap)
++      /* A wide glyph in the last column (REP repeating a wide character at the right margin):
++       * its right half would be off the screen, where getcell() returns NULL. */
++      break;
++    gap->chars[0] = (uint32_t)-1;
++  }
+ 
+   VTermRect rect = {
+     .start_row = pos.row,
+@@ -195,6 +201,8 @@
+     .start_col = pos.col,
+     .end_col   = pos.col+info->width,
+   };
++  if(rect.end_col > screen->cols)
++    rect.end_col = screen->cols;
+ 
+   cell->pen.protected_cell = info->protected_cell;
+   cell->pen.dwl            = info->dwl;

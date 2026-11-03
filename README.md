@@ -4,7 +4,7 @@ A retro CRT-style terminal emulator for LCOS (C++17, gtkmm-3.0, libvterm), aimin
 
 Work in progress, not part of LCOS 1.0.
 
-License: GPL-3.0-or-later (see `LICENSE`).
+License: GPL-3.0-or-later (see `LICENSE`). Bundled libvterm 0.3.3 (`third_party/libvterm`) is MIT, Copyright Paul Evans; see `third_party/README.md`.
 
 ## Status: M6 in progress (branch `m6-ux`; M5 merged as PR #6)
 
@@ -70,7 +70,10 @@ from a built-in, edit every option, rename, delete); the amber entry is no longe
 
 ### Build
 
-Needs `libgtkmm-3.0-dev`, `libvterm-dev` (0.3.3), `libepoxy-dev`, `libegl-dev`, `libfontconfig-dev`, Meson, Ninja, g++.
+Needs `libgtkmm-3.0-dev`, `libepoxy-dev`, `libegl-dev`, `libfontconfig-dev`, Meson, Ninja, g++, a C compiler, `patch` and Python 3.
+libvterm 0.3.3 is bundled in `third_party/libvterm` (pristine upstream source; MIT) and built as a static library with the
+patches in `third_party/libvterm-patches` applied at build time (`third_party/README.md`). `meson setup build -Dlibvterm=system`
+uses the installed `libvterm-dev` (>= 0.3) instead, without those patches.
 No fonts are bundled. For the retro profiles, install `fonts-terminus` (or `fonts-terminus-otb`), `fonts-pc` and `fonts-3270`.
 Without them, the profiles fall back to DejaVu Sans Mono. See `docs/FONTS.md`.
 
@@ -141,6 +144,9 @@ start with '.', have leading or trailing spaces, contain `/`, `\` or control cha
     LIBGL_ALWAYS_SOFTWARE=1 build/lterm-m1-bench --tick-gl --profile amber --frame --quality static
     build/lterm-m0-bench --bench --threads 1,4,8 --runs 5 --frames 30
     DISPLAY=:1 IDLE=1 tools/bench-m1.sh /tmp/bench build   # full M1 matrix (see docs/M1-BENCHMARKS.md)
+
+libvterm 0.3.3 (MIT, Copyright 2008 Paul Evans, <https://www.leonerd.org.uk/code/libvterm/>) is bundled in
+`third_party/libvterm` with local patches; see `third_party/README.md`.
 
 The effect maths follows cool-retro-term 1.2.0 (GPL-3.0-or-later, Filippo Scognamiglio);
 it was re-implemented here for C++ and GLSL 3.30 (both projects are GPL-3.0-or-later).

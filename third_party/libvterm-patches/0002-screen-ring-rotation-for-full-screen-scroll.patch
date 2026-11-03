@@ -1,0 +1,119 @@
+From: Lunduke Journal <bryan@lunduke.com>
+Subject: [PATCH 2/2] screen: scroll the whole screen by rotating rows instead of moving cells
+
+Each line that scrolls off a full screen made moverect_internal() memmove every remaining row
+(rows x cols cells). A flood like `seq 1 2000000` spends most of its time there, and the cost
+grows with the window size.
+
+Each buffer now has a ring offset, ringtop[]. Logical row 0 is stored at physical row
+ringtop. getcell() adds the offset, so everything that goes through getcell() (glyphs, erase,
+get_cell, get_text, scrollback push, attrs) sees the same logical screen as before. A
+whole-screen scroll up (full width, from row `downward` to the last row) only advances the
+offset, and copies the old bottom rows (usually 1) into the vacated ones, so the cell buffer
+holds exactly what stock holds: erasing resets only chars[0] and the pen, and stock's
+get_cell() shows the rest of chars[] after a right-half marker. The vacated rows are then
+erased by erase_internal() as before. Partial scrolls (scroll regions, side margins, scroll
+down) keep the row-by-row memmove, which already goes through getcell(). resize_buffer()
+indexes the buffer directly, so it first linearizes it (ringtop = 0). Scrollback pushes still
+happen before the rotation, exactly as before.
+
+Output (screen cells, cursor, scrollback lines, damage/moverect callbacks) is unchanged. This
+is checked against stock 0.3.3 by tests/libvterm_diff.c (meson test libvterm-diff; randomised
+streams with scroll regions, REP, wide and combining characters, altscreen, reflow and
+resizes) and by libvterm's own t/ suite.
+
+Based on the prototype in the performance review (lv-ring); this version keeps the offset
+per buffer, linearizes at the start of resize_buffer(), guards rows == 0, and copies the
+vacated rows' old contents (without that, the differential test found right-half cells
+reporting other code points than stock).
+
+Local patch for Lunduke Terminal; not sent upstream.
+
+--- a/src/screen.c
++++ b/src/screen.c
+@@ -66,6 +66,10 @@
+ 
+   /* buffer will == buffers[0] or buffers[1], depending on altscreen */
+   ScreenCell *buffer;
++  /* Row rotation: logical row 0 of buffers[i] is stored at physical row ringtop[i], so a
++   * full-screen scroll up only moves this offset instead of every cell (see moverect_internal).
++   * Only getcell() and linearize() know about it; resize_buffer() linearizes first. */
++  int ringtop[2];
+ 
+   /* buffer for a single screen row used in scrollback storage callbacks */
+   VTermScreenCell *sb_buffer;
+@@ -85,7 +89,28 @@
+     return NULL;
+   if(col < 0 || col >= screen->cols)
+     return NULL;
+-  return screen->buffer + (screen->cols * row) + col;
++  int top = screen->ringtop[screen->buffer == screen->buffers[BUFIDX_ALTSCREEN] ? BUFIDX_ALTSCREEN : BUFIDX_PRIMARY];
++  int physrow = row + top;
++  if(physrow >= screen->rows)
++    physrow -= screen->rows;
++  return screen->buffer + (screen->cols * physrow) + col;
++}
++
++/* Rotate buffers[bufidx] back so that logical row 0 is physical row 0 again. */
++static void linearize(VTermScreen *screen, int bufidx)
++{
++  int top = screen->ringtop[bufidx];
++  ScreenCell *buf = screen->buffers[bufidx];
++  if(!top || !buf)
++    return;
++
++  size_t rowbytes = sizeof(ScreenCell) * screen->cols;
++  ScreenCell *tmp = vterm_allocator_malloc(screen->vt, rowbytes * screen->rows);
++  memcpy(tmp, buf + (size_t)top * screen->cols, rowbytes * (screen->rows - top));
++  memcpy((char *)tmp + rowbytes * (screen->rows - top), buf, rowbytes * top);
++  memcpy(buf, tmp, rowbytes * screen->rows);
++  vterm_allocator_free(screen->vt, tmp);
++  screen->ringtop[bufidx] = 0;
+ }
+ 
+ static ScreenCell *alloc_buffer(VTermScreen *screen, int rows, int cols)
+@@ -237,6 +262,28 @@
+   int cols = src.end_col - src.start_col;
+   int downward = src.start_row - dest.start_row;
+ 
++  if(downward > 0 && screen->rows > 0 &&
++     dest.start_row == 0 && dest.start_col == 0 && dest.end_col == screen->cols && // whole width,
++     src.end_row == screen->rows && dest.end_row == screen->rows - downward) {      // whole height
++    /* Whole-screen scroll up: rotate instead of moving every row. The rows that were at the
++     * top are now the bottom `downward` rows; the caller erases them (erase_internal), as it
++     * erases the vacated rows after the memmove below.
++     * The memmove leaves the bottom rows holding what they held before, and erasing resets only
++     * chars[0] and the pen: the rest of chars[] stays and get_cell() shows it after a wide
++     * glyph's right-half marker (-1) lands there. So give the vacated rows those same contents
++     * (`downward` rows, usually 1, instead of rows - downward); the buffer then holds exactly
++     * what stock holds. In ascending j every source row is read before it is overwritten. */
++    int idx = screen->buffer == screen->buffers[BUFIDX_ALTSCREEN] ? BUFIDX_ALTSCREEN : BUFIDX_PRIMARY;
++    int rows = screen->rows, top = screen->ringtop[idx];
++    size_t rowcells = (size_t)screen->cols;
++    for(int j = 0; j < downward; j++)
++      memcpy(screen->buffer + rowcells * ((top + j) % rows),
++             screen->buffer + rowcells * ((top + rows - downward + j) % rows),
++             sizeof(ScreenCell) * rowcells);
++    screen->ringtop[idx] = (top + downward) % rows;
++    return 1;
++  }
++
+   int init_row, test_row, inc_row;
+   if(downward < 0) {
+     init_row = dest.end_row - 1;
+@@ -514,6 +561,7 @@
+ 
+ static void resize_buffer(VTermScreen *screen, int bufidx, int new_rows, int new_cols, bool active, VTermStateFields *statefields)
+ {
++  linearize(screen, bufidx);  /* the code below indexes old_buffer directly */
+   int old_rows = screen->rows;
+   int old_cols = screen->cols;
+ 
+@@ -886,6 +934,7 @@
+   screen->cbdata    = NULL;
+ 
+   screen->buffers[BUFIDX_PRIMARY] = alloc_buffer(screen, rows, cols);
++  screen->ringtop[BUFIDX_PRIMARY] = screen->ringtop[BUFIDX_ALTSCREEN] = 0;
+ 
+   screen->buffer = screen->buffers[BUFIDX_PRIMARY];
+ 

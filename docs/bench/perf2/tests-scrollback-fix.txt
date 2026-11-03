@@ -1,0 +1,151 @@
+scrollback-default test fix (PR #10 review nit 1): stty-size polling instead of a fixed sleep 1
+=============================================================================================
+All numbers REAL (measured on the box, 2026-11-03 CST). No GPU (llvmpipe/CPU renderer).
+Display: own Xvfb :63 (1920x1200x24) + xfwm4 --compositor=off. Script: tests/scrollback_default_test.sh
+at ce8cbc4, run directly with the meson view_env variables (ASAN/LSAN/UBSAN_OPTIONS, LIBGL_ALWAYS_SOFTWARE=1)
+and the settle bound meson passes (3000 ms release, 10000 ms sanitized).
+
+Chosen approach: polling. A fixed --size does not help: the size change the old sleep 1 covered
+is not the window manager's but the terminal's own first allocation: the pty starts at 24x80
+(terminal_view.cpp:74) and becomes 41x127 (1280x800 default window) ~50 ms later; 41-24 = 17,
+the 17 lines that went missing. Probe (release, 3 runs, stty size every 50 ms for 2 s): 1 sample
+24 80, then 39 samples 41 127; no later resize by xfwm4 seen.
+
+Build dirs: build (release, bundled/patched libvterm), build-sys (release, -Dlibvterm=system = stock
+0.3.3), build-san / build-san-sys (debug, -Db_sanitize=address,undefined, bundled / system).
+
+Repeat runs, serial, 20 each (each run = 4 checks: 5000, 5000, 10000, 7000 + 2 file-unchanged cmp):
+  new patched release serial: 20/20 passed
+  new stock release serial: 20/20 passed
+  new patched asan serial: 20/20 passed
+  new stock asan serial: 20/20 passed
+  Every check got the wanted sb-lines value (80/80 per build kind); the size settled at 41 127 in
+  every check, after 411-520 ms (wall clock, includes the 300 ms stability window); the
+  "never changed" fallback was never taken.
+  Wall time per run: release 10-11 s, ASan 18-23 s, except three runs that took 135-264 s and
+  still passed (stock release runs 17 and 20, stock ASan run 2): each check is under a 60 s
+  timeout, so the time went outside the terminal runs; cause not found (box-wide stall?).
+
+First version (a189688, wall-clock bound), discarded: patched ASan serial 19/20. The failing run:
+  check 2 reported "timeout: terminal size still changing after 52020 ms (last 41 127)", i.e.
+  one poll of the loop took ~52 s (the size was already 41 127); the other 3 checks of that run
+  passed. ce8cbc4 bounds the wait by poll count (settle-ms / 100) so one stalled poll no longer
+  ends the wait. With the first version also: patched release 20/20, stock release 20/20, stock
+  ASan 5/5 (stopped there to switch versions).
+
+Not done: repeat runs under extra CPU load, and the old fixed-sleep version (not measured).
+
+Full suites at cde1b6b (code = ce8cbc4; meson test --no-rebuild --timeout-multiplier 4; Xvfb :63 + xfwm4; 2026-11-03 14:05 CST)
+26 tests: the metainfo test is not configured in this run (appstreamcli was not on PATH when meson
+reconfigured after the meson.build change); checked separately: appstreamcli validate --no-net --explain
+data/*.metainfo.xml -> 'Validation was successful: pedantic: 1', rc 0.
+== release serial (--num-processes 1): Ok: 26  Fail: 0  Timeout: 0  
+   1/26 desktop-file         OK                0.01s
+   2/26 effects              OK                0.24s
+   3/26 governor             OK                0.01s
+   4/26 profiles             OK                0.01s
+   5/26 custom-profiles      OK                0.11s
+   6/26 painter              OK                0.13s
+   7/26 fonts                OK                0.04s
+   8/26 vterm                OK                0.01s
+   9/26 gl-match             OK               11.86s
+  10/26 session              OK                0.15s
+  11/26 fixes                OK                0.39s
+  12/26 fuzz-regress         OK                0.01s
+  13/26 libvterm-rep         OK                0.01s
+  14/26 unicode              OK                0.01s
+  15/26 search               OK                0.69s
+  16/26 view                 OK               99.60s
+  17/26 review               OK               38.40s
+  18/26 ux                   OK               19.24s
+  19/26 scrollback-default   OK               10.12s
+  20/26 cli                  OK                0.14s
+  21/26 libvterm-pristine    OK                0.03s
+  22/26 libvterm-t-patched   OK                0.89s
+  23/26 libvterm-t-stock     OK                0.90s
+  24/26 libvterm-diff        OK                9.32s
+  25/26 libvterm-diff-repfix OK               11.12s
+  26/26 libvterm-feed-diff   OK               34.17s
+== release parallel (--num-processes 2): Ok: 26  Fail: 0  Timeout: 0  
+   1/26 desktop-file         OK                0.01s
+   2/26 governor             OK                0.00s
+   3/26 profiles             OK                0.00s
+   4/26 custom-profiles      OK                0.09s
+   5/26 painter              OK                0.10s
+   6/26 fonts                OK                0.02s
+   7/26 vterm                OK                0.00s
+   8/26 effects              OK                0.23s
+   9/26 session              OK                0.14s
+  10/26 fixes                OK                0.39s
+  11/26 fuzz-regress         OK                0.01s
+  12/26 libvterm-rep         OK                0.01s
+  13/26 unicode              OK                0.01s
+  14/26 search               OK                0.77s
+  15/26 gl-match             OK               12.27s
+  16/26 view                 OK               97.83s
+  17/26 review               OK               45.24s
+  18/26 ux                   OK               19.18s
+  19/26 scrollback-default   OK              172.02s
+  20/26 libvterm-pristine    OK                0.01s
+  21/26 cli                  OK                0.19s
+  22/26 libvterm-t-patched   OK                0.96s
+  23/26 libvterm-t-stock     OK                0.96s
+  24/26 libvterm-diff        OK                9.66s
+  25/26 libvterm-diff-repfix OK               10.14s
+  26/26 libvterm-feed-diff   OK               34.22s
+== ASan/UBSan+LSan serial (--num-processes 1): Ok: 26  Fail: 0  Timeout: 0  
+   1/26 desktop-file         OK                0.01s
+   2/26 effects              OK                1.95s
+   3/26 governor             OK                0.02s
+   4/26 profiles             OK                0.03s
+   5/26 custom-profiles      OK                0.20s
+   6/26 painter              OK                0.31s
+   7/26 fonts                OK                0.07s
+   8/26 vterm                OK                0.04s
+   9/26 gl-match             OK               89.75s
+  10/26 session              OK                0.89s
+  11/26 fixes                OK                0.49s
+  12/26 fuzz-regress         OK                0.05s
+  13/26 libvterm-rep         OK                0.04s
+  14/26 unicode              OK                0.04s
+  15/26 search               OK               22.39s
+  16/26 view                 OK              125.17s
+  17/26 review               OK               70.85s
+  18/26 ux                   OK               42.99s
+  19/26 scrollback-default   OK               18.16s
+  20/26 cli                  OK                0.33s
+  21/26 libvterm-pristine    OK                0.00s
+  22/26 libvterm-t-patched   OK                1.56s
+  23/26 libvterm-t-stock     OK                1.47s
+  24/26 libvterm-diff        OK               46.83s
+  25/26 libvterm-diff-repfix OK               49.71s
+  26/26 libvterm-feed-diff   OK              159.03s
+== ASan/UBSan+LSan parallel (--num-processes 2): Ok: 26  Fail: 0  Timeout: 0  
+   1/26 desktop-file         OK                0.01s
+   2/26 governor             OK                0.01s
+   3/26 profiles             OK                0.01s
+   4/26 custom-profiles      OK                0.16s
+   5/26 painter              OK                0.29s
+   6/26 fonts                OK                0.05s
+   7/26 vterm                OK                0.02s
+   8/26 effects              OK                1.51s
+   9/26 session              OK                0.85s
+  10/26 fixes                OK                0.48s
+  11/26 fuzz-regress         OK                0.04s
+  12/26 libvterm-rep         OK                0.03s
+  13/26 unicode              OK                0.02s
+  14/26 search               OK               21.64s
+  15/26 gl-match             OK               87.25s
+  16/26 view                 OK              122.01s
+  17/26 review               OK               71.31s
+  18/26 ux                   OK               42.90s
+  19/26 scrollback-default   OK               18.29s
+  20/26 libvterm-pristine    OK                0.01s
+  21/26 cli                  OK                0.29s
+  22/26 libvterm-t-patched   OK                1.52s
+  23/26 libvterm-t-stock     OK                1.55s
+  24/26 libvterm-diff        OK               48.88s
+  25/26 libvterm-diff-repfix OK               51.32s
+  26/26 libvterm-feed-diff   OK              160.58s
+  Note: scrollback-default took 172.02 s in the release parallel run (10-18 s in the other three);
+  it passed; cause not found (same kind of long wall time as the 3 slow repeat runs above).

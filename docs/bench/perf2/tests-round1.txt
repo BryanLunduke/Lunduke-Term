@@ -1,0 +1,71 @@
+# Test suites, round 1 (REAL, 2026-11-03 09:27-10:20 CST, HEAD 74e1a8f)
+# own Xvfb :82 1280x1024x24 + xfwm4 --compositor=off; meson test --no-rebuild --timeout-multiplier 4; -j2 builds
+# load = /proc/loadavg at start/end of each suite (box is shared; other workers' load included)
+
+== build
+== 2026-11-03 09:27:01 CST release | HEAD 74e1a8f | load 6.60 5.08 5.77 | Xvfb :82 alive (pid 2593866), xfwm4 alive (pid 2593902)
+Ok:                 25  
+Fail:               1   
+Timeout:            0   
+exit 1 | 09:36:58 | load 184.61 168.89 85.04 | Xvfb :82 alive (pid 2593866), xfwm4 alive (pid 2593902)
+== 2026-11-03 09:36:58 CST asan-serial | HEAD 74e1a8f | load 184.61 168.89 85.04 | Xvfb :82 alive (pid 2593866), xfwm4 alive (pid 2593902)
+Ok:                 23  
+Fail:               3   
+Timeout:            0   
+exit 3 | 09:54:54 | load 5.14 10.42 31.85 | Xvfb :82 alive (pid 2593866), xfwm4 alive (pid 2593902)
+== 2026-11-03 09:54:54 CST asan-parallel | HEAD 74e1a8f | load 5.14 10.42 31.85 | Xvfb :82 alive (pid 2593866), xfwm4 alive (pid 2593902)
+Ok:                 24  
+Fail:               2   
+Timeout:            0   
+exit 2 | 10:13:47 | load 3.45 4.63 13.65 | Xvfb :82 alive (pid 2593866), xfwm4 alive (pid 2593902)
+== 10:13:47 -Dlibvterm=system
+configure+build OK; ldd: libvterm.so.0 => /lib/x86_64-linux-gnu/libvterm.so.0
+== 2026-11-03 10:17:34 CST system | HEAD 74e1a8f | load 5.64 5.14 13.00 | Xvfb :82 alive (pid 2593866), xfwm4 alive (pid 2593902)
+Ok:                 20  
+Fail:               0   
+Timeout:            0   
+exit 0 | 10:20:40 | load 4.78 5.17 11.60 | Xvfb :82 alive (pid 2593866), xfwm4 alive (pid 2593902)
+stopped own xfwm4 2593902, Xvfb 2593866; done 10:20:41
+
+## failures and analysis
+release: scrollback-default FAIL (sb-lines 17 short) at load 150-185; (round-1 guess: load flake) -> WRONG, see tests-round2.txt: reproducible at load 4-5, follows patch 0002.
+asan-serial + asan-parallel: libvterm-t-patched/-stock FAIL in t/10state_putglyph.test = LeakSanitizer:
+  stock libvterm 0.3.3 vterm_state_free never frees the selection buffer (only the t/ harness sets it).
+  Fixed in f8430ac by tests/lsan-libvterm-t.supp (leak:vterm_state_set_selection_callbacks); both t/ suites pass in build-san.
+asan-serial: libvterm-diff seed 61 TIMEOUT 300 s under load ~185; 3 reruns of seed 61 ~1 s each, 100-seed ASan rerun clean.
+-Dlibvterm=system: 20/20 OK (bundled-only tests not defined), links /lib/x86_64-linux-gnu/libvterm.so.0.
+
+## failing test output
+FAIL: t/10state_putglyph.test (2 passed before it)
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+
+23/26 libvterm-t-stock     FAIL              0.17s   exit status 1
+--
+FAIL: t/10state_putglyph.test (2 passed before it)
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+
+24/26 libvterm-diff        OK               61.16s
+--
+FAIL: t/10state_putglyph.test (2 passed before it)
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+
+23/26 libvterm-t-stock     FAIL              0.11s   exit status 1
+--
+FAIL: t/10state_putglyph.test (2 passed before it)
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+
+24/26 libvterm-diff        FAIL            400.84s   exit status 1
+--
+seed 61: TIMEOUT after 300 s (exit [-9, -9])
+
+
+libvterm diff mode a: seeds 1..100, 2000 steps each, 943001858 bytes compared per side, 1 different or timed out (exit -999: 1, exit 0: 99)
+start time:   15:30:03
+duration:     8.53s
+result:       exit status 1
+command:      LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf2/tests/lsan.supp:print_suppressions=0 LIBGL_ALWAYS_SOFTWARE=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:fast_unwind_on_malloc=0 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MESON_TEST_ITERATION=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 MALLOC_PERTURB_=143 /usr/bin/sh /workspace/lunduke-term-perf2/build/../tests/scrollback_default_test.sh ./lunduke-terminal
+----------------------------------- stdout -----------------------------------
+no settings.ini: sb-lines=5000 (want 5000)
+settings.ini without scrollback-lines: sb-lines=4983 (want 5000)
+saved scrollback-lines=10000: sb-lines=9983 (want 10000)
+saved scrollback-lines=7000: sb-lines=6983 (want 7000)

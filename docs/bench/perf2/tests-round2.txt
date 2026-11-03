@@ -1,0 +1,66 @@
+# Test suites, round 2 (REAL, 2026-11-03 10:20-10:36 CST), after f8430ac (LSan suppression for the t/ harness)
+# own Xvfb :82 1280x1024x24 + xfwm4 --compositor=off; release: --num-processes 2; ASan/UBSan+LSan: --num-processes 1; --timeout-multiplier 4
+# ASan/UBSan parallel was NOT rerun after f8430ac; its round-1 failures were only the two t/ leak failures fixed by f8430ac.
+
+== 2026-11-03 10:20:52 CST release | HEAD cf4a5a7 | load 4.66 5.13 11.51 | Xvfb :82 alive (pid 2645372), xfwm4 alive (pid 2645387)
+20/26 scrollback-default   FAIL              8.49s   exit status 1
+20/26 scrollback-default   FAIL              8.49s   exit status 1
+Ok:                 25  
+Fail:               1   
+Skipped:            0   
+Timeout:            0   
+exit 1 | 10:25:07 | load 5.32 5.21 10.01 | Xvfb :82 alive (pid 2645372), xfwm4 alive (pid 2645387)
+== 2026-11-03 10:25:07 CST asan-serial | HEAD 5904f71 | load 5.32 5.21 10.01 | Xvfb :82 alive (pid 2645372), xfwm4 alive (pid 2645387)
+20/26 scrollback-default   FAIL             17.19s   exit status 1
+20/26 scrollback-default   FAIL             17.19s   exit status 1
+Ok:                 25  
+Fail:               1   
+Skipped:            0   
+Timeout:            0   
+exit 1 | 10:36:48 | load 4.47 4.73 7.17 | Xvfb :82 alive (pid 2645372), xfwm4 alive (pid 2645387)
+stopped own xfwm4 2645387, Xvfb 2645372 10:36:50
+
+## scrollback-default output
+-- release
+result:       exit status 1
+no settings.ini: sb-lines=4983 (want 5000)
+settings.ini without scrollback-lines: sb-lines=5000 (want 5000)
+saved scrollback-lines=10000: sb-lines=9983 (want 10000)
+saved scrollback-lines=7000: sb-lines=6983 (want 7000)
+-- asan-serial
+result:       exit status 1
+no settings.ini: sb-lines=5000 (want 5000)
+settings.ini without scrollback-lines: sb-lines=5000 (want 5000)
+saved scrollback-lines=10000: sb-lines=10000 (want 10000)
+saved scrollback-lines=7000: sb-lines=0 (want 7000)
+
+## scrollback-default: NOT a load flake (REAL, own Xvfb :83 + xfwm4, load 4-5, WM alive every run)
+# 6x interleaved master vs branch (10:27-10:31 CST):
+1 master | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=10000 7000: sb-lines=7000 scrollback default: ok  | load 4.26 4.63 8.05 | wm alive
+1 branch | empty: sb-lines=5000 none: sb-lines=4983 10000: sb-lines=9983 7000: sb-lines=7000  | load 4.53 4.67 8.03 | wm alive
+2 master | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=10000 7000: sb-lines=7000 scrollback default: ok  | load 4.57 4.68 8.01 | wm alive
+2 branch | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=9983 7000: sb-lines=7000  | load 4.71 4.71 7.98 | wm alive
+3 master | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=10000 7000: sb-lines=7000 scrollback default: ok  | load 4.91 4.75 7.96 | wm alive
+3 branch | empty: sb-lines=5000 none: sb-lines=4983 10000: sb-lines=9983 7000: sb-lines=6983  | load 4.92 4.76 7.93 | wm alive
+4 master | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=10000 7000: sb-lines=7000 scrollback default: ok  | load 4.93 4.76 7.91 | wm alive
+4 branch | empty: sb-lines=4983 none: sb-lines=4983 10000: sb-lines=9983 7000: sb-lines=6983  | load 4.95 4.77 7.88 | wm alive
+5 master | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=10000 7000: sb-lines=7000 scrollback default: ok  | load 4.80 4.74 7.84 | wm alive
+5 branch | empty: sb-lines=4983 none: sb-lines=4983 10000: sb-lines=9983 7000: sb-lines=6983  | load 4.82 4.75 7.83 | wm alive
+6 master | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=10000 7000: sb-lines=7000 scrollback default: ok  | load 5.24 4.84 7.82 | wm alive
+6 branch | empty: sb-lines=4983 none: sb-lines=4983 10000: sb-lines=10000 7000: sb-lines=6983  | load 5.28 4.86 7.80 | wm alive
+stopped own xfwm4 2659509 Xvfb 2659477
+# 3x interleaved: branch built with -Dlibvterm=system (sys), branch objects relinked with libvterm-stock.a (stock), libvterm-repfix.a = 0001 only (repfix), branch (patched = 0001+0002) (10:35-10:38 CST):
+1 sys | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=10000 7000: sb-lines=7000 scrollback default: ok  | load 4.66 4.78 7.24 | wm alive
+1 stock | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=10000 7000: sb-lines=7000 scrollback default: ok  | load 4.60 4.77 7.22 | wm alive
+1 repfix | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=10000 7000: sb-lines=7000 scrollback default: ok  | load 4.51 4.74 7.19 | wm alive
+1 patched | empty: sb-lines=4983 none: sb-lines=4983 10000: sb-lines=9983 7000: sb-lines=6983  | load 4.35 4.70 7.15 | wm alive
+2 sys | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=10000 7000: sb-lines=7000 scrollback default: ok  | load 4.40 4.70 7.14 | wm alive
+2 stock | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=10000 7000: sb-lines=7000 scrollback default: ok  | load 4.74 4.76 7.13 | wm alive
+2 repfix | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=10000 7000: sb-lines=7000 scrollback default: ok  | load 4.92 4.81 7.12 | wm alive
+2 patched | empty: sb-lines=5000 none: sb-lines=4983 10000: sb-lines=9983 7000: sb-lines=6983  | load 4.93 4.81 7.11 | wm alive
+3 sys | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=10000 7000: sb-lines=7000 scrollback default: ok  | load 5.02 4.83 7.09 | wm alive
+3 stock | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=10000 7000: sb-lines=7000 scrollback default: ok  | load 4.86 4.80 7.06 | wm alive
+3 repfix | empty: sb-lines=5000 none: sb-lines=5000 10000: sb-lines=10000 7000: sb-lines=7000 scrollback default: ok  | load 4.81 4.79 7.03 | wm alive
+3 patched | empty: sb-lines=4983 none: sb-lines=4983 10000: sb-lines=9983 7000: sb-lines=6983  | load 4.83 4.80 7.02 | wm alive
+stopped own xfwm4 2664058 Xvfb 2664028
+=> the failure follows patch 0002. Note asan-serial "7000: sb-lines=0": no stats-mem line at all in that run (ASan slowness vs the 60 s timeout or the 1 s stats tick; not investigated). Investigation: see STATUS.md.

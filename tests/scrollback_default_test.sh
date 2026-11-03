@@ -3,8 +3,11 @@
 # Default scrollback (M6, editor order): 5000 lines when settings.ini has no scrollback-lines;
 # a value already saved there (10000, the old default, or any other) is used as is, and the file
 # is not rewritten. Runs the real binary, so the settings.ini path in main.cpp is covered.
-# Usage: scrollback_default_test.sh path/to/lunduke-terminal. Skips (77) without $DISPLAY.
+# Usage: scrollback_default_test.sh path/to/lunduke-terminal [settle-ms]. Skips (77) without $DISPLAY.
+# settle-ms bounds the wait for the terminal size to settle (meson passes the ltermWaitMs()
+# bounds of tests/sanitizer.hpp: 3000 in a release build, 10000 with sanitizers; default 3000).
 bin=$1
+settle_ms=${2:-3000}
 [ -n "$DISPLAY" ] || { echo "skip: no DISPLAY"; exit 77; }
 tmp=$(mktemp -d /tmp/lterm-sbdefault.XXXXXX) || exit 1
 trap 'rm -rf "$tmp"' EXIT
@@ -13,13 +16,46 @@ fail=0
 # Prints the last sb-lines= value of a run that prints 12000 lines, then exits. Lines with tabs=0
 # are skipped: when the tab has closed, a stats tick can still fire before the window goes (seen
 # under ASan, slower teardown) and reports sb-lines=0 for no tab.
-run() {
+# Before printing, the shell in the terminal waits for the terminal size to settle: the pty starts
+# at 24x80 and gets the window's real size (41x127 at the default 1280x800 on a 1920x1200 Xvfb
+# with xfwm4) only after the first size allocation, which can come late under load. If the
+# window grows after the 12000 lines are out, libvterm pops scrollback lines back onto the screen
+# (here 17), and sb-lines ends that many short. settle.sh polls `stty size` every 100 ms; the
+# size has settled once it changed and then read the same 3 more times (300 ms), or when it never
+# changed within settle-ms. The bound counts polls (settle-ms / 100), not wall time, so one stalled
+# poll (a 52 s stall was seen once under ASan) does not end the wait early. A size still changing
+# after the last poll writes "timeout" to the status file, prints nothing, and the check fails.
+cat > "$tmp/settle.sh" <<'SETTLE'
+status=$1 max_polls=$(( $2 / 100 ))
+now_ms() { echo $(( $(date +%s%N) / 1000000 )); }
+t0=$(now_ms)
+last=$(stty size) same=0 changed=0 polls=0
+while :; do
+    sleep 0.1
+    polls=$((polls + 1))
+    cur=$(stty size)
+    if [ "$cur" = "$last" ]; then same=$((same + 1)); else same=0 changed=1 last=$cur; fi
+    t=$(( $(now_ms) - t0 ))
+    if [ "$changed" = 1 ] && [ "$same" -ge 3 ]; then echo "settled $cur after $t ms" > "$status"; break; fi
+    if [ "$polls" -ge "$max_polls" ]; then
+        if [ "$changed" = 0 ]; then echo "settled $cur after $t ms (unchanged)" > "$status"; break; fi
+        echo "timeout: terminal size still changing after $polls polls, $t ms (last $cur)" > "$status"
+        exit 1
+    fi
+done
+seq 1 12000
+sleep 2
+SETTLE
+run() {  # config-dir status-file
     XDG_CONFIG_HOME=$1 timeout 60 "$bin" --profile plain --renderer cpu --stats-every 1 --on-exit close \
-        -e sh -c 'seq 1 12000; sleep 2' 2>&1 | sed -n 's/^stats-mem .* tabs=[1-9][0-9]* .* sb-lines=\([0-9]*\) .*/\1/p' | tail -n 1
+        -e sh "$tmp/settle.sh" "$2" "$settle_ms" 2>&1 | sed -n 's/^stats-mem .* tabs=[1-9][0-9]* .* sb-lines=\([0-9]*\) .*/\1/p' | tail -n 1
 }
 check() {  # name config-dir expected
-    got=$(run "$2")
-    echo "$1: sb-lines=$got (want $3)"
+    st="$tmp/status.$4"
+    got=$(run "$2" "$st")
+    settle=$(cat "$st" 2>/dev/null || echo "no settle status (the shell in the terminal did not run)")
+    echo "$1: sb-lines=$got (want $3; $settle)"
+    case $settle in timeout*) echo "FAIL: $1: $settle (bound ${settle_ms} ms)"; fail=1 ;; esac
     [ "$got" = "$3" ] || fail=1
 }
 
@@ -30,10 +66,10 @@ printf '[terminal]\nscrollback-lines=7000\n' > "$tmp/other/lunduke-terminal/sett
 cp "$tmp/old/lunduke-terminal/settings.ini" "$tmp/old.ini"
 cp "$tmp/other/lunduke-terminal/settings.ini" "$tmp/other.ini"
 
-check "no settings.ini" "$tmp/empty" 5000
-check "settings.ini without scrollback-lines" "$tmp/none" 5000
-check "saved scrollback-lines=10000" "$tmp/old" 10000
-check "saved scrollback-lines=7000" "$tmp/other" 7000
+check "no settings.ini" "$tmp/empty" 5000 1
+check "settings.ini without scrollback-lines" "$tmp/none" 5000 2
+check "saved scrollback-lines=10000" "$tmp/old" 10000 3
+check "saved scrollback-lines=7000" "$tmp/other" 7000 4
 cmp -s "$tmp/old.ini" "$tmp/old/lunduke-terminal/settings.ini" || { echo "settings.ini (10000) was rewritten"; fail=1; }
 cmp -s "$tmp/other.ini" "$tmp/other/lunduke-terminal/settings.ini" || { echo "settings.ini (7000) was rewritten"; fail=1; }
 [ "$fail" = 0 ] && echo "scrollback default: ok"

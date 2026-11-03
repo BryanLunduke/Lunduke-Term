@@ -79,13 +79,20 @@ Suggests: fonts-hermit,
 
 ## Build dependencies
 
-See `debian/control`: meson, ninja, pkgconf, libgtkmm-3.0-dev (>= 3.24), libvterm-dev (>= 0.3),
+See `debian/control`: meson, ninja, pkgconf, patch, python3, libgtkmm-3.0-dev (>= 3.24),
 libepoxy-dev, libegl-dev, libfontconfig-dev and libx11-dev (view_test). For `dh_auto_test`
 (skipped with `nocheck`), it also needs xvfb, xauth, libgl1-mesa-dri (llvmpipe for gl-match) and
 fonts-dejavu-core.
 
 `debian/rules` runs the tests under `xvfb-run -a` with `--no-parallel`. view_test is built with
 AddressSanitizer and needs `$DISPLAY`.
+
+libvterm is bundled (`third_party/libvterm`, 0.3.3, MIT; patches in `third_party/libvterm-patches`,
+applied at build time) and linked statically, so the package no longer depends on `libvterm0`.
+`debian/copyright` has its stanza. `-Dlibvterm=system` (with `libvterm-dev`) is still possible, but
+then the REP fix and the scroll speed-up are missing.
+A `-Dlibvterm=system` build still has the REP crash: a NULL dereference at screen.c:190 when REP
+repeats a wide character at the right margin (patch 0001, test `libvterm-rep`).
 
 ## Not done (on purpose)
 
