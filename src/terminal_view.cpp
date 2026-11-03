@@ -418,7 +418,9 @@ void TerminalView::applyProfile() {
     if (!pick.monospace)
         std::fprintf(stderr, "lunduke-terminal: font '%s' is not monospaced\n", pick.family.c_str());
     autoFontPx_ = pick.px;
-    const int px = opts_.fontPx > 0 ? opts_.fontPx : pick.px;
+    const int base = opts_.fontPx > 0 ? opts_.fontPx : pick.px;
+    const int px = zoomedFontPx(base, zoomPx_);
+    fontPxInUse_ = px;
     painter_.reset(new GridPainter(pick.family, px, scale_));  // px stays logical
     applyColors();
     cpu_.reset();
@@ -438,6 +440,7 @@ void TerminalView::setProfile(const std::string& id) {
     if (!p) return;
     profile_ = *p;
     applyTubeOverrides(profile_, opts_.tube);
+    zoomPx_ = 0;  // perf step 1: a new profile starts at its own size
     applyProfile();
     if (opts_.effects < 0) effectsOn_ = profile_.effects;
     applyColors();
@@ -1371,6 +1374,22 @@ bool TerminalView::onKey(GdkEventKey* ev) {
             return true;
         }
     }
+    // Perf step 1: font zoom. Ctrl+= and Ctrl++ (Shift+= on most layouts, or the keypad +)
+    // bigger, Ctrl+- (or keypad -) smaller, Ctrl+0 (or keypad 0) back to the configured size.
+    // These are taken from the program (on master Ctrl+- sent ESC[45;5u; Ctrl+_ still sends 0x1f, ^_).
+    if (mods == GDK_CONTROL_MASK || mods == ctrlShift) {
+        switch (ev->keyval) {
+        case GDK_KEY_equal: case GDK_KEY_plus: case GDK_KEY_KP_Add: zoomFont(1); return true;
+        default: break;
+        }
+    }
+    if (mods == GDK_CONTROL_MASK) {
+        switch (ev->keyval) {
+        case GDK_KEY_minus: case GDK_KEY_KP_Subtract: zoomFont(-1); return true;
+        case GDK_KEY_0: case GDK_KEY_KP_0: resetFontZoom(); return true;
+        default: break;
+        }
+    }
     if (mods == GDK_SHIFT_MASK && !session_->altScreen()) {
         const int page = std::max(1, session_->rows() - 1);
         switch (ev->keyval) {
@@ -1603,7 +1622,30 @@ void TerminalView::setFont(const std::string& family, int px) {
     if (family == opts_.fontFamily && px == opts_.fontPx) return;
     opts_.fontFamily = family;
     opts_.fontPx = std::max(0, px);
+    zoomPx_ = 0;  // perf step 1: an explicit size replaces the zoom
     applyProfile();  // new painter, cell size and grid
+    chooseMode();
+    updateContent();
+    requestFrame();
+}
+
+void TerminalView::zoomFont(int steps) {
+    const int base = opts_.fontPx > 0 ? opts_.fontPx : autoFontPx_;
+    if (base <= 0 || steps == 0) return;
+    const int cur = zoomedFontPx(base, zoomPx_);
+    const int want = zoomedFontPx(base, cur - base + steps);
+    if (want == cur) return;  // at the limit (or a base outside the range, stepped further out)
+    zoomPx_ = want - base;
+    applyProfile();
+    chooseMode();
+    updateContent();
+    requestFrame();
+}
+
+void TerminalView::resetFontZoom() {
+    if (zoomPx_ == 0) return;
+    zoomPx_ = 0;
+    applyProfile();
     chooseMode();
     updateContent();
     requestFrame();

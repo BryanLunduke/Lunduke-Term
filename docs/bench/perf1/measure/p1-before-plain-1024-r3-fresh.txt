@@ -1,0 +1,9 @@
+# p1-before-plain-1024-r3 fresh 07:22:10
+Rss:               51068 kB
+Pss:               26777 kB
+Shared_Clean:      29672 kB
+Private_Clean:      8920 kB
+Private_Dirty:      9404 kB
+Anonymous:          9404 kB
+GLmaps 0
+Threads 5

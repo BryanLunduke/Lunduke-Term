@@ -104,6 +104,7 @@ int main() {
         s.run(3000, 100);  // 10 % at 1 fps
         CHECK(s.demotions == 0);
     }
+    CHECK(GovernorConfig().budget == 0.15);  // perf step 1: the default budget (was 0.25)
     {  // no frames (paused / hidden) says nothing
         EffectsGovernor g;
         GovernorConfig c;
@@ -116,7 +117,8 @@ int main() {
     // M4 item 2: a probe needs probeWindows CONSECUTIVE good windows.
     auto demotedGov = [] {
         EffectsGovernor g;
-        GovernorConfig c;  // budget 0.25, base 100 ms, max 1000 ms, 1 s windows, 3 probe windows
+        GovernorConfig c;  // base 100 ms, max 1000 ms, 1 s windows, 3 probe windows
+        c.budget = 0.25;   // the thresholds below were worked out for 0.25 (the default until perf step 1)
         g.configure(c);
         g.restart(0);
         g.demoted(0);

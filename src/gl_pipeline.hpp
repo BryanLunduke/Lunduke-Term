@@ -13,6 +13,18 @@
 
 namespace lterm {
 
+// Perf step 1: the uniforms each program sets per frame / per content update. Their locations are
+// looked up once, right after the programs are linked (they never change for a linked program);
+// M0-M6 called glGetUniformLocation for every one of them each time: 29 per effects tick (dyn)
+// and up to 32 per content update (down, blur, burn, static, bezel composite).
+#define LTERM_GL_UNIFORMS_DOWN(X) X(src) X(srcSize)
+#define LTERM_GL_UNIFORMS_BLUR(X) X(weights) X(radius) X(size) X(src) X(dir)
+#define LTERM_GL_UNIFORMS_BURN(X) X(src) X(prev) X(decay0)
+#define LTERM_GL_UNIFORMS_STAT(X) X(src) X(bloomSrc) X(size) X(curvature) X(fontColor) X(backgroundColor) X(chroma) X(bloomStrength) X(screenBrightness) X(useBloom) X(inset) X(rgbShift)
+#define LTERM_GL_UNIFORMS_DYN(X) X(staticTex) X(burnTex) X(noiseTex) X(size) X(curvature) X(fontColor) X(chroma) X(time) X(hsync) X(hsyncScale) X(hsyncFreq) X(jitter) X(jitterDisp) X(staticNoise) X(noiseAmount) X(noiseScale) X(noiseOffset) X(glowingLine) X(burnIn) X(burnInDecay) X(rasterization) X(vrY) X(rasterIntensity) X(flicker) X(ambient) X(flipY) X(inset) X(useFrame) X(frameTex)
+#define LTERM_GL_UNIFORMS_FRAME(X) X(size) X(inset) X(insetPx) X(inner) X(radius) X(curvature) X(frameColor) X(shininess) X(pixelScale) X(mode)
+#define LTERM_GL_UNIFORMS_COMP(X) X(baseTex) X(reflTex) X(bloomSrc) X(fontColor) X(chroma) X(bloomStrength) X(screenBrightness) X(useRefl)
+
 class GlPipeline {
 public:
     // Requires a current GL 3.3 core context; all other calls need the same context current.
@@ -41,7 +53,8 @@ public:
     // Effects tick into `fbo` (0 = default framebuffer) at (0,0,width,height). flipY for window
     // framebuffers (GtkGLArea); false for the internal FBO that readPixels() reads.
     void render(float timeMs, unsigned fbo, bool flipY);
-    // Effects tick into the internal output FBO and read it back as RGBA8, row 0 = top.
+    // Effects tick into the internal output FBO and read it back as RGBA8, row 0 = top. The output
+    // texture/FBO are allocated on the first call (per size); the window never needs them.
     void renderToMemory(float timeMs, uint8_t* out);
     void release();  // deletes every GL object this pipeline owns
     // Review item 3: frees the size-dependent textures/FBOs (nearly all of the memory) and keeps
@@ -53,6 +66,9 @@ public:
     int liveFramebuffers() const { return liveFbo_; }
     // M4 item 4: bytes of texture storage those textures ask for (width x height x texel size).
     size_t liveTextureBytes() const { return liveTexBytes_; }
+    // Perf step 1: glGetUniformLocation calls made by every GlPipeline in this process so far
+    // (all in the constructor; tests check that frames add none).
+    static long uniformLookups();
 
 private:
     unsigned compile(const char* fs);
@@ -86,6 +102,19 @@ private:
     float burnLast_ = 0, burnPrev_ = 0;
     bool haveBurn_ = false;
     std::vector<float> weights_;
+    // Uniform locations per program (-1: not active in that program, ignored by glUniform*).
+    struct UniformLocations {
+#define LTERM_LOC_FIELD(n) int n = -1;
+        struct { LTERM_GL_UNIFORMS_DOWN(LTERM_LOC_FIELD) } down;
+        struct { LTERM_GL_UNIFORMS_BLUR(LTERM_LOC_FIELD) } blur;
+        struct { LTERM_GL_UNIFORMS_BURN(LTERM_LOC_FIELD) } burn;
+        struct { LTERM_GL_UNIFORMS_STAT(LTERM_LOC_FIELD) } stat;
+        struct { LTERM_GL_UNIFORMS_DYN(LTERM_LOC_FIELD) } dyn;
+        struct { LTERM_GL_UNIFORMS_FRAME(LTERM_LOC_FIELD) } frame;
+        struct { LTERM_GL_UNIFORMS_COMP(LTERM_LOC_FIELD) } comp;
+#undef LTERM_LOC_FIELD
+    } loc_;
+    void lookUpUniforms();
 };
 
 // Number of texture names 1..maxName the current context reports as textures (glIsTexture).

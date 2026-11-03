@@ -28,6 +28,7 @@ GlPipeline::GlPipeline(const EffectParams& params)
     progFrameComp_ = compile(glsl::kFrameComposite);
     ok_ = progDown_ && progBlur_ && progBurn_ && progStatic_ && progDyn_ && progFrame_ && progFrameComp_;
     if (!ok_) return;
+    lookUpUniforms();
     texNoise_ = makeTex(kNoiseSize, kNoiseSize, kSizedFmt, true, true);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, kNoiseSize, kNoiseSize, GL_RGBA, GL_FLOAT, noiseTexture().data());
 }
@@ -39,6 +40,40 @@ long gProgramsCompiled = 0;
 }
 
 long GlPipeline::programsCompiled() { return gProgramsCompiled; }
+
+namespace {
+long gUniformLookups = 0;
+GLint uniformLocation(GLuint prog, const char* name) {
+    ++gUniformLookups;
+    return glGetUniformLocation(prog, name);
+}
+}  // namespace
+
+long GlPipeline::uniformLookups() { return gUniformLookups; }
+
+void GlPipeline::lookUpUniforms() {
+#define LTERM_LOC_GET(n) loc_.down.n = uniformLocation(progDown_, #n);
+    LTERM_GL_UNIFORMS_DOWN(LTERM_LOC_GET)
+#undef LTERM_LOC_GET
+#define LTERM_LOC_GET(n) loc_.blur.n = uniformLocation(progBlur_, #n);
+    LTERM_GL_UNIFORMS_BLUR(LTERM_LOC_GET)
+#undef LTERM_LOC_GET
+#define LTERM_LOC_GET(n) loc_.burn.n = uniformLocation(progBurn_, #n);
+    LTERM_GL_UNIFORMS_BURN(LTERM_LOC_GET)
+#undef LTERM_LOC_GET
+#define LTERM_LOC_GET(n) loc_.stat.n = uniformLocation(progStatic_, #n);
+    LTERM_GL_UNIFORMS_STAT(LTERM_LOC_GET)
+#undef LTERM_LOC_GET
+#define LTERM_LOC_GET(n) loc_.dyn.n = uniformLocation(progDyn_, #n);
+    LTERM_GL_UNIFORMS_DYN(LTERM_LOC_GET)
+#undef LTERM_LOC_GET
+#define LTERM_LOC_GET(n) loc_.frame.n = uniformLocation(progFrame_, #n);
+    LTERM_GL_UNIFORMS_FRAME(LTERM_LOC_GET)
+#undef LTERM_LOC_GET
+#define LTERM_LOC_GET(n) loc_.comp.n = uniformLocation(progFrameComp_, #n);
+    LTERM_GL_UNIFORMS_COMP(LTERM_LOC_GET)
+#undef LTERM_LOC_GET
+}
 
 void GlPipeline::setParams(const EffectParams& params) {
     p_ = params;
@@ -187,13 +222,13 @@ void GlPipeline::resize(int width, int height) {
     texBloomB_ = makeTex(hw_, hh_, kSizedFmt, true, false);
     for (int i = 0; i < 2; ++i) texBurn_[i] = makeTex(bw_, bh_, kSizedFmt, true, false);
     texStatic_ = makeTex(w_, h_, kSizedFmt, true, false);
-    texOut_ = makeTex(w_, h_, GL_RGBA8, false, false);
+    // texOut_/fboOut_ (RGBA8, w x h) are only read back by renderToMemory() (headless tests and
+    // benchmarks); the window renders to the GtkGLArea framebuffer, so they are made on first use.
     fboDown_ = makeFbo(texDown_);
     fboBloomA_ = makeFbo(texBloomA_);
     fboBloomB_ = makeFbo(texBloomB_);
     for (int i = 0; i < 2; ++i) fboBurn_[i] = makeFbo(texBurn_[i]);
     fboStatic_ = makeFbo(texStatic_);
-    fboOut_ = makeFbo(texOut_);
     haveBurn_ = false;
     geom_ = frameGeometry(p_, w_, h_);
     if (p_.frame) {
@@ -209,18 +244,18 @@ void GlPipeline::resize(int width, int height) {
         glDisable(GL_BLEND);
         const GLuint p = progFrame_;
         glUseProgram(p);
-        glUniform2f(glGetUniformLocation(p, "size"), static_cast<float>(w_), static_cast<float>(h_));
-        glUniform2f(glGetUniformLocation(p, "inset"), geom_.ix, geom_.iy);
-        glUniform1f(glGetUniformLocation(p, "insetPx"), geom_.inset);
-        glUniform2f(glGetUniformLocation(p, "inner"), geom_.innerW, geom_.innerH);
-        glUniform1f(glGetUniformLocation(p, "radius"), geom_.radius);
-        glUniform1f(glGetUniformLocation(p, "curvature"), d_.curvature);
-        glUniform3f(glGetUniformLocation(p, "frameColor"), p_.frameColor.r, p_.frameColor.g, p_.frameColor.b);
-        glUniform1f(glGetUniformLocation(p, "shininess"), p_.frameShininess);
-        glUniform1f(glGetUniformLocation(p, "pixelScale"), p_.pixelScale);
-        glUniform1i(glGetUniformLocation(p, "mode"), 0);
+        glUniform2f(loc_.frame.size, static_cast<float>(w_), static_cast<float>(h_));
+        glUniform2f(loc_.frame.inset, geom_.ix, geom_.iy);
+        glUniform1f(loc_.frame.insetPx, geom_.inset);
+        glUniform2f(loc_.frame.inner, geom_.innerW, geom_.innerH);
+        glUniform1f(loc_.frame.radius, geom_.radius);
+        glUniform1f(loc_.frame.curvature, d_.curvature);
+        glUniform3f(loc_.frame.frameColor, p_.frameColor.r, p_.frameColor.g, p_.frameColor.b);
+        glUniform1f(loc_.frame.shininess, p_.frameShininess);
+        glUniform1f(loc_.frame.pixelScale, p_.pixelScale);
+        glUniform1i(loc_.frame.mode, 0);
         drawTo(fboFrameBase_, w_, h_, p);
-        glUniform1i(glGetUniformLocation(p, "mode"), 1);
+        glUniform1i(loc_.frame.mode, 1);
         drawTo(fboFrameRefl_, w_, h_, p);
         // Until the first content frame the composite is the base.
         glBindFramebuffer(GL_READ_FRAMEBUFFER, fboFrameBase_);
@@ -238,10 +273,10 @@ void GlPipeline::drawTo(unsigned fbo, int w, int h, unsigned prog) {
     glDrawArrays(GL_TRIANGLES, 0, 3);
 }
 
-static void bindTex(GLuint prog, const char* name, int unit, GLuint tex) {
+static void bindTex(GLint loc, int unit, GLuint tex) {
     glActiveTexture(GL_TEXTURE0 + unit);
     glBindTexture(GL_TEXTURE_2D, tex);
-    glUniform1i(glGetUniformLocation(prog, name), unit);
+    glUniform1i(loc, unit);
 }
 
 void GlPipeline::updateSource(const uint8_t* px, int stride, PixelOrder order, float timeMs, int rowBegin,
@@ -267,20 +302,20 @@ void GlPipeline::updateSource(const uint8_t* px, int stride, PixelOrder order, f
     const bool halfBurn = p_.burnIn > 0 && p_.burnInHalfRes;
     if (p_.bloom > 0 || halfBurn) {
         glUseProgram(progDown_);
-        bindTex(progDown_, "src", 0, texSrc_);
-        glUniform2i(glGetUniformLocation(progDown_, "srcSize"), w_, h_);
+        bindTex(loc_.down.src, 0, texSrc_);
+        glUniform2i(loc_.down.srcSize, w_, h_);
         drawTo(fboDown_, hw_, hh_, progDown_);
     }
     if (p_.bloom > 0) {
         glUseProgram(progBlur_);
-        glUniform1fv(glGetUniformLocation(progBlur_, "weights"), 65, weights_.data());
-        glUniform1i(glGetUniformLocation(progBlur_, "radius"), std::min(64, p_.bloomRadiusHalfRes));
-        glUniform2i(glGetUniformLocation(progBlur_, "size"), hw_, hh_);
-        bindTex(progBlur_, "src", 0, texDown_);
-        glUniform2i(glGetUniformLocation(progBlur_, "dir"), 1, 0);
+        glUniform1fv(loc_.blur.weights, 65, weights_.data());
+        glUniform1i(loc_.blur.radius, std::min(64, p_.bloomRadiusHalfRes));
+        glUniform2i(loc_.blur.size, hw_, hh_);
+        bindTex(loc_.blur.src, 0, texDown_);
+        glUniform2i(loc_.blur.dir, 1, 0);
         drawTo(fboBloomB_, hw_, hh_, progBlur_);
-        bindTex(progBlur_, "src", 0, texBloomB_);
-        glUniform2i(glGetUniformLocation(progBlur_, "dir"), 0, 1);
+        bindTex(loc_.blur.src, 0, texBloomB_);
+        glUniform2i(loc_.blur.dir, 0, 1);
         drawTo(fboBloomA_, hw_, hh_, progBlur_);
     }
     if (p_.burnIn > 0) {
@@ -299,39 +334,39 @@ void GlPipeline::updateSource(const uint8_t* px, int stride, PixelOrder order, f
         const float decay0 = std::clamp((burnLast_ - burnPrev_) * d_.burnInTime, 0.0f, 1.0f);
         const int next = 1 - burnCur_;
         glUseProgram(progBurn_);
-        bindTex(progBurn_, "src", 0, p_.burnInHalfRes ? texDown_ : texSrc_);
-        bindTex(progBurn_, "prev", 1, texBurn_[burnCur_]);
-        glUniform1f(glGetUniformLocation(progBurn_, "decay0"), decay0);
+        bindTex(loc_.burn.src, 0, p_.burnInHalfRes ? texDown_ : texSrc_);
+        bindTex(loc_.burn.prev, 1, texBurn_[burnCur_]);
+        glUniform1f(loc_.burn.decay0, decay0);
         drawTo(fboBurn_[next], bw_, bh_, progBurn_);
         burnCur_ = next;
     }
     const GLuint p = progStatic_;
     glUseProgram(p);
-    bindTex(p, "src", 0, texSrc_);
-    bindTex(p, "bloomSrc", 1, texBloomA_);
-    glUniform2f(glGetUniformLocation(p, "size"), static_cast<float>(w_), static_cast<float>(h_));
-    glUniform1f(glGetUniformLocation(p, "curvature"), d_.curvature);
-    glUniform3f(glGetUniformLocation(p, "fontColor"), p_.fontColor.r, p_.fontColor.g, p_.fontColor.b);
-    glUniform3f(glGetUniformLocation(p, "backgroundColor"), p_.backgroundColor.r, p_.backgroundColor.g,
+    bindTex(loc_.stat.src, 0, texSrc_);
+    bindTex(loc_.stat.bloomSrc, 1, texBloomA_);
+    glUniform2f(loc_.stat.size, static_cast<float>(w_), static_cast<float>(h_));
+    glUniform1f(loc_.stat.curvature, d_.curvature);
+    glUniform3f(loc_.stat.fontColor, p_.fontColor.r, p_.fontColor.g, p_.fontColor.b);
+    glUniform3f(loc_.stat.backgroundColor, p_.backgroundColor.r, p_.backgroundColor.g,
                 p_.backgroundColor.b);
-    glUniform1f(glGetUniformLocation(p, "chroma"), p_.chromaColor);
-    glUniform1f(glGetUniformLocation(p, "bloomStrength"), d_.bloomStrength);
-    glUniform1f(glGetUniformLocation(p, "screenBrightness"), d_.screenBrightness);
-    glUniform1i(glGetUniformLocation(p, "useBloom"), p_.bloom > 0);
-    glUniform2f(glGetUniformLocation(p, "inset"), geom_.ix, geom_.iy);
-    glUniform1f(glGetUniformLocation(p, "rgbShift"), rgbShiftPx(p_) / static_cast<float>(w_));
+    glUniform1f(loc_.stat.chroma, p_.chromaColor);
+    glUniform1f(loc_.stat.bloomStrength, d_.bloomStrength);
+    glUniform1f(loc_.stat.screenBrightness, d_.screenBrightness);
+    glUniform1i(loc_.stat.useBloom, p_.bloom > 0);
+    glUniform2f(loc_.stat.inset, geom_.ix, geom_.iy);
+    glUniform1f(loc_.stat.rgbShift, rgbShiftPx(p_) / static_cast<float>(w_));
     drawTo(fboStatic_, w_, h_, p);
     if (p_.frame && p_.bloom > 0 && p_.frameShininess > 0) {
         const GLuint c = progFrameComp_;
         glUseProgram(c);
-        bindTex(c, "baseTex", 0, texFrameBase_);
-        bindTex(c, "reflTex", 1, texFrameRefl_);
-        bindTex(c, "bloomSrc", 2, texBloomA_);
-        glUniform3f(glGetUniformLocation(c, "fontColor"), p_.fontColor.r, p_.fontColor.g, p_.fontColor.b);
-        glUniform1f(glGetUniformLocation(c, "chroma"), p_.chromaColor);
-        glUniform1f(glGetUniformLocation(c, "bloomStrength"), d_.bloomStrength);
-        glUniform1f(glGetUniformLocation(c, "screenBrightness"), d_.screenBrightness);
-        glUniform1i(glGetUniformLocation(c, "useRefl"), 1);
+        bindTex(loc_.comp.baseTex, 0, texFrameBase_);
+        bindTex(loc_.comp.reflTex, 1, texFrameRefl_);
+        bindTex(loc_.comp.bloomSrc, 2, texBloomA_);
+        glUniform3f(loc_.comp.fontColor, p_.fontColor.r, p_.fontColor.g, p_.fontColor.b);
+        glUniform1f(loc_.comp.chroma, p_.chromaColor);
+        glUniform1f(loc_.comp.bloomStrength, d_.bloomStrength);
+        glUniform1f(loc_.comp.screenBrightness, d_.screenBrightness);
+        glUniform1i(loc_.comp.useRefl, 1);
         drawTo(fboFrame_, w_, h_, c);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(prevFbo));
@@ -345,44 +380,48 @@ void GlPipeline::render(float timeMs, unsigned fbo, bool flipY) {
     glDisable(GL_DEPTH_TEST);
     const GLuint p = progDyn_;
     glUseProgram(p);
-    bindTex(p, "staticTex", 0, texStatic_);
-    bindTex(p, "burnTex", 1, texBurn_[burnCur_]);
-    bindTex(p, "noiseTex", 2, texNoise_);
-    auto u1 = [&](const char* n, float v) { glUniform1f(glGetUniformLocation(p, n), v); };
-    glUniform2f(glGetUniformLocation(p, "size"), static_cast<float>(w_), static_cast<float>(h_));
-    u1("curvature", d_.curvature);
-    glUniform3f(glGetUniformLocation(p, "fontColor"), p_.fontColor.r, p_.fontColor.g, p_.fontColor.b);
-    u1("chroma", p_.chromaColor);
-    u1("time", timeMs);
-    u1("hsync", p_.horizontalSync);
-    u1("hsyncScale", fu.hsyncScale);
-    u1("hsyncFreq", fu.hsyncFreq);
-    u1("jitter", p_.jitter);
-    glUniform2f(glGetUniformLocation(p, "jitterDisp"), d_.jitterX, d_.jitterY);
-    u1("staticNoise", p_.staticNoise);
+    bindTex(loc_.dyn.staticTex, 0, texStatic_);
+    bindTex(loc_.dyn.burnTex, 1, texBurn_[burnCur_]);
+    bindTex(loc_.dyn.noiseTex, 2, texNoise_);
+    auto u1 = [](GLint l, float v) { glUniform1f(l, v); };
+    glUniform2f(loc_.dyn.size, static_cast<float>(w_), static_cast<float>(h_));
+    u1(loc_.dyn.curvature, d_.curvature);
+    glUniform3f(loc_.dyn.fontColor, p_.fontColor.r, p_.fontColor.g, p_.fontColor.b);
+    u1(loc_.dyn.chroma, p_.chromaColor);
+    u1(loc_.dyn.time, timeMs);
+    u1(loc_.dyn.hsync, p_.horizontalSync);
+    u1(loc_.dyn.hsyncScale, fu.hsyncScale);
+    u1(loc_.dyn.hsyncFreq, fu.hsyncFreq);
+    u1(loc_.dyn.jitter, p_.jitter);
+    glUniform2f(loc_.dyn.jitterDisp, d_.jitterX, d_.jitterY);
+    u1(loc_.dyn.staticNoise, p_.staticNoise);
     float noiseAmount = p_.staticNoise;
     if (p_.horizontalSync != 0.0f && p_.staticNoise != 0.0f) noiseAmount += fu.hsyncScale * 7.0f;
-    u1("noiseAmount", noiseAmount);
-    glUniform2f(glGetUniformLocation(p, "noiseScale"), (w_ / p_.pixelScale * 0.75f) / kNoiseSize,
+    u1(loc_.dyn.noiseAmount, noiseAmount);
+    glUniform2f(loc_.dyn.noiseScale, (w_ / p_.pixelScale * 0.75f) / kNoiseSize,
                 (h_ / p_.pixelScale * 0.75f) / kNoiseSize);
-    glUniform2f(glGetUniformLocation(p, "noiseOffset"), fu.noiseOffsetX, fu.noiseOffsetY);
-    u1("glowingLine", d_.glowingLine);
-    u1("burnIn", p_.burnIn);
-    u1("burnInDecay", fu.burnInDecay);
-    glUniform1i(glGetUniformLocation(p, "rasterization"), p_.rasterization);
-    u1("vrY", h_ / p_.scanlinePeriod);
-    u1("rasterIntensity", p_.rasterizationIntensity);
-    u1("flicker", fu.flickerBrightness);
-    u1("ambient", d_.ambient);
-    glUniform1i(glGetUniformLocation(p, "flipY"), flipY ? 1 : 0);
-    glUniform2f(glGetUniformLocation(p, "inset"), geom_.ix, geom_.iy);
-    glUniform1i(glGetUniformLocation(p, "useFrame"), p_.frame ? 1 : 0);
-    bindTex(p, "frameTex", 3, p_.frame ? texFrame_ : texStatic_);
+    glUniform2f(loc_.dyn.noiseOffset, fu.noiseOffsetX, fu.noiseOffsetY);
+    u1(loc_.dyn.glowingLine, d_.glowingLine);
+    u1(loc_.dyn.burnIn, p_.burnIn);
+    u1(loc_.dyn.burnInDecay, fu.burnInDecay);
+    glUniform1i(loc_.dyn.rasterization, p_.rasterization);
+    u1(loc_.dyn.vrY, h_ / p_.scanlinePeriod);
+    u1(loc_.dyn.rasterIntensity, p_.rasterizationIntensity);
+    u1(loc_.dyn.flicker, fu.flickerBrightness);
+    u1(loc_.dyn.ambient, d_.ambient);
+    glUniform1i(loc_.dyn.flipY, flipY ? 1 : 0);
+    glUniform2f(loc_.dyn.inset, geom_.ix, geom_.iy);
+    glUniform1i(loc_.dyn.useFrame, p_.frame ? 1 : 0);
+    bindTex(loc_.dyn.frameTex, 3, p_.frame ? texFrame_ : texStatic_);
     drawTo(fbo, w_, h_, p);
 }
 
 void GlPipeline::renderToMemory(float timeMs, uint8_t* out) {
     if (!ok_ || !texSrc_) return;
+    if (!texOut_) {  // freed with the other sized objects by resize()/setParams()/releaseSized()
+        texOut_ = makeTex(w_, h_, GL_RGBA8, false, false);
+        fboOut_ = makeFbo(texOut_);
+    }
     render(timeMs, fboOut_, false);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glReadPixels(0, 0, w_, h_, GL_RGBA, GL_UNSIGNED_BYTE, out);

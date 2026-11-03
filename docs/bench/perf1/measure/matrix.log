@@ -1,0 +1,27 @@
+02:41:26 start p1-before-amber-gl-1280-r1 load=0.99 0.90 1.08 nproc=8
+02:42:49 start p1-after-amber-gl-1280-r1 load=0.73 0.82 1.03 nproc=8
+02:44:14 start p1-before-amber-gl-1024-r1 load=0.88 0.90 1.05 nproc=8
+02:45:35 start p1-after-amber-gl-1024-r1 load=0.30 0.70 0.96 nproc=8
+02:46:57 start p1-before-amber-cpu-1024-r1 load=0.79 0.81 0.98 nproc=8
+02:48:19 start p1-after-amber-cpu-1024-r1 load=0.33 0.66 0.91 nproc=8
+02:50:17 start p1-before-plain-1024-r1 load=1.04 0.90 0.98 nproc=8
+02:51:39 start p1-after-plain-1024-r1 load=0.93 0.88 0.97 nproc=8
+02:53:00 start p1-after-amber-gl-1280-r2 load=0.58 0.81 0.94 nproc=8
+awk: cannot open "/proc/2413547/stat" (No such file or directory)
+./measure.sh: line 38: kill: (2413547) - No such process
+07:01:06 start p1-before-amber-gl-1280-r2 load=3.88 1.97 1.33 nproc=8
+07:02:30 start p1-after-amber-gl-1024-r2 load=1.69 1.75 1.31 nproc=8
+07:03:53 start p1-before-amber-gl-1024-r2 load=0.87 1.51 1.26 nproc=8
+07:05:15 start p1-after-amber-cpu-1024-r2 load=0.36 1.19 1.17 nproc=8
+07:06:38 start p1-before-amber-cpu-1024-r2 load=0.62 1.12 1.14 nproc=8
+07:08:02 start p1-after-plain-1024-r2 load=0.36 0.91 1.07 nproc=8
+07:09:23 start p1-before-plain-1024-r2 load=1.09 1.05 1.10 nproc=8
+07:10:45 start p1-before-amber-gl-1280-r3 load=0.74 0.94 1.06 nproc=8
+07:12:12 start p1-after-amber-gl-1280-r3 load=1.13 1.09 1.10 nproc=8
+07:13:36 start p1-before-amber-gl-1024-r3 load=0.59 0.93 1.04 nproc=8
+07:14:59 start p1-after-amber-gl-1024-r3 load=0.78 0.94 1.04 nproc=8
+07:19:16 start p1-before-amber-cpu-1024-r3 load=0.02 0.44 0.81 nproc=8
+07:20:38 start p1-after-amber-cpu-1024-r3 load=0.95 0.73 0.88 nproc=8
+07:22:01 start p1-before-plain-1024-r3 load=0.46 0.63 0.83 nproc=8
+07:23:22 start p1-after-plain-1024-r3 load=0.59 0.66 0.82 nproc=8
+MATRIX_DONE 07:24:43

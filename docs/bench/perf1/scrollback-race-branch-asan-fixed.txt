@@ -1,0 +1,35 @@
+== branch fixed script run 1
+no settings.ini: sb-lines=5000 (want 5000)
+settings.ini without scrollback-lines: sb-lines=5000 (want 5000)
+saved scrollback-lines=10000: sb-lines=10000 (want 10000)
+saved scrollback-lines=7000: sb-lines=7000 (want 7000)
+scrollback default: ok
+rc=0
+== branch fixed script run 2
+no settings.ini: sb-lines=5000 (want 5000)
+settings.ini without scrollback-lines: sb-lines=5000 (want 5000)
+saved scrollback-lines=10000: sb-lines=10000 (want 10000)
+saved scrollback-lines=7000: sb-lines=7000 (want 7000)
+scrollback default: ok
+rc=0
+== branch fixed script run 3
+no settings.ini: sb-lines=5000 (want 5000)
+settings.ini without scrollback-lines: sb-lines=5000 (want 5000)
+saved scrollback-lines=10000: sb-lines=10000 (want 10000)
+saved scrollback-lines=7000: sb-lines=7000 (want 7000)
+scrollback default: ok
+rc=0
+== branch fixed script run 4
+no settings.ini: sb-lines=5000 (want 5000)
+settings.ini without scrollback-lines: sb-lines=5000 (want 5000)
+saved scrollback-lines=10000: sb-lines=10000 (want 10000)
+saved scrollback-lines=7000: sb-lines=7000 (want 7000)
+scrollback default: ok
+rc=0
+== branch fixed script run 5
+no settings.ini: sb-lines=5000 (want 5000)
+settings.ini without scrollback-lines: sb-lines=5000 (want 5000)
+saved scrollback-lines=10000: sb-lines=10000 (want 10000)
+saved scrollback-lines=7000: sb-lines=7000 (want 7000)
+scrollback default: ok
+rc=0

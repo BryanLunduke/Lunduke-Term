@@ -1,0 +1,9 @@
+# p1-after-amber-gl-1024-r2 after 07:03:22
+Rss:              188936 kB
+Pss:              177963 kB
+Shared_Clean:      12660 kB
+Private_Clean:     92168 kB
+Private_Dirty:     81036 kB
+Anonymous:         81036 kB
+GLmaps 19
+Threads 21

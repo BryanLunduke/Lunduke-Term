@@ -1,0 +1,9 @@
+# p1-before-amber-cpu-1024-r1 after 02:47:48
+Rss:              104852 kB
+Pss:               94938 kB
+Shared_Clean:       8180 kB
+Private_Clean:     30100 kB
+Private_Dirty:     60428 kB
+Anonymous:         60428 kB
+GLmaps 0
+Threads 8
