@@ -1,0 +1,47 @@
+# perf step 2: long differential runs, stock vs patched libvterm (REAL; /workspace/perf2-work/verify/run.sh at be7e249's test sources)
+# mode a = pristine 0.3.3 vs 0001+0002; mode b = 0.3.3+0001 vs 0001+0002 (REP of wide glyphs, 1-column screens).
+# 'bytes compared' = the full log of every callback and dump, compared byte for byte (runner streams both).
+# mutation check: the first version of 0002 (f40898d) must be caught. -13 = SIGPIPE: the runner stops reading at the first difference.
+# feed comparison: tools/libvterm_feed_diff.sh; flood8.txt = the 8 MiB measurement file (sha256 9897451c057cdf35...).
+
+== 2026-11-03 08:41:03 CST load 5.16 5.45 4.87: release, mode a (stock vs patched), seeds 1..3000 x 2000 steps
+libvterm diff mode a: seeds 1..3000, 2000 steps each, 28824717635 bytes compared per side, 0 different or timed out (exit 0: 3000)
+
+== 2026-11-03 08:46:06 CST load 7.42 6.54 5.51: release, mode b (stock+0001 vs patched), seeds 1..3000 x 2000 steps
+libvterm diff mode b: seeds 1..3000, 2000 steps each, 28468133340 bytes compared per side, 0 different or timed out (exit 0: 3000)
+
+== 2026-11-03 08:50:47 CST load 5.56 6.22 5.68: release, mode a, seeds 100001..100300 x 20000 steps (long streams)
+libvterm diff mode a: seeds 100001..100300, 20000 steps each, 27656351150 bytes compared per side, 0 different or timed out (exit 0: 300)
+
+== 2026-11-03 08:54:59 CST load 7.07 6.31 5.82: release, mode b, seeds 100001..100300 x 20000 steps (long streams)
+libvterm diff mode b: seeds 100001..100300, 20000 steps each, 27598971009 bytes compared per side, 0 different or timed out (exit 0: 300)
+
+== 2026-11-03 08:59:12 CST load 6.11 6.18 5.88: ASan/UBSan + leaks (build-san), mode a, seeds 1..300 x 2000 steps
+libvterm diff mode a: seeds 1..300, 2000 steps each, 2847329015 bytes compared per side, 0 different or timed out (exit 0: 300)
+
+== 2026-11-03 09:01:34 CST load 5.46 6.01 5.87: ASan/UBSan + leaks (build-san), mode b, seeds 1..300 x 2000 steps
+libvterm diff mode b: seeds 1..300, 2000 steps each, 2849406548 bytes compared per side, 0 different or timed out (exit 0: 300)
+
+== 2026-11-03 09:03:59 CST load 6.63 6.33 6.02: mutation check: stock vs the first 0002 (commit f40898d, without the vacated-row copy), seeds 1..20
+seed 1: DIFFERENT (exit -13 vs -13), first difference at byte 246586
+seed 2: DIFFERENT (exit -13 vs -13), first difference at byte 81188
+seed 3: DIFFERENT (exit -13 vs -13), first difference at byte 12855
+seed 3 mode a 8x58 reflow 0 altscreen 1 merge 3 sb 100000
+seed 3 mode a 8x58 reflow 0 altscreen 1 merge 3 sb 100000
+libvterm diff mode a: seeds 1..20, 2000 steps each, 50516784 bytes compared per side, 19 different or timed out (exit -13: 19, exit 0: 1)
+
+== 2026-11-03 09:04:00 CST load 6.63 6.33 6.02: feed comparison: sources, seq 1 2000000, flood8.txt (8 MiB, the measurement file)
+same: sources (1056184 bytes) at 24x80, log 67500758 bytes + exit status, sha256 d82bfd33b1918779
+same: sources (1056184 bytes) at 50x132, log 94977654 bytes + exit status, sha256 1922c53148ec6c2f
+same: sources (1056184 bytes) at 7x33, log 44422136 bytes + exit status, sha256 1bce2c62ed7db6a3
+same: sources (1056184 bytes) at 60x211, log 147780339 bytes + exit status, sha256 dde42377a867b81c
+same: seq 1 2000000 (14888896 bytes) at 24x80, log 4355537335 bytes + exit status, sha256 36dbe47791825994
+same: seq 1 2000000 (14888896 bytes) at 50x132, log 7064613720 bytes + exit status, sha256 a38faac415df4041
+same: seq 1 2000000 (14888896 bytes) at 7x33, log 1901684782 bytes + exit status, sha256 c049d0aabe37418d
+same: seq 1 2000000 (14888896 bytes) at 60x211, log 11176882720 bytes + exit status, sha256 e1bd00bfc129b916
+same: flood8.txt at 24x80, log 523399921 bytes + exit status, sha256 bebd5da36935b676
+same: flood8.txt at 50x132, log 729622764 bytes + exit status, sha256 7e90454ef4f56bd1
+same: flood8.txt at 7x33, log 347098908 bytes + exit status, sha256 74f4a5d8a6b3813b
+same: flood8.txt at 60x211, log 1133004781 bytes + exit status, sha256 837299afadb2858e
+
+== 2026-11-03 09:20:23 CST load 5.75 6.31 6.53: done

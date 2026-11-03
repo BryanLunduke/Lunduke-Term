@@ -1,0 +1,87 @@
+# gcov line coverage of the patched screen.c (0001+0002) from tests/libvterm_diff.c, seeds 1..100, modes a and b, 2000 steps (REAL, 2026-11-03 09:07:55 CST)
+# built by /tmp/lvcov/cov.sh: screen.c -O0 --coverage + stock -O2 other files; gcov 14.2.0
+screen.c: 622 of 681 executable lines run (91.3%)
+patched lines (count: line):
+250178005:   94:  int top = screen->ringtop[screen->buffer == screen->buffers[BUFIDX_ALTSCREEN] ? BUFIDX_ALTSCREEN : BUFIDX_PRIMARY];
+6937:  102:static void linearize(VTermScreen *screen, int bufidx)
+6937:  104:  int top = screen->ringtop[bufidx];
+3895:  115:  screen->ringtop[bufidx] = 0;
+17203007:  139:    break;
+45769:  167:    break;
+214693:  218:    if(!gap)
+2117:  221:      break;
+2117:  232:    rect.end_col = screen->cols;
+884941:  279:    int rows = screen->rows, top = screen->ringtop[idx];
+904556:  282:      memcpy(screen->buffer + rowcells * ((top + j) % rows),
+884941:  285:    screen->ringtop[idx] = (top + downward) % rows;
+2532:  527:    break;
+1992:  531:    break;
+6937:  566:  linearize(screen, bufidx);  /* the code below indexes old_buffer directly */
+2830:  663:      break;
+8682:  685:            break;
+1332:  739:        break;
+557837:  749:            break;
+200:  939:  screen->ringtop[BUFIDX_PRIMARY] = screen->ringtop[BUFIDX_ALTSCREEN] = 0;
+42396711: 1039:      break;
+1071: 1203:      break;
+1078: 1208:      break;
+unexecuted lines:
+91:    return NULL;
+179:  default:
+181:    return;
+206:    return 0;
+322:  damagerect(screen, dest);
+324:  return 1;
+460:  return 0;
+505:  case VTERM_N_ATTRS:
+506:    return 0;
+509:  return 0;
+519:      return 0;
+539:  return 1;
+549:  return 0;
+722:    fprintf(stderr, "screen_resize failed to update cursor position\n");
+723:    abort();
+854:  return 1;
+895:  return 0;
+915:    return NULL;
+1019:size_t vterm_screen_get_chars(const VTermScreen *screen, uint32_t *chars, size_t len, const VTermRect rect)
+1021:  return _get_chars(screen, 0, chars, len, rect);
+1034:    return 0;
+1083:    return vt->screen;
+1097:void vterm_screen_set_reflow(VTermScreen *screen, bool reflow)
+1099:  vterm_screen_enable_reflow(screen, reflow);
+1100:}
+1118:void *vterm_screen_get_cbdata(VTermScreen *screen)
+1120:  return screen->cbdata;
+1123:void vterm_screen_set_unrecognised_fallbacks(VTermScreen *screen, const VTermStateFallbacks *fallbacks, void *user)
+1125:  vterm_state_set_unrecognised_fallbacks(screen->state, fallbacks, user);
+1126:}
+1128:void *vterm_screen_get_unrecognised_fbdata(VTermScreen *screen)
+1130:  return vterm_state_get_unrecognised_fbdata(screen->state);
+1181:    return 1;
+1214:void vterm_screen_convert_color_to_rgb(const VTermScreen *screen, VTermColor *col)
+1216:  vterm_state_convert_color_to_rgb(screen->state, col);
+1217:}
+1219:static void reset_default_colours(VTermScreen *screen, ScreenCell *buffer)
+1221:  for(int row = 0; row <= screen->rows - 1; row++)
+1222:    for(int col = 0; col <= screen->cols - 1; col++) {
+1223:      ScreenCell *cell = &buffer[row * screen->cols + col];
+1224:      if(VTERM_COLOR_IS_DEFAULT_FG(&cell->pen.fg))
+1225:        cell->pen.fg = screen->pen.fg;
+1226:      if(VTERM_COLOR_IS_DEFAULT_BG(&cell->pen.bg))
+1227:        cell->pen.bg = screen->pen.bg;
+1229:}
+1231:void vterm_screen_set_default_colors(VTermScreen *screen, const VTermColor *default_fg, const VTermColor *default_bg)
+1233:  vterm_state_set_default_colors(screen->state, default_fg, default_bg);
+1235:  if(default_fg && VTERM_COLOR_IS_DEFAULT_FG(&screen->pen.fg)) {
+1236:    screen->pen.fg = *default_fg;
+1237:    screen->pen.fg.type = (screen->pen.fg.type & ~VTERM_COLOR_DEFAULT_MASK)
+1238:                        | VTERM_COLOR_DEFAULT_FG;
+1241:  if(default_bg && VTERM_COLOR_IS_DEFAULT_BG(&screen->pen.bg)) {
+1242:    screen->pen.bg = *default_bg;
+1243:    screen->pen.bg.type = (screen->pen.bg.type & ~VTERM_COLOR_DEFAULT_MASK)
+1244:                        | VTERM_COLOR_DEFAULT_BG;
+1247:  reset_default_colours(screen, screen->buffers[0]);
+1248:  if(screen->buffers[1])
+1249:    reset_default_colours(screen, screen->buffers[1]);
+1250:}
