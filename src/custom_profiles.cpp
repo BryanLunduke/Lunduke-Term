@@ -488,4 +488,18 @@ bool deleteCustomProfile(const std::string& dir, const std::string& id, std::str
     return true;
 }
 
+std::string profileListText() {
+    std::vector<Profile> all = builtinProfiles();
+    all.insert(all.end(), customProfiles().begin(), customProfiles().end());
+    std::string out;
+    for (const auto& p : all) {
+        const auto f = profileFont(p);
+        char line[512];
+        std::snprintf(line, sizeof line, "%-16s %-22s font: %s %dpx%s%s\n", p.id.c_str(), p.label.c_str(), f.family.c_str(), f.px,
+                      f.fallback ? " (fallback)" : "", f.monospace ? "" : " (not monospaced!)");
+        out += line;
+    }
+    return out;
+}
+
 }  // namespace lterm

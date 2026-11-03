@@ -291,7 +291,19 @@ int main() {
         g_unlink(badColor.c_str());
         CHECK(validateProfileName("badcolor", &err, "", dir));
     }
-    // A directory that cannot be written: save fails with a message, nothing crashes.
+    // ---- --list-profiles (PR #7 review): every built-in and custom profile, no "[default]" ----
+    {
+        const std::string list = profileListText();
+        std::printf("--list-profiles:\n%s", list.c_str());
+        CHECK(list.find("[default]") == std::string::npos && list.find("default") == std::string::npos);
+        size_t lines = 0;
+        for (char ch : list) lines += ch == '\n';
+        CHECK(lines == builtinProfiles().size() + customProfiles().size());
+        for (const auto& b : builtinProfiles()) CHECK(list.find(b.id + " ") != std::string::npos);
+        CHECK(list.find("custom:My Tube") != std::string::npos);
+        CHECK(list.find("amber            Amber ") != std::string::npos);  // the label alone
+    }
+
     {
         Profile r = p;
         r.id = customProfileId("Elsewhere");

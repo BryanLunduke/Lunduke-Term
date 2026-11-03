@@ -54,4 +54,8 @@ bool saveCustomProfile(const std::string& dir, const Profile& p, std::string* er
 bool renameCustomProfile(const std::string& dir, const std::string& id, const std::string& newName, std::string* err);
 bool deleteCustomProfile(const std::string& dir, const std::string& id, std::string* err);
 
+// --list-profiles: one line per built-in, then per custom profile: id, label, the font it
+// resolves to here. No "[default]" marker (PR #7 review, the editor's decision).
+std::string profileListText();
+
 }  // namespace lterm
