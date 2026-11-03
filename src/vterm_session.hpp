@@ -150,10 +150,21 @@ public:
     std::function<void()> onBell;
 
 private:
-    struct SbLine {
-        std::vector<VTermScreenCell> cells;  // trailing blank cells trimmed
-        bool wrapped = false;                // continues on the next line
+    // M6 item 6: a scrollback cell is 16 bytes instead of VTermScreenCell's 40. chars[0], the
+    // attributes and the width are packed; the rare cells with combining characters keep
+    // chars[1..] in SbLine::extra (column + 5 code points each).
+    struct SbCell {
+        uint32_t ch = 0;
+        uint32_t bits = 0;  // attrs (18 bits), width (8 bits), "has extra chars" (1 bit)
+        VTermColor fg{}, bg{};
     };
+    struct SbLine {
+        std::vector<SbCell> cells;    // trailing blank cells trimmed
+        std::vector<uint32_t> extra;  // per combining cell: column, chars[1..5]
+        bool wrapped = false;         // continues on the next line
+    };
+    static void packCell(const VTermScreenCell& c, int col, SbLine& line);
+    static void unpackCell(const SbLine& line, int col, VTermScreenCell& out);
     Color8 mapColor(VTermColor c, bool foreground) const;
     void toCell(const VTermScreenCell& vc, Cell& cell) const;
     void normalizeCell(int col, VTermScreenCell& c) const;

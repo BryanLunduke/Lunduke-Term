@@ -859,6 +859,63 @@ void VtermSession::toCell(const VTermScreenCell& vc, Cell& cell) const {
     cell.selected = false;
 }
 
+static_assert(sizeof(VTermColor) == 4, "SbCell assumes a 4-byte VTermColor");
+static_assert(VTERM_MAX_CHARS_PER_CELL == 6, "SbLine::extra stores chars[1..5]");
+static constexpr int kSbExtra = VTERM_MAX_CHARS_PER_CELL;  // uint32s per combining cell: column + 5 chars
+
+void VtermSession::packCell(const VTermScreenCell& c, int col, SbLine& line) {
+    static_assert(sizeof(SbCell) == 16, "scrollback cell size");
+    const VTermScreenCellAttrs& a = c.attrs;
+    uint32_t b = a.bold | a.underline << 1 | a.italic << 3 | a.blink << 4 | a.reverse << 5 | a.conceal << 6 |
+                 a.strike << 7 | a.font << 8 | a.dwl << 12 | a.dhl << 13 | a.small << 15 | a.baseline << 16;
+    b |= static_cast<uint32_t>(static_cast<uint8_t>(c.width)) << 18;
+    SbCell s;
+    s.ch = c.chars[0];
+    s.fg = c.fg;
+    s.bg = c.bg;
+    if (c.chars[0] != 0 && c.chars[1] != 0) {
+        b |= 1u << 26;
+        line.extra.push_back(static_cast<uint32_t>(col));
+        bool end = false;
+        for (int i = 1; i < VTERM_MAX_CHARS_PER_CELL; ++i) {
+            end = end || c.chars[i] == 0;
+            line.extra.push_back(end ? 0 : c.chars[i]);
+        }
+    }
+    s.bits = b;
+    line.cells.push_back(s);
+}
+
+void VtermSession::unpackCell(const SbLine& line, int col, VTermScreenCell& out) {
+    const SbCell& s = line.cells[static_cast<size_t>(col)];
+    const uint32_t b = s.bits;
+    out = VTermScreenCell{};
+    out.chars[0] = s.ch;
+    if (b >> 26 & 1) {
+        for (size_t i = 0; i + kSbExtra <= line.extra.size(); i += kSbExtra) {
+            if (line.extra[i] != static_cast<uint32_t>(col)) continue;
+            for (int k = 1; k < VTERM_MAX_CHARS_PER_CELL; ++k) out.chars[k] = line.extra[i + static_cast<size_t>(k)];
+            break;
+        }
+    }
+    out.width = static_cast<char>(static_cast<int8_t>(b >> 18 & 0xff));
+    VTermScreenCellAttrs& a = out.attrs;
+    a.bold = b & 1;
+    a.underline = b >> 1 & 3;
+    a.italic = b >> 3 & 1;
+    a.blink = b >> 4 & 1;
+    a.reverse = b >> 5 & 1;
+    a.conceal = b >> 6 & 1;
+    a.strike = b >> 7 & 1;
+    a.font = b >> 8 & 15;
+    a.dwl = b >> 12 & 1;
+    a.dhl = b >> 13 & 3;
+    a.small = b >> 15 & 1;
+    a.baseline = b >> 16 & 3;
+    out.fg = s.fg;
+    out.bg = s.bg;
+}
+
 static VTermScreenCell blankCell() {
     VTermScreenCell c{};
     c.width = 1;
@@ -961,7 +1018,7 @@ bool VtermSession::getCell(long line, int col, VTermScreenCell& out) const {
     long idx = static_cast<long>(sb_.size()) - (pushed_ - line);
     if (idx < 0) return false;
     const SbLine& l = sb_[static_cast<size_t>(idx)];
-    if (col < static_cast<int>(l.cells.size())) out = l.cells[static_cast<size_t>(col)];
+    if (col < static_cast<int>(l.cells.size())) unpackCell(l, col, out);
     else out = blankCell();
     normalizeCell(col, out);
     return true;
@@ -1058,7 +1115,9 @@ int VtermSession::cbPushLine(int cols, const VTermScreenCell* cells, void* user)
     while (n > 0 && cells[n - 1].chars[0] == 0 && VTERM_COLOR_IS_DEFAULT_BG(&cells[n - 1].bg) &&
            !cells[n - 1].attrs.reverse)
         --n;
-    l.cells.assign(cells, cells + n);
+    l.cells.reserve(static_cast<size_t>(n));
+    for (int c = 0; c < n; ++c) packCell(cells[c], c, l);
+    l.extra.shrink_to_fit();
     // Line k of a push batch is wrapped when old row k+1 is a continuation. libvterm shifts its
     // line info before the screen pushes the scrolled-out rows, so for the usual one-line
     // scroll (a linefeed at the bottom) the old row 1 is now row 0. Multi-line pushes (CSI S,
@@ -1082,8 +1141,10 @@ int VtermSession::cbPopLine(int cols, VTermScreenCell* cells, void* user) {
     if (s->sb_.empty()) return 0;
     const SbLine& l = s->sb_.back();
     const VTermScreenCell blank = blankCell();
-    for (int c = 0; c < cols; ++c)
-        cells[c] = c < static_cast<int>(l.cells.size()) ? l.cells[static_cast<size_t>(c)] : blank;
+    for (int c = 0; c < cols; ++c) {
+        if (c < static_cast<int>(l.cells.size())) unpackCell(l, c, cells[c]);
+        else cells[c] = blank;
+    }
     s->sb_.pop_back();
     --s->pushed_;
     ++s->epoch_;
@@ -1256,12 +1317,13 @@ void VtermSession::cbOutput(const char* bytes, size_t len, void* user) {
 }
 
 size_t VtermSession::scrollbackBytesFull(size_t lines, int cols) {
-    return lines * (sizeof(SbLine) + static_cast<size_t>(std::max(cols, 0)) * sizeof(VTermScreenCell));
+    return lines * (sizeof(SbLine) + static_cast<size_t>(std::max(cols, 0)) * sizeof(SbCell));
 }
 
 size_t VtermSession::scrollbackBytes() const {
     size_t b = 0;
-    for (const SbLine& l : sb_) b += sizeof(SbLine) + l.cells.capacity() * sizeof(VTermScreenCell);
+    for (const SbLine& l : sb_)
+        b += sizeof(SbLine) + l.cells.capacity() * sizeof(SbCell) + l.extra.capacity() * sizeof(uint32_t);
     return b;
 }
 
