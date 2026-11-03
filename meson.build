@@ -53,6 +53,7 @@ lterm_exe = executable('lunduke-terminal',
   'src/main.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep],
+  cpp_args : ['-DLTERM_VERSION="@0@"'.format(meson.project_version())],
   install : true)
 
 # Desktop integration (installed by `meson install`; see docs/PACKAGING.md).
@@ -156,3 +157,6 @@ test('ux', ux_test_exe, env : view_env, timeout : 120, is_parallel : false)
 # Default scrollback 5000; a saved scrollback-lines is kept. Runs the binary; skips without $DISPLAY.
 test('scrollback-default', find_program('sh'), args : [files('tests/scrollback_default_test.sh'), lterm_exe],
   env : view_env, timeout : 240, is_parallel : false)
+# Perf step 1: --help, --version and an unknown option (exit 0, 0, 2). Needs no $DISPLAY.
+test('cli', find_program('sh'), args : [files('tests/cli_test.sh'), lterm_exe, meson.project_version()],
+  env : test_env, timeout : 60)

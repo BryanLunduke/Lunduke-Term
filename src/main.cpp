@@ -9,7 +9,9 @@
 //                    [--cursor-blink|--no-cursor-blink]
 //                    [--frame|--no-frame] [--frame-size PX] [--frame-color #RRGGBB]
 //                    [--frame-shininess 0..1] [--rgb-shift 0..1]
-//                    [-T|--title TITLE] [--list-profiles] [-e COMMAND ARGS...]
+//                    [-T|--title TITLE] [--list-profiles] [-h|--help] [--version] [-e COMMAND ARGS...]
+// --quit-after is in milliseconds. --help/--version print to stdout and exit 0; an unknown
+// option or a bad value exits 2.
 // Settings (optional): $XDG_CONFIG_HOME/lunduke-terminal/settings.ini, group [terminal], keys
 // profile, effects (true/false), renderer, threads, effects-fps, max-fps, pause-unfocused,
 // effects-quality, cpu-budget (percent of one core, software rendering only, 0 = off),
@@ -31,7 +33,70 @@
 #include <cstring>
 #include <sys/wait.h>
 
+#ifndef LTERM_VERSION
+#define LTERM_VERSION "unknown"
+#endif
+
 namespace {
+
+// Keep in sync with the option parser in main() and the README.
+const char kUsage[] =
+    "Usage: lunduke-terminal [OPTION...] [-e COMMAND [ARGS...]]\n"
+    "A terminal emulator with CRT effects.\n"
+    "\n"
+    "Profile and effects:\n"
+    "  --profile ID              colour/effects profile (see --list-profiles)\n"
+    "  --list-profiles           list the built-in and custom profiles and exit\n"
+    "  --effects, --no-effects   force the CRT effects on or off (default: the profile decides)\n"
+    "  --renderer auto|gl|cpu    effects back-end (default auto: GL, the C++ path if GL fails)\n"
+    "  --effects-quality auto|full|reduced|static\n"
+    "                            effects level (default auto: reduced on software rendering)\n"
+    "  --effects-fps N           animated effects ticks per second (default 20)\n"
+    "  --max-fps N               cap for content updates (default 60)\n"
+    "  --cpu-budget PERCENT      software rendering only: slow the animation until painting it\n"
+    "                            uses at most PERCENT of one core (default 15, 0 = off)\n"
+    "  --threads N               C++ fallback threads (default 4)\n"
+    "  --no-pause-unfocused      keep animating while the window is inactive\n"
+    "  --frame, --no-frame       bezel on/off; --frame-size PX, --frame-color #RRGGBB,\n"
+    "                            --frame-shininess 0..1 tune it\n"
+    "  --rgb-shift 0..1          chromatic RGB shift\n"
+    "\n"
+    "Text and window:\n"
+    "  --font FAMILY             font family (default: the profile's)\n"
+    "  --font-px N               font size in pixels (default: the profile's)\n"
+    "  --size WxH                initial window size in pixels (default 1280x800)\n"
+    "  -T, --title TITLE         window title\n"
+    "  --scrollback N            scrollback lines (default 5000)\n"
+    "  --cursor-shape block|underline|bar, --cursor-blink, --no-cursor-blink\n"
+    "  --bell LIST               comma list of visual, urgent, audible or none\n"
+    "\n"
+    "Session:\n"
+    "  -e COMMAND [ARGS...]      run COMMAND instead of the shell (must be last)\n"
+    "  --login                   start the shell as a login shell\n"
+    "  --cwd DIR                 working directory\n"
+    "  --on-exit close|hold|hold-on-error\n"
+    "                            what the tab does when the command exits (default hold-on-error)\n"
+    "  --hold                    same as --on-exit hold\n"
+    "\n"
+    "Testing and diagnostics:\n"
+    "  --quit-after MS           close the window after MS milliseconds\n"
+    "  --stats                   print frame statistics on exit\n"
+    "  --stats-every S           print a memory line on stdout every S seconds\n"
+    "  -h, --help                show this help and exit\n"
+    "  --version                 show the version and exit\n"
+    "\n"
+    "Keys:\n"
+    "  Ctrl+Shift+T / Ctrl+Shift+W   new tab / close tab\n"
+    "  Ctrl+PgUp / Ctrl+PgDn         previous / next tab\n"
+    "  Ctrl+Shift+F                  search the scrollback\n"
+    "  Ctrl+Shift+S                  settings\n"
+    "  Ctrl+Shift+C / Ctrl+Shift+V   copy / paste (Shift+Insert pastes the primary selection)\n"
+    "  Ctrl+Shift+E                  toggle the effects\n"
+    "  Ctrl+Shift+P                  next profile\n"
+    "  Shift+PgUp/PgDn/Home/End      scroll the scrollback\n"
+    "\n"
+    "Settings: $XDG_CONFIG_HOME/lunduke-terminal/settings.ini (command-line options win).\n";
+
 
 void parseBell(lterm::ViewOptions& o, const std::string& list) {
     o.bellVisual = o.bellUrgent = o.bellAudible = false;
@@ -90,6 +155,19 @@ void loadSettings(lterm::ViewOptions& o) {
 }  // namespace
 
 int main(int argc, char** argv) {
+    // --help / --version before anything reads settings or profiles (their warnings would be noise).
+    for (int i = 1; i < argc; ++i) {
+        const std::string a = argv[i];
+        if (a == "-e") break;  // the rest belongs to the command
+        if (a == "-h" || a == "--help") {
+            std::fputs(kUsage, stdout);
+            return 0;
+        }
+        if (a == "--version") {
+            std::printf("lunduke-terminal %s\n", LTERM_VERSION);
+            return 0;
+        }
+    }
     lterm::ViewOptions opts;
     {
         // M6 item 4: custom profiles (profiles/*.ini next to settings.ini) before the settings and
@@ -146,7 +224,8 @@ int main(int argc, char** argv) {
         } else if (a == "-e") {
             for (++i; i < argc; ++i) opts.command.push_back(argv[i]);
         } else {
-            std::fprintf(stderr, "lunduke-terminal: unknown option %s\n", a.c_str());
+            std::fprintf(stderr, "lunduke-terminal: unknown option %s\nTry 'lunduke-terminal --help'.\n",
+                         a.c_str());
             return 2;
         }
     }
