@@ -233,7 +233,9 @@ int main(int argc, char** argv) {
     EffectParams m1f = m1;  // with the bezel: its three extra textures must not leak either
     m1f.frame = true;
     m1f.rgbShift = 0.3f;
+    const long look0 = GlPipeline::uniformLookups();
     GlEffects gl(m1f);
+    const long lookCtor = GlPipeline::uniformLookups() - look0;
     gl.resize(W, H);
     gl.renderNoReadback(0.0f);
     const int tex0 = gl.pipeline()->liveTextures(), fbo0 = gl.pipeline()->liveFramebuffers();
@@ -249,5 +251,11 @@ int main(int argc, char** argv) {
     std::printf("after 50 resizes (bezel on): textures %d -> %d, fbos %d -> %d, glIsTexture %d -> %d, PSNR %.2f dB, max diff %d\n",
                 tex0, tex1, fbo0, fbo1, gltex0, gltex1, ps, mx);
     if (tex1 != tex0 || fbo1 != fbo0 || gltex1 != gltex0 || ps < 40.0) ++fails;
+    // Perf step 1: uniform locations are looked up once per pipeline (constructor); 50 resizes
+    // (bezel redrawn each time), content updates and ticks with readback add none.
+    const long lookFrames = GlPipeline::uniformLookups() - look0 - lookCtor;
+    std::printf("uniform lookups: %ld in the constructor, %ld during 50 resizes + frames + readback\n", lookCtor,
+                lookFrames);
+    if (lookCtor <= 0 || lookFrames != 0) ++fails;
     return fails ? 1 : 0;
 }
