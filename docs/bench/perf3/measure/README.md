@@ -1,5 +1,7 @@
 # Perf step 3: window measurements (REAL unless marked DERIVED)
 
+> CPU frame time after the PR #11 review fix (row prepass) is re-measured in ../measure-review/README.md; the CPU slowdown described below is for 2f13075.
+
 Conditions: my own Xvfb :93 (1920x1200x24, GLX) with `xfwm4 --compositor=off`, on the shared 8-core box, 2026-11-03 15:15-15:53 CST. Mesa llvmpipe only (software GL), no GPU. Window 1280x800, `--profile amber`, GL (default renderer) and `--renderer cpu`; under llvmpipe the app picks quality "reduced" (stats line). There were 3 rounds: before/after on odd rounds, after/before on even rounds.
 BEFORE = master 6283674 release build (sha256 42b7cbe0…). AFTER = perf-step3 release build of 995c820 (sha256 1e07f5ab…). The code is unchanged up to the head; only docs were added.
 Script: measure.sh is a copy of perf1-work/measure.sh. The only change: the terminal runs with `--quit-after 170000`, so it exits cleanly and prints its `--stats` line (frame times). All 12 runs exited cleanly. matrix.sh checks before and after every run that Xvfb and the same xfwm4 PID are alive, and redoes a run if not. **The WM was alive for all 12 runs; none was discarded** (matrix.log; every window was decorated at 10,58).

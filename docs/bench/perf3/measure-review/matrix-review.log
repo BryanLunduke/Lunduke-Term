@@ -1,0 +1,16 @@
+own Xvfb :97 pid 3402393, xfwm4 pid 3402410; 2026-11-03 18:01:57 CST; nproc 8
+before /workspace/perf3-work/bin-master/lunduke-terminal sha256 42b7cbe031972a82; after /workspace/perf3-work/bin-review/lunduke-terminal sha256 1e45d1105b84a2ac
+18:01:57 start p3r-before-amber-cpu-1280-r1 try 1 load=1.36 1.11 1.28 wm=alive
+18:04:48 end p3r-before-amber-cpu-1280-r1 wm=alive
+18:04:48 start p3r-after-amber-cpu-1280-r1 try 1 load=0.83 0.96 1.19 wm=alive
+18:07:39 end p3r-after-amber-cpu-1280-r1 wm=alive
+18:07:39 start p3r-after-amber-cpu-1280-r2 try 1 load=0.61 0.79 1.08 wm=alive
+18:10:29 end p3r-after-amber-cpu-1280-r2 wm=alive
+18:10:29 start p3r-before-amber-cpu-1280-r2 try 1 load=0.73 0.74 1.00 wm=alive
+18:13:20 end p3r-before-amber-cpu-1280-r2 wm=alive
+18:13:20 start p3r-before-amber-cpu-1280-r3 try 1 load=0.33 0.59 0.90 wm=alive
+18:16:11 end p3r-before-amber-cpu-1280-r3 wm=alive
+18:16:11 start p3r-after-amber-cpu-1280-r3 try 1 load=0.35 0.55 0.83 wm=alive
+18:19:01 end p3r-after-amber-cpu-1280-r3 wm=alive
+MATRIX_DONE 2026-11-03 18:19:01 CST
+stopped own xfwm4 3402410 and Xvfb 3402393

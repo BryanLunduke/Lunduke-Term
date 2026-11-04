@@ -103,12 +103,21 @@ make optional.
 
 See measure/README.md (12 runs, xfwm4 alive in all of them, none discarded). Medians of 3
 (REAL): Private_Dirty after output, amber GL 88640 -> 86432 kB, amber CPU 74824 -> 48700 kB.
-Idle CPU is within noise. CPU-renderer frame time is about 9% worse (median tick 9.86 -> 10.71 ms).
+Idle CPU is within noise. At 2f13075 the CPU renderer was slower in every run: median tick
+9.86 -> 10.71 ms (+9%) and effects-source 13.41 -> 15.74 ms (+17%).
+
+After the row prepass (PR #11 review), measure-review/README.md re-measured the CPU renderer only
+(6 runs, xfwm4 alive in all of them, none discarded). Medians of 3 (REAL): effects-source
+14.50 -> 14.05 ms (-3%), median tick 10.48 -> 10.98 ms (+5%), Private_Dirty after output
+74696 -> 48748 kB, idle CPU within noise. The tick ranges overlap (before 10.35-11.02, after
+10.66-11.33 ms), so with 3 runs the tick is not shown to be either slower or equal; the
+effects-source cost is gone. Compare numbers only within one matrix: master's own median tick
+was 9.86 ms in the first matrix and 10.48 ms in the second.
 
 ## Not measured
 
 GPU drivers (no GPU). Other window sizes. Profiles other than amber. Full and static quality
 in the window (llvmpipe picks reduced). Peak memory during resize. Texture bytes from the app's
 own counter (measure.sh-style runs do not read it; the GL figure above is DERIVED from sizes).
-A profile of where the extra CPU frame time goes. Bloom in 16-bit fixed point (not tried,
+A profile of the CPU frame time (the remaining +5% median tick is not explained). Bloom in 16-bit fixed point (not tried,
 because the static variant already failed the bar).

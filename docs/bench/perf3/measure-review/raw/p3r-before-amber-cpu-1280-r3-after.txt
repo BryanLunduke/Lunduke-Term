@@ -1,0 +1,9 @@
+# p3r-before-amber-cpu-1280-r3 after 18:14:09
+Rss:              121228 kB
+Pss:               89140 kB
+Shared_Clean:      29812 kB
+Private_Clean:      8764 kB
+Private_Dirty:     74652 kB
+Anonymous:         74652 kB
+GLmaps 0
+Threads 8
