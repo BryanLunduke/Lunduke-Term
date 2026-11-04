@@ -37,8 +37,8 @@ Spread (REAL, min-max of 3): tick before 10.35-11.02, after 10.66-11.33 ms; effe
 
 DERIVED reading: memory is unchanged by the prepass: Private_Dirty is about 25.9 MB lower than
 master, fresh and after work, as in the first matrix. Idle CPU is within noise. Effects-source is
-no longer slower: median 14.50 -> 14.05 ms (-0.45 ms, -3%), and every after run is inside the
-before range. Median tick is 10.48 -> 10.98 ms (+0.50 ms, +5%), but the ranges overlap (one before
+no longer slower: median 14.50 -> 14.05 ms (-0.45 ms, -3%), and every after run (13.80-14.11)
+is below the before median (before runs 13.88-15.53). Median tick is 10.48 -> 10.98 ms (+0.50 ms, +5%), but the ranges overlap (one before
 run is slower than two after runs), so with 3 runs I cannot call it slower or equal; the step
 is under the run-to-run spread seen here. In the first matrix every after run was slower than every
 before run on both numbers; that is no longer true. Master's own median tick moved 9.86 -> 10.48 ms
