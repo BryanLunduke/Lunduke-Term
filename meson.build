@@ -154,6 +154,8 @@ executable('lterm-m5-throughput-bench', 'tools/m5_throughput_bench.cpp', 'src/te
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
 test('effects', executable('effects_test', 'tests/effects_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]), env : test_env)
+test('cpu-hash', executable('cpu_hash_test', 'tests/cpu_hash_test.cpp',
+  include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]), env : test_env)
 test('governor', executable('governor_test', 'tests/governor_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]), env : test_env)
 test('profiles', executable('profiles_test', 'tests/profiles_test.cpp',
