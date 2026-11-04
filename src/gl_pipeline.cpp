@@ -14,6 +14,12 @@ namespace lterm {
 // checks the result against the C++ reference (PSNR). The source and output textures are RGBA8
 // (M6 item 6: the source comes from an 8-bit Cairo image).
 static constexpr GLenum kSizedFmt = GL_RGBA16F;
+// Perf step 3: no separate "bloom A" target any more. The blur ping-pongs down -> bloomB (horizontal)
+// -> down (vertical), so texDown_ holds the bloom once the blur has run; the half-res burn-in, the
+// only other reader of the downsample, now runs before the blur. Same passes, same formats, so the
+// output is unchanged; one half-res RGBA16F texture less (2 MB at 1280x800). The smaller 4-byte
+// formats (R11F_G11F_B10F, RGB10_A2) were measured for down/bloom/static and did not hold the
+// GL-vs-CPU PSNR bar (docs/bench/perf3), so the float textures stay RGBA16F.
 
 GlPipeline::GlPipeline(const EffectParams& params)
     : p_(params), d_(derive(params)), weights_(bloomWeights(params.bloomRadiusHalfRes)) {
@@ -190,7 +196,7 @@ void GlPipeline::releaseSized() {
 }
 
 void GlPipeline::freeSized() {
-    for (unsigned* f : {&fboDown_, &fboBloomA_, &fboBloomB_, &fboBurn_[0], &fboBurn_[1], &fboStatic_, &fboOut_,
+    for (unsigned* f : {&fboDown_, &fboBloomB_, &fboBurn_[0], &fboBurn_[1], &fboStatic_, &fboOut_,
                         &fboFrameBase_, &fboFrameRefl_, &fboFrame_}) {
         if (*f) {
             glDeleteFramebuffers(1, f);
@@ -198,7 +204,7 @@ void GlPipeline::freeSized() {
         }
         *f = 0;
     }
-    for (unsigned* t : {&texSrc_, &texDown_, &texBloomA_, &texBloomB_, &texBurn_[0], &texBurn_[1], &texStatic_,
+    for (unsigned* t : {&texSrc_, &texDown_, &texBloomB_, &texBurn_[0], &texBurn_[1], &texStatic_,
                         &texOut_, &texFrameBase_, &texFrameRefl_, &texFrame_}) {
         if (*t) deleteTex(t);
     }
@@ -218,14 +224,12 @@ void GlPipeline::resize(int width, int height) {
     // an 8-bit texture holds it exactly; a half-float one cost 4 more bytes per pixel (4 MB at 1280x800).
     texSrc_ = makeTex(w_, h_, GL_RGBA8, true, false);
     texDown_ = makeTex(hw_, hh_, kSizedFmt, true, false);
-    texBloomA_ = makeTex(hw_, hh_, kSizedFmt, true, false);
     texBloomB_ = makeTex(hw_, hh_, kSizedFmt, true, false);
     for (int i = 0; i < 2; ++i) texBurn_[i] = makeTex(bw_, bh_, kSizedFmt, true, false);
     texStatic_ = makeTex(w_, h_, kSizedFmt, true, false);
     // texOut_/fboOut_ (RGBA8, w x h) are only read back by renderToMemory() (headless tests and
     // benchmarks); the window renders to the GtkGLArea framebuffer, so they are made on first use.
     fboDown_ = makeFbo(texDown_);
-    fboBloomA_ = makeFbo(texBloomA_);
     fboBloomB_ = makeFbo(texBloomB_);
     for (int i = 0; i < 2; ++i) fboBurn_[i] = makeFbo(texBurn_[i]);
     fboStatic_ = makeFbo(texStatic_);
@@ -306,18 +310,6 @@ void GlPipeline::updateSource(const uint8_t* px, int stride, PixelOrder order, f
         glUniform2i(loc_.down.srcSize, w_, h_);
         drawTo(fboDown_, hw_, hh_, progDown_);
     }
-    if (p_.bloom > 0) {
-        glUseProgram(progBlur_);
-        glUniform1fv(loc_.blur.weights, 65, weights_.data());
-        glUniform1i(loc_.blur.radius, std::min(64, p_.bloomRadiusHalfRes));
-        glUniform2i(loc_.blur.size, hw_, hh_);
-        bindTex(loc_.blur.src, 0, texDown_);
-        glUniform2i(loc_.blur.dir, 1, 0);
-        drawTo(fboBloomB_, hw_, hh_, progBlur_);
-        bindTex(loc_.blur.src, 0, texBloomB_);
-        glUniform2i(loc_.blur.dir, 0, 1);
-        drawTo(fboBloomA_, hw_, hh_, progBlur_);
-    }
     if (p_.burnIn > 0) {
         if (!haveBurn_) {
             for (int i = 0; i < 2; ++i) {
@@ -334,16 +326,28 @@ void GlPipeline::updateSource(const uint8_t* px, int stride, PixelOrder order, f
         const float decay0 = std::clamp((burnLast_ - burnPrev_) * d_.burnInTime, 0.0f, 1.0f);
         const int next = 1 - burnCur_;
         glUseProgram(progBurn_);
-        bindTex(loc_.burn.src, 0, p_.burnInHalfRes ? texDown_ : texSrc_);
+        bindTex(loc_.burn.src, 0, p_.burnInHalfRes ? texDown_ : texSrc_);  // the downsample, before the blur
         bindTex(loc_.burn.prev, 1, texBurn_[burnCur_]);
         glUniform1f(loc_.burn.decay0, decay0);
         drawTo(fboBurn_[next], bw_, bh_, progBurn_);
         burnCur_ = next;
     }
+    if (p_.bloom > 0) {
+        glUseProgram(progBlur_);
+        glUniform1fv(loc_.blur.weights, 65, weights_.data());
+        glUniform1i(loc_.blur.radius, std::min(64, p_.bloomRadiusHalfRes));
+        glUniform2i(loc_.blur.size, hw_, hh_);
+        bindTex(loc_.blur.src, 0, texDown_);
+        glUniform2i(loc_.blur.dir, 1, 0);
+        drawTo(fboBloomB_, hw_, hh_, progBlur_);
+        bindTex(loc_.blur.src, 0, texBloomB_);
+        glUniform2i(loc_.blur.dir, 0, 1);
+        drawTo(fboDown_, hw_, hh_, progBlur_);  // the bloom now lives in texDown_
+    }
     const GLuint p = progStatic_;
     glUseProgram(p);
     bindTex(loc_.stat.src, 0, texSrc_);
-    bindTex(loc_.stat.bloomSrc, 1, texBloomA_);
+    bindTex(loc_.stat.bloomSrc, 1, texDown_);
     glUniform2f(loc_.stat.size, static_cast<float>(w_), static_cast<float>(h_));
     glUniform1f(loc_.stat.curvature, d_.curvature);
     glUniform3f(loc_.stat.fontColor, p_.fontColor.r, p_.fontColor.g, p_.fontColor.b);
@@ -361,7 +365,7 @@ void GlPipeline::updateSource(const uint8_t* px, int stride, PixelOrder order, f
         glUseProgram(c);
         bindTex(loc_.comp.baseTex, 0, texFrameBase_);
         bindTex(loc_.comp.reflTex, 1, texFrameRefl_);
-        bindTex(loc_.comp.bloomSrc, 2, texBloomA_);
+        bindTex(loc_.comp.bloomSrc, 2, texDown_);
         glUniform3f(loc_.comp.fontColor, p_.fontColor.r, p_.fontColor.g, p_.fontColor.b);
         glUniform1f(loc_.comp.chroma, p_.chromaColor);
         glUniform1f(loc_.comp.bloomStrength, d_.bloomStrength);

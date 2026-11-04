@@ -1,0 +1,9 @@
+# p3-after-amber-gl-1280-r3 fresh 15:45:08
+Rss:              192444 kB
+Pss:              135995 kB
+Shared_Clean:      68872 kB
+Private_Clean:     36368 kB
+Private_Dirty:     83204 kB
+Anonymous:         83204 kB
+GLmaps 19
+Threads 23

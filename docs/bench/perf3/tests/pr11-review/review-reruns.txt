@@ -1,0 +1,13 @@
+18:54:11 load 1.05 1.54 1.45
+1/1 review OK              38.55s
+flood amber (release build): longest main-loop gap 19 ms, 127 slices cut, 10 content frames, Ctrl+C -> exit 21 ms
+flood amber: 19 content frames in 2.0 s (cap 10 per s while flooding)
+18:54:50 load 0.97 1.48 1.43
+1/1 review OK              38.42s
+flood amber (release build): longest main-loop gap 73 ms, 121 slices cut, 7 content frames, Ctrl+C -> exit 21 ms
+flood amber: 19 content frames in 2.0 s (cap 10 per s while flooding)
+18:55:29 load 1.18 1.49 1.44
+1/1 review OK              38.45s
+flood amber (release build): longest main-loop gap 19 ms, 135 slices cut, 8 content frames, Ctrl+C -> exit 21 ms
+flood amber: 19 content frames in 2.0 s (cap 10 per s while flooding)
+DONE

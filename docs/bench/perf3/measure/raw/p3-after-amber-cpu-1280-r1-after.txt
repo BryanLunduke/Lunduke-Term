@@ -1,0 +1,9 @@
+# p3-after-amber-cpu-1280-r1 after 15:24:59
+Rss:               95384 kB
+Pss:               65709 kB
+Shared_Clean:      29716 kB
+Private_Clean:      8824 kB
+Private_Dirty:     48844 kB
+Anonymous:         48844 kB
+GLmaps 0
+Threads 8

@@ -86,9 +86,9 @@ private:
              progFrameComp_ = 0;
     unsigned texNoise_ = 0;
     // Size-dependent objects (recreated by resize()).
-    unsigned texSrc_ = 0, texDown_ = 0, texBloomA_ = 0, texBloomB_ = 0, texBurn_[2] = {0, 0}, texStatic_ = 0,
+    unsigned texSrc_ = 0, texDown_ = 0, texBloomB_ = 0, texBurn_[2] = {0, 0}, texStatic_ = 0,
              texOut_ = 0;
-    unsigned fboDown_ = 0, fboBloomA_ = 0, fboBloomB_ = 0, fboBurn_[2] = {0, 0}, fboStatic_ = 0, fboOut_ = 0;
+    unsigned fboDown_ = 0, fboBloomB_ = 0, fboBurn_[2] = {0, 0}, fboStatic_ = 0, fboOut_ = 0;
     // Bezel (p_.frame): static base + reflection lookup (rendered on resize), composite per content.
     unsigned texFrameBase_ = 0, texFrameRefl_ = 0, texFrame_ = 0;
     unsigned fboFrameBase_ = 0, fboFrameRefl_ = 0, fboFrame_ = 0;

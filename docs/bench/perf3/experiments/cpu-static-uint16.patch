@@ -1,0 +1,94 @@
+diff --git a/src/cpu_effects.cpp b/src/cpu_effects.cpp
+index 9c41509..ab89aff 100644
+--- a/src/cpu_effects.cpp
++++ b/src/cpu_effects.cpp
+@@ -36,7 +36,7 @@ void CpuEffects::resize(int width, int height) {
+     bh_ = p_.burnInHalfRes ? hh_ : h_;
+     const size_t n = static_cast<size_t>(w_) * h_ * 4;
+     src_.assign(n, 0);
+-    static_.assign(n, 0.0f);
++    static_.assign(static_cast<size_t>(w_) * h_ * 3, 0);
+     burn_.assign(static_cast<size_t>(bw_) * bh_ * 4, 0.0f);
+     down_.assign(static_cast<size_t>(hw_) * hh_ * 3, 0.0f);
+     bloomB_.assign(down_.size(), 0.0f);
+@@ -262,11 +262,10 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
+                     o1 += std::min(std::max(bgc * d_.bloomStrength, 0.0f), 0.5f);
+                     o2 += std::min(std::max(bb * d_.bloomStrength, 0.0f), 0.5f);
+                 }
+-                float* o = &static_[idx * 4];
+-                o[0] = o0 * d_.screenBrightness;
+-                o[1] = o1 * d_.screenBrightness;
+-                o[2] = o2 * d_.screenBrightness;
+-                o[3] = 1.0f;
++                uint16_t* o = &static_[idx * 3];
++                o[0] = toFixed16(o0 * d_.screenBrightness, kStaticScale);
++                o[1] = toFixed16(o1 * d_.screenBrightness, kStaticScale);
++                o[2] = toFixed16(o2 * d_.screenBrightness, kStaticScale);
+             }
+         }
+     });
+@@ -339,7 +338,7 @@ void CpuEffects::renderTo(float timeMs, uint8_t* out, int stride, PixelOrder ord
+                 float color = 0.0001f;
+                 if (p_.staticNoise != 0.0f) color += nt[3] * noiseAmount * (1.0f - dist * 1.3f);
+                 color += glow;
+-                sampleClamp<3>(static_.data(), w_, h_, tu, tv, t);
++                sampleClamp<3, 3>(static_.data(), w_, h_, tu, tv, 1.0f / kStaticScale, t);
+                 if (p_.burnIn != 0.0f) {
+                     sampleClamp<3>(burn_.data(), bw_, bh_, su, sv, b);
+                     float br = 0.65f * (b[0] - fu.burnInDecay);
+diff --git a/src/cpu_effects.hpp b/src/cpu_effects.hpp
+index 8c32dc1..cc0f89a 100644
+--- a/src/cpu_effects.hpp
++++ b/src/cpu_effects.hpp
+@@ -38,7 +38,11 @@ private:
+     std::vector<float> bloomB_;
+     std::vector<float> burn_;             // RGBA float (rgb + prev mask), full or half res
+     int bw_ = 0, bh_ = 0;                 // burn-in buffer size
+-    std::vector<float> static_;   // RGBA float, static pass output
++    // Static pass output, RGB 16-bit fixed point (perf step 3: was RGBA float, 16 B per pixel, now 6).
++    // Values are 0..~3.75 (brightness up to 1.5 x (colour + bloom up to 0.5)); one step is 1/16384,
++    // 1/64 of an 8-bit output step.
++    static constexpr float kStaticScale = 16384.0f;
++    std::vector<uint16_t> static_;
+     // Perf step 3: the screen-local coordinates before the barrel warp (separable), per column / row.
+     std::vector<float> colLu_, rowLv_;
+     // Source uv (su, sv) and warped screen-local uv (lu, lv) of pixel (x, y); mirrors screenCoords().
+diff --git a/src/sampling.hpp b/src/sampling.hpp
+index 1d5293e..b84c800 100644
+--- a/src/sampling.hpp
++++ b/src/sampling.hpp
+@@ -62,6 +62,34 @@ inline void sampleClamp(const uint8_t* tex, int w, int h, float u, float v, floa
+     }
+ }
+ 
++// Perf step 3: 16-bit fixed point textures. A value x is stored as round(x * scale), clamped to
++// 0..65535, and read back as k * (1 / scale).
++inline uint16_t toFixed16(float x, float scale) {
++    const float k = x * scale + 0.5f;
++    return static_cast<uint16_t>(k <= 0.0f ? 0.0f : (k >= 65535.0f ? 65535.0f : k));
++}
++// tex: uint16 fixed point, C channels per texel; inv = 1 / scale. Writes the first N channels.
++template <int N = 3, int C = 3>
++inline void sampleClamp(const uint16_t* tex, int w, int h, float u, float v, float inv, float out[4]) {
++    static_assert(N <= C, "N channels of a C-channel texture");
++    float x = u * w - 0.5f, y = v * h - 0.5f;
++    int x0 = ifloor(x), y0 = ifloor(y);
++    float fx = x - static_cast<float>(x0), fy = y - static_cast<float>(y0);
++    int x1 = clampi(x0 + 1, 0, w - 1), y1 = clampi(y0 + 1, 0, h - 1);
++    x0 = clampi(x0, 0, w - 1);
++    y0 = clampi(y0, 0, h - 1);
++    const uint16_t* a = tex + (static_cast<size_t>(y0) * w + x0) * C;
++    const uint16_t* b = tex + (static_cast<size_t>(y0) * w + x1) * C;
++    const uint16_t* c = tex + (static_cast<size_t>(y1) * w + x0) * C;
++    const uint16_t* d = tex + (static_cast<size_t>(y1) * w + x1) * C;
++    for (int i = 0; i < N; ++i) {
++        const float fa = a[i] * inv, fb = b[i] * inv, fc = c[i] * inv, fd = d[i] * inv;
++        float top = fa + (fb - fa) * fx;
++        float bot = fc + (fd - fc) * fx;
++        out[i] = top + (bot - top) * fy;
++    }
++}
++
+ inline int wrapi(int v, int n) {
+     int r = v % n;
+     return r < 0 ? r + n : r;

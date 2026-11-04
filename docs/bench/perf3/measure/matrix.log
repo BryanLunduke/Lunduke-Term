@@ -1,0 +1,28 @@
+own Xvfb :93 pid 3217407, xfwm4 pid 3217421; 2026-11-03 15:15:39 CST; nproc 8
+before /workspace/perf3-work/bin-master/lunduke-terminal sha256 42b7cbe031972a82; after /workspace/perf3-work/bin-after/lunduke-terminal sha256 1e07f5ab6c259139
+15:15:39 start p3-before-amber-gl-1280-r1 try 1 load=0.88 1.56 1.41 wm=alive
+15:18:30 end p3-before-amber-gl-1280-r1 wm=alive
+15:18:30 start p3-after-amber-gl-1280-r1 try 1 load=0.42 1.25 1.33 wm=alive
+15:21:20 end p3-after-amber-gl-1280-r1 wm=alive
+15:21:20 start p3-before-amber-cpu-1280-r1 try 1 load=0.26 0.90 1.18 wm=alive
+15:24:10 end p3-before-amber-cpu-1280-r1 wm=alive
+15:24:10 start p3-after-amber-cpu-1280-r1 try 1 load=0.48 0.72 1.06 wm=alive
+15:27:01 end p3-after-amber-cpu-1280-r1 wm=alive
+15:27:01 start p3-after-amber-gl-1280-r2 try 1 load=0.59 0.82 1.05 wm=alive
+15:32:08 end p3-after-amber-gl-1280-r2 wm=alive
+15:32:08 start p3-before-amber-gl-1280-r2 try 1 load=0.10 0.43 0.83 wm=alive
+15:34:59 end p3-before-amber-gl-1280-r2 wm=alive
+15:34:59 start p3-after-amber-cpu-1280-r2 try 1 load=0.33 0.41 0.76 wm=alive
+15:37:49 end p3-after-amber-cpu-1280-r2 wm=alive
+15:37:49 start p3-before-amber-cpu-1280-r2 try 1 load=0.84 0.62 0.79 wm=alive
+15:40:40 end p3-before-amber-cpu-1280-r2 wm=alive
+15:40:40 start p3-before-amber-gl-1280-r3 try 1 load=0.33 0.56 0.74 wm=alive
+15:45:00 end p3-before-amber-gl-1280-r3 wm=alive
+15:45:00 start p3-after-amber-gl-1280-r3 try 1 load=1.47 1.43 1.08 wm=alive
+15:47:51 end p3-after-amber-gl-1280-r3 wm=alive
+15:47:51 start p3-before-amber-cpu-1280-r3 try 1 load=0.48 1.06 1.00 wm=alive
+15:50:42 end p3-before-amber-cpu-1280-r3 wm=alive
+15:50:42 start p3-after-amber-cpu-1280-r3 try 1 load=0.61 0.83 0.92 wm=alive
+15:53:33 end p3-after-amber-cpu-1280-r3 wm=alive
+MATRIX_DONE 2026-11-03 15:53:33 CST
+stopped own xfwm4 3217421 and Xvfb 3217407
