@@ -1,0 +1,6 @@
+appstreamcli: /workspace/lterm-tools/root/usr/bin/appstreamcli
+release-serial rc=0 237s
+release-parallel rc=0 223s
+asan-serial rc=0 635s
+asan-parallel rc=0 553s
+ALL_DONE

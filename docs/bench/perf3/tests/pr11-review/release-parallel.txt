@@ -1,0 +1,37 @@
+ 1/28 desktop-file         OK                0.01s
+ 2/28 metainfo             OK                0.01s
+ 3/28 effects              OK                0.22s
+ 4/28 governor             OK                0.00s
+ 5/28 profiles             OK                0.00s
+ 6/28 custom-profiles      OK                0.09s
+ 7/28 painter              OK                0.08s
+ 8/28 fonts                OK                0.02s
+ 9/28 vterm                OK                0.00s
+10/28 cpu-hash             OK                0.55s
+11/28 session              OK                0.15s
+12/28 fixes                OK                0.39s
+13/28 fuzz-regress         OK                0.01s
+14/28 libvterm-rep         OK                0.01s
+15/28 unicode              OK                0.00s
+16/28 search               OK                0.71s
+17/28 gl-match             OK                9.94s
+18/28 view                 OK               97.77s
+19/28 review               OK               38.46s
+20/28 ux                   OK               22.06s
+21/28 scrollback-default   OK               10.13s
+22/28 libvterm-pristine    OK                0.01s
+23/28 cli                  OK                0.14s
+24/28 libvterm-t-patched   OK                0.87s
+25/28 libvterm-t-stock     OK                0.88s
+26/28 libvterm-diff        OK                9.27s
+27/28 libvterm-diff-repfix OK                9.93s
+28/28 libvterm-feed-diff   OK               34.47s
+
+Ok:                 28  
+Expected Fail:      0   
+Fail:               0   
+Unexpected Pass:    0   
+Skipped:            0   
+Timeout:            0   
+
+Full log written to /workspace/lunduke-term-perf3/build/meson-logs/testlog.txt

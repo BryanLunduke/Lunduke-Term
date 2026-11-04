@@ -1,0 +1,592 @@
+Log of Meson test suite run on 2026-11-03T18:33:56.877204
+
+Inherited environment: __CURSOR_SANDBOX_ENV_RESTORE='builtin unset CURSOR_CONVERSATION_ID CURSOR_REQUEST_ID CURSOR_AGENT_STORE_FILES_DIR CURSOR_AGENT_STORE_SHARED_PATHS 2>/dev/null || true; builtin unset CURSOR_CONVERSATION_ID CURSOR_REQUEST_ID CURSOR_AGENT_STORE_FILES_DIR CURSOR_AGENT_STORE_SHARED_PATHS 2>/dev/null || true; builtin export CURSOR_CONVERSATION_ID='"'"'sand-subagent-2f710223-99e0-6c53-5ad2-cd247d0241a5'"'"'; builtin export CURSOR_REQUEST_ID='"'"'1db0d833-533c-4409-aa50-a3f77aee7364'"'"'' SAND_BOX_SCRIPT_SYNC_DISABLED=1 AGENT_TRANSCRIPTS=/home/box/.cursor/projects/workspace/agent-transcripts _ZO_DOCTOR=0 SAND_BOX_TENANT_ID=309e836236dc80225062 SAND_SUPERVISOR_ENABLED=1 SAND_BOX_TELEMETRY_LOG=/tmp/sand-box-telemetry.log PWD=/workspace/lunduke-term-perf3 SAND_BOX_STORE_HIBERNATE_HOOK=1 LOGNAME=box SAND_HTTP_PROXY_NAME=runner-egress-proxy SAND_EGRESS_TUNNEL_ENABLED=1 SAND_BOX_AUTH_ID='grok|user_01M0ET97V2KP8G939X9XRFQKAR' COREPACK_HOME=/usr/local/share/corepack HOME=/home/box SAND_BOX_STORE_COPY_IN=1 LANG=C.UTF-8 SAND_EGRESS_TUNNEL_PROXY_ADDR=127.0.0.1:8791 LS_COLORS='' CURSOR_CONVERSATION_ID=sand-subagent-2f710223-99e0-6c53-5ad2-cd247d0241a5 CURSOR_RIPGREP_PATH=/exec-daemon/rg SAND_BOX_PERSISTENT_KEYRING=1 SAND_EGRESS_TUNNEL_WS_PORT=8790 SAND_MANIFEST_V2=1 FORCE_COLOR=0 SCREEN_HEIGHT=1200 SAND_BOX_CLUSTER=us12 SAND_HOST_PORT=1340 EXEC_DAEMON_CWD=/workspace SAND_BOX_DESKTOP_PANEL=1 SAND_AGENT_STORE_RPC_SERVICE=agent-store CURSOR_AGENT_SOCKET=/tmp/sand-identity.sock SAND_BOX_STORE_ID=300f0988-57ff-54bd-8b83-3cf6e3f5ca85 SAND_BOX_CREATED_AT_MS=1793383103945 CURSOR_AGENT=1 CURSOR_REQUEST_ID=1db0d833-533c-4409-aa50-a3f77aee7364 SAND_BOX_BOOT_STARTED_AT_MS=1793383106569 NPM_CONFIG_PREFIX=/home/box/.local SAND_BOX_AUDIO_DEVICES=1 SAND_BOOT_CLEARS_HOST_WEBRTC_POLICY=1 TERM=dumb SAND_BOX_BOOT_STATIC_SNAPSHOT=sand-box-263d3bab72e7-amd64.v5 USER=box SAND_BOX_MAX_WINDOWS=100 DISPLAY=:96 SHLVL=4 SAND_BOX_STORE_BACKEND=v2 SAND_GATEWAY_BIND_HOST=0.0.0.0 LIBGL_ALWAYS_SOFTWARE=1 NO_COLOR=1 LD_LIBRARY_PATH=/workspace/lterm-tools/root/usr/lib/x86_64-linux-gnu XDG_RUNTIME_DIR=/tmp/xdg-runtime-box-7 SAND_EGRESS_TUNNEL_WS_ADDR=0.0.0.0:8790 SAND_BOX_BOOT_ID=7bb46a65-edfa-473b-8805-9171d2490342 SAND_USER_NON_ROOT=1 LC_ALL=C.UTF-8 SAND_STORE_BETTER_CLI=1 BROWSER=/usr/local/bin/box-chrome PATH=/workspace/lterm-tools/root/usr/bin:/workspace/lterm-tools/root/usr/bin:/workspace/lterm-tools/root/usr/bin:/home/box/.local/bin:/home/box/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/xdg-runtime-box-7/bus SAND_HOST_UID_SPLIT_ACTIVE=0 SAND_BOX_STORE_SYNC=1 DEBIAN_FRONTEND=noninteractive SCREEN_WIDTH=1920 OLDPWD=/workspace/perf3-work _=/usr/bin/meson 
+
+==================================== 1/28 ====================================
+test:         desktop-file
+start time:   00:33:56
+duration:     0.00s
+result:       exit status 0
+command:      ASAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1 MALLOC_PERTURB_=209 UBSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 MESON_TEST_ITERATION=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 /usr/bin/desktop-file-validate /workspace/lunduke-term-perf3/data/org.lunduke.LundukeTerminal.desktop
+==============================================================================
+
+==================================== 2/28 ====================================
+test:         metainfo
+start time:   00:33:56
+duration:     0.01s
+result:       exit status 0
+command:      ASAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1 UBSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 MESON_TEST_ITERATION=1 MALLOC_PERTURB_=179 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 /workspace/lterm-tools/root/usr/bin/appstreamcli validate --no-net --explain /workspace/lunduke-term-perf3/data/org.lunduke.LundukeTerminal.metainfo.xml
+----------------------------------- stdout -----------------------------------
+✔ Validation was successful: pedantic: 1
+==============================================================================
+
+==================================== 3/28 ====================================
+test:         effects
+start time:   00:33:56
+duration:     1.36s
+result:       exit status 0
+command:      MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 MALLOC_PERTURB_=60 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/effects_test
+----------------------------------- stdout -----------------------------------
+scale 2 (2x2 average) vs scale 1, static + scanlines: PSNR 28.72 dB (unscaled parameters 26.02 dB)
+bezel pixel next to a lit column: 29 -> 40
+rgb shift fringes: left 63,42,21 right 21,42,63
+effects_test: OK
+==============================================================================
+
+==================================== 4/28 ====================================
+test:         cpu-hash
+start time:   00:33:58
+duration:     4.85s
+result:       exit status 0
+command:      MALLOC_PERTURB_=33 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/cpu_hash_test
+----------------------------------- stdout -----------------------------------
+ok   1x1 burn-in half-res: 05fc69acbeadd64c
+ok   1x1 burn-in full-res: 05fc69acbeadd64c
+ok   2x3 burn-in half-res: ce6f45f7b93ad495
+ok   2x3 burn-in full-res: ce6f45f7b93ad495
+ok   7x9 burn-in half-res: 4788a2da13c5f471
+ok   7x9 burn-in full-res: 4788a2da13c5f471
+ok   33x17 burn-in half-res: b884ee107a1c0ba4
+ok   33x17 burn-in full-res: 9bf855cdcb91e681
+ok   641x399 burn-in half-res: 5690a5f0cb5e868a
+ok   641x399 burn-in full-res: 507480fb494ac744
+ok   1279x801 burn-in half-res: 0997b17c7ca1e591
+ok   1279x801 burn-in full-res: 5dc6f445c4b43453
+==============================================================================
+
+==================================== 5/28 ====================================
+test:         governor
+start time:   00:34:03
+duration:     0.02s
+result:       exit status 0
+command:      MALLOC_PERTURB_=251 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/governor_test
+----------------------------------- stdout -----------------------------------
+slow-down then recover: interval 100 ms
+demote/probe/recover: 5 demotions
+governor: 146 ms tick, 232 then 404 ms frames: 1 demotion(s), tick 1000 ms
+costly probe: 5 demotions, last probe 1 frame(s), next in 80 s
+governor: all passed
+==============================================================================
+
+==================================== 6/28 ====================================
+test:         profiles
+start time:   00:34:03
+duration:     0.01s
+result:       exit status 0
+command:      MESON_TEST_ITERATION=1 MALLOC_PERTURB_=29 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/profiles_test
+----------------------------------- stdout -----------------------------------
+amber            blue grey 0.50, bright blue grey 0.68
+green            blue grey 0.50, bright blue grey 0.68
+green-scanlines  blue grey 0.50, bright blue grey 0.68
+ibm-dos          blue grey 0.30, bright blue grey 0.45
+ibm-3278         blue grey 0.50, bright blue grey 0.68
+vintage          blue grey 0.50, bright blue grey 0.68
+futuristic       blue grey 0.44, bright blue grey 0.62
+paper-white      blue grey 0.50, bright blue grey 0.68
+pixel-8bit       blue grey 0.50, bright blue grey 0.68
+pixel-hires-mono blue grey 0.50, bright blue grey 0.68
+pixel-16bit      blue grey 0.50, bright blue grey 0.68
+pixel-40col      blue grey 0.50, bright blue grey 0.68
+modern           blue grey 0.50, bright blue grey 0.68
+profiles_test: OK
+==============================================================================
+
+==================================== 7/28 ====================================
+test:         custom-profiles
+start time:   00:34:03
+duration:     0.17s
+result:       exit status 0
+command:      MALLOC_PERTURB_=74 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/custom_profiles_test
+----------------------------------- stdout -----------------------------------
+round trip: 14 built-ins and one profile with every option changed
+corrupt: /tmp/lterm-custom-profiles-test-3442309/lunduke-terminal/profiles/BadColour.ini: [profile] foreground: bad colour (want #rrggbb) (skipped)
+corrupt: /tmp/lterm-custom-profiles-test-3442309/lunduke-terminal/profiles/BadNumber.ini: [effects] bloom: Key file contains key “bloom” in group “effects” which has a value that cannot be interpreted. (skipped)
+corrupt: /tmp/lterm-custom-profiles-test-3442309/lunduke-terminal/profiles/Binary.ini: no [profile] group (skipped)
+corrupt: /tmp/lterm-custom-profiles-test-3442309/lunduke-terminal/profiles/Broken.ini: Key file contains line “[profile” which is not a key-value pair, group, or comment (skipped)
+corrupt: /tmp/lterm-custom-profiles-test-3442309/lunduke-terminal/profiles/NoGroup.ini: no [profile] group (skipped)
+--list-profiles:
+plain            Plain (no effects)     font: DejaVu Sans Mono 16px
+amber            Amber                  font: DejaVu Sans Mono 22px (fallback)
+green            Green                  font: DejaVu Sans Mono 22px (fallback)
+green-scanlines  Green scanlines        font: DejaVu Sans Mono 22px (fallback)
+ibm-dos          IBM DOS (colour)       font: DejaVu Sans Mono 22px (fallback)
+ibm-3278         IBM 3278 (static)      font: DejaVu Sans Mono 22px (fallback)
+vintage          Vintage                font: DejaVu Sans Mono 22px (fallback)
+futuristic       Futuristic (colour)    font: DejaVu Sans Mono 22px (fallback)
+paper-white      Paper white            font: DejaVu Sans Mono 22px (fallback)
+pixel-8bit       Pixel 8-bit (blue)     font: DejaVu Sans Mono 22px (fallback)
+pixel-hires-mono Pixel hi-res mono      font: DejaVu Sans Mono 22px (fallback)
+pixel-16bit      Pixel 16-bit           font: DejaVu Sans Mono 22px (fallback)
+pixel-40col      Pixel 40-column        font: DejaVu Sans Mono 22px (fallback)
+modern           Modern (mint)          font: DejaVu Sans Mono 22px (fallback)
+custom:My Tube   My Tube                font: DejaVu Sans Mono 19px (fallback)
+custom profiles: all passed
+==============================================================================
+
+==================================== 8/28 ====================================
+test:         painter
+start time:   00:34:03
+duration:     0.29s
+result:       exit status 0
+command:      MALLOC_PERTURB_=246 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/painter_test
+----------------------------------- stdout -----------------------------------
+glyph cache vs direct Pango: mean abs diff 0.0000, max diff 0, 112 glyphs cached
+dirty-row repaint vs full repaint: max diff 0
+cursor shapes block/underline/bar/hollow: ok
+scale 1 cell 8x17, scale 2 cell 16x34
+scale 2 downsampled vs scale 1: mean abs diff 1.25, ink ratio 1.008
+scale 2 bar cursor: 4 px wide
+direct: wide cell 0 ink left 73 right 48
+direct: wide cell 2 ink left 54 right 21
+direct: wide cell 6 ink left 50 right 26
+direct: wide cell 8 ink left 120 right 116
+direct: ink x 38, e+acute 48, a+2 marks 55, blank after it 8
+glyph cache: wide cell 0 ink left 73 right 48
+glyph cache: wide cell 2 ink left 54 right 21
+glyph cache: wide cell 6 ink left 50 right 26
+glyph cache: wide cell 8 ink left 120 right 116
+glyph cache: ink x 38, e+acute 48, a+2 marks 55, blank after it 4
+wide/combining text, glyph cache vs direct Pango: mean abs diff 0.0000, max diff 0
+glyph cache emoji: 237 coloured px
+==============================================================================
+
+==================================== 9/28 ====================================
+test:         fonts
+start time:   00:34:03
+duration:     0.05s
+result:       exit status 0
+command:      MALLOC_PERTURB_=71 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/fonts_test
+----------------------------------- stdout -----------------------------------
+fonts: all checks passed
+==============================================================================
+
+=================================== 10/28 ====================================
+test:         vterm
+start time:   00:34:03
+duration:     0.02s
+result:       exit status 0
+command:      MALLOC_PERTURB_=175 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/vterm_test
+----------------------------------- stdout -----------------------------------
+vterm_test: OK
+==============================================================================
+
+=================================== 11/28 ====================================
+test:         gl-match
+start time:   00:34:03
+duration:     80.83s
+result:       exit status 0
+command:      MALLOC_PERTURB_=23 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/gl_match_test /workspace/lunduke-term-perf3/build-san/../tests/data/unicode-sample.txt
+----------------------------------- stdout -----------------------------------
+half-res burn-in, renderer llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1: PSNR 62.90 dB, max diff 2
+full-res burn-in, renderer llvmpipe (LLVM 19.1.7, 256 bits) / 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1: PSNR 62.94 dB, max diff 2
+amber full: PSNR 62.77 dB, max diff 2
+amber reduced: PSNR 62.57 dB, max diff 2
+amber static: PSNR 62.47 dB, max diff 2
+green-scanlines full: PSNR 63.55 dB, max diff 1
+green-scanlines reduced: PSNR 63.24 dB, max diff 1
+green-scanlines static: PSNR 63.22 dB, max diff 1
+amber full scale 2: PSNR 63.98 dB, max diff 2
+amber reduced scale 2: PSNR 63.71 dB, max diff 2
+amber static scale 2: PSNR 63.61 dB, max diff 2
+green-scanlines full scale 2: PSNR 64.72 dB, max diff 1
+green-scanlines reduced scale 2: PSNR 64.38 dB, max diff 2
+green-scanlines static scale 2: PSNR 64.32 dB, max diff 1
+ibm-dos rgb full scale 1: PSNR 61.16 dB, max diff 1
+ibm-dos rgb reduced scale 1: PSNR 60.94 dB, max diff 1
+ibm-dos rgb static scale 1: PSNR 60.95 dB, max diff 1
+amber bezel full scale 1: PSNR 62.40 dB, max diff 2
+amber bezel reduced scale 1: PSNR 62.20 dB, max diff 2
+amber bezel static scale 1: PSNR 62.17 dB, max diff 2
+green-scanlines bezel full scale 1: PSNR 63.05 dB, max diff 1
+green-scanlines bezel reduced scale 1: PSNR 62.75 dB, max diff 2
+green-scanlines bezel static scale 1: PSNR 62.64 dB, max diff 2
+amber bezel+rgb full scale 1: PSNR 63.15 dB, max diff 1
+amber bezel+rgb reduced scale 1: PSNR 62.95 dB, max diff 1
+amber bezel+rgb static scale 1: PSNR 62.94 dB, max diff 1
+vintage bezel full scale 1: PSNR 64.19 dB, max diff 1
+vintage bezel reduced scale 1: PSNR 63.90 dB, max diff 1
+vintage bezel static scale 1: PSNR 64.03 dB, max diff 1
+futuristic full scale 1: PSNR 64.19 dB, max diff 1
+futuristic reduced scale 1: PSNR 64.80 dB, max diff 1
+futuristic static scale 1: PSNR 64.78 dB, max diff 1
+paper-white bezel full scale 1: PSNR 59.03 dB, max diff 2
+paper-white bezel reduced scale 1: PSNR 58.87 dB, max diff 2
+paper-white bezel static scale 1: PSNR 58.81 dB, max diff 2
+ibm-dos rgb full scale 2: PSNR 62.43 dB, max diff 1
+ibm-dos rgb reduced scale 2: PSNR 62.07 dB, max diff 1
+ibm-dos rgb static scale 2: PSNR 62.06 dB, max diff 1
+amber bezel full scale 2: PSNR 63.29 dB, max diff 1
+amber bezel reduced scale 2: PSNR 63.08 dB, max diff 2
+amber bezel static scale 2: PSNR 63.00 dB, max diff 2
+green-scanlines bezel full scale 2: PSNR 63.77 dB, max diff 1
+green-scanlines bezel reduced scale 2: PSNR 63.44 dB, max diff 2
+green-scanlines bezel static scale 2: PSNR 63.37 dB, max diff 2
+amber bezel+rgb full scale 2: PSNR 63.67 dB, max diff 1
+amber bezel+rgb reduced scale 2: PSNR 63.48 dB, max diff 1
+amber bezel+rgb static scale 2: PSNR 63.45 dB, max diff 1
+vintage bezel full scale 2: PSNR 64.57 dB, max diff 1
+vintage bezel reduced scale 2: PSNR 64.43 dB, max diff 1
+vintage bezel static scale 2: PSNR 64.54 dB, max diff 1
+futuristic full scale 2: PSNR 64.21 dB, max diff 1
+futuristic reduced scale 2: PSNR 64.84 dB, max diff 1
+futuristic static scale 2: PSNR 64.92 dB, max diff 1
+paper-white bezel full scale 2: PSNR 59.95 dB, max diff 1
+paper-white bezel reduced scale 2: PSNR 59.76 dB, max diff 2
+paper-white bezel static scale 2: PSNR 59.70 dB, max diff 2
+unicode sample amber full scale 1: PSNR 68.07 dB, max diff 1
+unicode sample amber static scale 1: PSNR 68.21 dB, max diff 2
+unicode sample green-scanlines full scale 1: PSNR 68.79 dB, max diff 1
+unicode sample green-scanlines static scale 1: PSNR 68.95 dB, max diff 1
+unicode sample vintage full scale 1: PSNR 69.15 dB, max diff 1
+unicode sample vintage static scale 1: PSNR 70.37 dB, max diff 1
+unicode sample amber full scale 2: PSNR 69.03 dB, max diff 1
+unicode sample amber static scale 2: PSNR 69.24 dB, max diff 2
+unicode sample green-scanlines full scale 2: PSNR 69.62 dB, max diff 1
+unicode sample green-scanlines static scale 2: PSNR 69.91 dB, max diff 1
+unicode sample vintage full scale 2: PSNR 69.59 dB, max diff 1
+unicode sample vintage static scale 2: PSNR 71.15 dB, max diff 1
+setParams -> amber bezel reduced: PSNR 62.20 dB, max diff 2
+setParams -> amber bezel static: PSNR 62.17 dB, max diff 2
+setParams -> amber bezel full: PSNR 62.40 dB, max diff 2
+setParams -> amber bezel static: PSNR 62.17 dB, max diff 2
+setParams -> amber bezel reduced: PSNR 62.20 dB, max diff 2
+setParams -> amber bezel static: PSNR 62.17 dB, max diff 2
+setParams x6: programs compiled 0, textures 11 -> 11, fbos 9 -> 9, worst PSNR 62.17 dB
+lazy output texture: no readback 7 textures / 5 fbos / 7217152 B; after readback 8 / 6 / 8241152 B (+1024000 B); after resize without readback 7 textures
+after 50 resizes (bezel on): textures 10 -> 10, fbos 8 -> 8, glIsTexture 11 -> 11, PSNR 63.22 dB, max diff 2
+uniform lookups: 69 in the constructor, 0 during 50 resizes + frames + readback
+==============================================================================
+
+=================================== 12/28 ====================================
+test:         session
+start time:   00:35:24
+duration:     0.86s
+result:       exit status 0
+command:      MESON_TEST_ITERATION=1 MALLOC_PERTURB_=188 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/session_test
+----------------------------------- stdout -----------------------------------
+scrollback cells: 3 rows x 40 columns round-tripped; 1656 bytes per 100-column line
+scrollback combining lookup: 3000 random side arrays match the linear scan; 300 lines, 33209 combining cells round-tripped
+session tests passed
+==============================================================================
+
+=================================== 13/28 ====================================
+test:         fixes
+start time:   00:35:25
+duration:     0.48s
+result:       exit status 0
+command:      MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 MALLOC_PERTURB_=108 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/fixes_test
+----------------------------------- stdout -----------------------------------
+fixes tests passed
+==============================================================================
+
+=================================== 14/28 ====================================
+test:         fuzz-regress
+start time:   00:35:25
+duration:     0.04s
+result:       exit status 0
+command:      MESON_TEST_ITERATION=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 MALLOC_PERTURB_=38 /workspace/lunduke-term-perf3/build-san/fuzz_regress_test
+----------------------------------- stdout -----------------------------------
+fuzz_regress_test: OK
+==============================================================================
+
+=================================== 15/28 ====================================
+test:         libvterm-rep
+start time:   00:35:25
+duration:     0.03s
+result:       exit status 0
+command:      MALLOC_PERTURB_=181 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/libvterm_rep_test
+----------------------------------- stdout -----------------------------------
+libvterm REP regression OK
+==============================================================================
+
+=================================== 16/28 ====================================
+test:         unicode
+start time:   00:35:25
+duration:     0.03s
+result:       exit status 0
+command:      MALLOC_PERTURB_=76 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/unicode_test
+----------------------------------- stdout -----------------------------------
+unicode_test: OK
+==============================================================================
+
+=================================== 17/28 ====================================
+test:         search
+start time:   00:35:25
+duration:     22.13s
+result:       exit status 0
+command:      MALLOC_PERTURB_=253 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/search_test
+----------------------------------- stdout -----------------------------------
+search 10000+24 lines x 80: 10000 matches in 1523.8 ms
+sliced build of 30000 lines: 468 extra calls
+100000 lines: build 1563 slices (worst 76.18 ms), worst keystroke 7.11 ms, 100 matches
+search_test: OK
+==============================================================================
+
+=================================== 18/28 ====================================
+test:         view
+start time:   00:35:48
+duration:     121.69s
+result:       exit status 0
+command:      MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:fast_unwind_on_malloc=0 MALLOC_PERTURB_=58 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/view_test
+----------------------------------- stdout -----------------------------------
+plain (plain, no effects): scale 1 -> 2: device 400x240 -> 800x480, grid 39x12 -> 39x12
+amber (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): scale 1 -> 2: device 400x240 -> 800x480, grid 28x8 -> 28x8
+bezel (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): 640x400, grid 42x12, margins 47,38
+bezel drag from cell 0,17 to the corner: 'alpha beta gamma'
+bezel (amber, effects: C++ fallback (4 threads), quality reduced): 640x400, grid 42x12, margins 47,38
+bezel drag from cell 0,17 to the corner: 'alpha beta gamma'
+view search, 100000 lines (ASan+UBSan build): first keystroke 7.73 ms (pending, 1 turns), worst later keystroke 3.34 ms, 'n' 100 / 'needle' 100 matches
+search bar: '2 of 2'
+corrupt settings: status 'Warning: /tmp/lterm-corrupt-test-3444480/settings.ini was not valid (Key file contains line “[terminal” which is not a key-value pair, group, or comment); it was replaced, the old text is in /tmp/lterm-corrupt-test-3444480/settings.ini.corrupt. Saved.'
+tab close (ASan+UBSan build): 19 closes, worst 12.45 ms, total 142.93 ms; 19 still running right after, all reaped 1994 ms later (limit 75 ms for the 2nd worst 9.01 ms)
+tab close trim: 1 trim(s), RSS dropped -4 kB (ASan has its own allocator: ~0 here)
+tab ids: double click -> 1 close, late close after reuse -> new tab kept, nested close ok
+governor auto (amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): after 4 s of output: quality reduced, demoted 0, tick 272 ms, frame 3.9 ms
+governor auto: costly probe aborted after 1 frame(s), retry in 3.0 s
+governor auto (ASan+UBSan build): probe reached Normal 3035 ms after auto came back (wait limit 30000 ms)
+governor auto: demoted at 7.9 s, back to reduced, tick 100 ms
+governor auto: GL programs compiled during demotion + 2 probes: 0
+governor cpu (amber, effects: C++ fallback (4 threads), quality reduced): after 4 s of output: quality reduced, demoted 0, tick 177 ms, frame 26.0 ms
+governor cpu: costly probe aborted after 1 frame(s), retry in 3.0 s
+governor cpu (ASan+UBSan build): probe reached Normal 5227 ms after auto came back (wait limit 30000 ms)
+governor cpu: demoted at 7.2 s, back to reduced, tick 211 ms
+governor cpu: GL programs compiled during demotion + 2 probes: 0
+probe deferral auto (unfocused): 8 due poll(s) deferred, state 1
+probe deferral auto (hidden): 10 due poll(s) deferred, state 1
+probe deferral cpu (unfocused): 8 due poll(s) deferred, state 1
+probe deferral cpu (hidden): 10 due poll(s) deferred, state 1
+view tests passed
+----------------------------------- stderr -----------------------------------
+
+(view_test:3444480): dbind-WARNING **: 18:35:48.198: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+lunduke-terminal: scrollback-lines 1099511627776 is too large, using 100000
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+
+(view_test:3444480): Gtk-WARNING **: 18:36:18.183: Could not load a pixbuf from /org/gtk/libgtk/theme/Adwaita/assets/check-symbolic.svg.
+This may indicate that pixbuf loaders or the mime database could not be found.
+lunduke-terminal: amber, effects: GLSL on GtkGLArea, quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on GtkGLArea, quality static (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+lunduke-terminal: plain, no effects
+lunduke-terminal: plain, no effects
+lunduke-terminal: plain, no effects
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: /tmp/lterm-corrupt-test-3444480/settings.ini was not valid (Key file contains line “[terminal” which is not a key-value pair, group, or comment); it was replaced, the old text is in /tmp/lterm-corrupt-test-3444480/settings.ini.corrupt
+lunduke-terminal: animation needs 40% of a core at 1 fps (404 ms per frame); effects-quality auto -> static, retry in 1.5 s
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: animation needs 391% of a core at 1 fps (3907 ms per frame); effects-quality auto -> static, retry in 3.0 s
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: animation needs 42% of a core at 1 fps (423 ms per frame); effects-quality auto -> static, retry in 1.5 s
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: animation needs 395% of a core at 1 fps (3948 ms per frame); effects-quality auto -> static, retry in 3.0 s
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: animation needs 390% of a core at 1 fps (3904 ms per frame); effects-quality auto -> static, retry in 1.0 s
+lunduke-terminal: effects-quality auto: probing the animation again
+lunduke-terminal: animation needs 392% of a core at 1 fps (3923 ms per frame); effects-quality auto -> static, retry in 1.0 s
+lunduke-terminal: effects-quality auto: probing the animation again
+==============================================================================
+
+=================================== 19/28 ====================================
+test:         review
+start time:   00:37:49
+duration:     70.52s
+result:       exit status 0
+command:      MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:fast_unwind_on_malloc=0 MALLOC_PERTURB_=156 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/review_test
+----------------------------------- stdout -----------------------------------
+flood plain (ASan+UBSan build): longest main-loop gap 61 ms, 52 slices cut, 2 content frames, Ctrl+C -> exit 30 ms
+flood amber (ASan+UBSan build): longest main-loop gap 41 ms, 61 slices cut, 2 content frames, Ctrl+C -> exit 49 ms
+flood amber: 17 content frames in 2.0 s (cap 10 per s while flooding)
+blink: stopped after the timeout, restarted by a key
+hidden tab: 48 frame requests skipped in 1 s, 0 painted
+confirm close: asked 5 times ("Close this tab? "sleep" is still running.")
+confirm: second request kept "Close this tab? "sleep" is still running."; accept closed the first (sleep) tab
+scrollback: 281 lines kept through new output, 50 after commit
+scrollback slip with output: 1095 lines before, 1197 during the 0.6 s at 50, 1232 after
+scrollback: lowered to 50 on dialog close: 50 lines
+settings: "Up to 1.0 MB per tab when full (63 columns)." / "Warning: up to 101 MB per tab when full (63 columns). Every tab keeps its own."
+input method: dead_acute e, Compose o c, x -> c3 a9 c2 a9 78 (3 commits)
+dead key + Ctrl chord: dead_acute, Ctrl+C, q, x -> 03 71 78
+hidden tab frees (gl, amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)): textures 4.6 MB shown -> 2.0 MB after 0.5 s hidden -> 4.6 MB again
+hidden tab frees (cpu, amber, effects: C++ fallback (4 threads), quality static): textures 0.0 MB shown -> 0.0 MB after 0.5 s hidden -> 0.0 MB again
+selection of 1019 lines: 80 lines compared over the ticks (screen 20 rows)
+stats off: 12 content frames, 0 samples kept
+stats on: 12 content frames, 27 samples kept
+stats: backend="amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)" content-frames=12 full-repaints=1 rows-painted=35 ticks=3 median paint 1.05 ms, median effects-source 4.26 ms, median tick 1.05 ms, glyphs cached 10
+stats: quality=reduced software=1 tick-interval 818.6 ms
+review tests passed
+----------------------------------- stderr -----------------------------------
+
+(review_test:3445582): dbind-WARNING **: 18:37:49.881: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: plain, no effects
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality static (software rendering)
+==============================================================================
+
+=================================== 20/28 ====================================
+test:         ux
+start time:   00:39:00
+duration:     43.79s
+result:       exit status 0
+command:      MALLOC_PERTURB_=203 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:fast_unwind_on_malloc=0 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/build-san/ux_test
+----------------------------------- stdout -----------------------------------
+plain render (gl; amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)): bright pixels of 256000: amber 16962, Ctrl+Shift+E off 13945, profile plain 6419
+plain render (cpu; amber, effects: C++ fallback (4 threads), quality reduced): bright pixels of 256000: amber 16956, Ctrl+Shift+E off 13945, profile plain 6419
+settings font size: amber uses 22 px, field 22; plain uses 16 px, field 16
+settings font size: override 30, then amber: field 22, override 0
+fullscreen: F11 handled, no window manager answered: state not checked
+font zoom: plain 16 px, 79 cols; Ctrl+= Ctrl++ KP+ -> 19 px, 72 cols; Ctrl+- KP- Ctrl+0 -> 16 px, 79 cols
+font zoom + settings: field 16 px while zoomed (saved without font-px: yes); override 30 -> Ctrl+= 31 -> Ctrl+0 30; amber after zoom: 22 px (profile 22 px)
+zoom from an out-of-range base: 120 px -> further out 120 px, toward the range 119 px, Ctrl+0 120 px
+zoom from an out-of-range base: 4 px -> further out 4 px, toward the range 5 px, Ctrl+0 4 px
+context menu: selection 'READY'
+context menu: Copy put 'READY' on the clipboard
+context menu: mouse reporting takes the plain right-click; Shift+right-click menu; Settings opened the dialog
+selection hasText: 8000 random cases agree with !text().empty() (0 mismatches); 5000x80 selection: hasText read 1 cell(s), text() 400000
+custom profile saved: bloom 0.00 jitter 0.90 rgb-shift 0.40 scanlines 1 font DejaVu Sans Mono:18 frame 1
+profile cycle: modern > custom:Cycle A > custom:Cycle B > plain > amber > green > green-scanlines > ibm-dos > ibm-3278 > vintage > futuristic > paper-white > pixel-8bit > pixel-hires-mono > pixel-16bit > pixel-40col > modern
+broken profile file: rename status 'Not renamed: A profile file named "broken.ini" already exists in /tmp/lterm-ux-test-3447638/lunduke-terminal/profiles but could not be loaded; fix or remove it by hand, or pick another name'
+delete saved default: settings.ini profile line now 'profile=amber'
+ux_test: config folder /tmp/lterm-ux-test-3447638 removed
+ux_test: all passed
+----------------------------------- stderr -----------------------------------
+
+(ux_test:3447638): dbind-WARNING **: 18:39:00.402: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: plain, no effects
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: custom:Mine, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+
+(ux_test:3447638): Gtk-WARNING **: 18:39:27.231: Could not load a pixbuf from /org/gtk/libgtk/theme/Adwaita/assets/check-symbolic.svg.
+This may indicate that pixbuf loaders or the mime database could not be found.
+lunduke-terminal: custom:Mine, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: custom:Renamed, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: custom:My profile, no effects
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: custom:Real, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: custom:Saved, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: custom:Other, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: custom:Saved, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+lunduke-terminal: amber, effects: GLSL on llvmpipe (LLVM 19.1.7, 256 bits), quality reduced (software rendering)
+==============================================================================
+
+=================================== 21/28 ====================================
+test:         scrollback-default
+start time:   00:39:44
+duration:     18.69s
+result:       exit status 0
+command:      MALLOC_PERTURB_=109 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:fast_unwind_on_malloc=0 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /usr/bin/sh /workspace/lunduke-term-perf3/build-san/../tests/scrollback_default_test.sh ./lunduke-terminal 10000
+----------------------------------- stdout -----------------------------------
+no settings.ini: sb-lines=5000 (want 5000; settled 41 127 after 415 ms)
+settings.ini without scrollback-lines: sb-lines=5000 (want 5000; settled 41 127 after 415 ms)
+saved scrollback-lines=10000: sb-lines=10000 (want 10000; settled 41 127 after 415 ms)
+saved scrollback-lines=7000: sb-lines=7000 (want 7000; settled 41 127 after 416 ms)
+scrollback default: ok
+==============================================================================
+
+=================================== 22/28 ====================================
+test:         cli
+start time:   00:40:02
+duration:     0.34s
+result:       exit status 0
+command:      MALLOC_PERTURB_=167 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /usr/bin/sh /workspace/lunduke-term-perf3/build-san/../tests/cli_test.sh ./lunduke-terminal 0.0.1
+----------------------------------- stdout -----------------------------------
+--help: exit 0 (want 0)
+-h: exit 0 (want 0)
+--profile amber --help: exit 0 (want 0)
+--version: exit 0 (want 0)
+--version printed: lunduke-terminal 0.0.1
+--no-such-option: exit 2 (want 2)
+--renderer bogus: exit 2 (want 2)
+--on-exit bogus: exit 2 (want 2)
+--cursor-shape bogus: exit 2 (want 2)
+--effects-quality bogus: exit 2 (want 2)
+cli: ok
+==============================================================================
+
+=================================== 23/28 ====================================
+test:         libvterm-pristine
+start time:   00:40:03
+duration:     0.01s
+result:       exit status 0
+command:      ASAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1 MALLOC_PERTURB_=54 UBSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 MESON_TEST_ITERATION=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 /usr/bin/sha256sum --quiet --strict -c /workspace/lunduke-term-perf3/third_party/libvterm-SHA256SUMS
+==============================================================================
+
+=================================== 24/28 ====================================
+test:         libvterm-t-patched
+start time:   00:40:03
+duration:     1.51s
+result:       exit status 0
+command:      MALLOC_PERTURB_=174 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan-libvterm-t.supp:print_suppressions=0 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 /workspace/lunduke-term-perf3/tools/libvterm_t_suite.sh ./libvterm_harness_patched /workspace/lunduke-term-perf3/third_party/libvterm
+----------------------------------- stdout -----------------------------------
+libvterm t/ suite: 43 test files passed (/workspace/lunduke-term-perf3/build-san/libvterm_harness_patched)
+==============================================================================
+
+=================================== 25/28 ====================================
+test:         libvterm-t-stock
+start time:   00:40:04
+duration:     1.53s
+result:       exit status 0
+command:      LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan-libvterm-t.supp:print_suppressions=0 MALLOC_PERTURB_=9 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 /workspace/lunduke-term-perf3/tools/libvterm_t_suite.sh ./libvterm_harness_stock /workspace/lunduke-term-perf3/third_party/libvterm
+----------------------------------- stdout -----------------------------------
+libvterm t/ suite: 43 test files passed (/workspace/lunduke-term-perf3/build-san/libvterm_harness_stock)
+==============================================================================
+
+=================================== 26/28 ====================================
+test:         libvterm-diff
+start time:   00:40:06
+duration:     47.62s
+result:       exit status 0
+command:      MALLOC_PERTURB_=47 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /usr/bin/python3 /workspace/lunduke-term-perf3/build-san/../tools/libvterm_diff_run.py ./libvterm_diff_stock ./libvterm_diff_patched a 1 100 2000 --timeout 300
+----------------------------------- stdout -----------------------------------
+libvterm diff mode a: seeds 1..100, 2000 steps each, 945604798 bytes compared per side, 0 different or timed out (exit 0: 100)
+==============================================================================
+
+=================================== 27/28 ====================================
+test:         libvterm-diff-repfix
+start time:   00:40:53
+duration:     51.11s
+result:       exit status 0
+command:      MALLOC_PERTURB_=119 MESON_TEST_ITERATION=1 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /usr/bin/python3 /workspace/lunduke-term-perf3/build-san/../tools/libvterm_diff_run.py ./libvterm_diff_repfix ./libvterm_diff_patched b 1 100 2000 --timeout 300
+----------------------------------- stdout -----------------------------------
+libvterm diff mode b: seeds 1..100, 2000 steps each, 994604316 bytes compared per side, 0 different or timed out (exit 0: 100)
+==============================================================================
+
+=================================== 28/28 ====================================
+test:         libvterm-feed-diff
+start time:   00:41:44
+duration:     166.56s
+result:       exit status 0
+command:      MESON_TEST_ITERATION=1 MALLOC_PERTURB_=73 ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 MSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_summary=1:print_stacktrace=1 LSAN_OPTIONS=suppressions=/workspace/lunduke-term-perf3/tests/lsan.supp:print_suppressions=0 /workspace/lunduke-term-perf3/tools/libvterm_feed_diff.sh ./libvterm_diff_stock ./libvterm_diff_patched /workspace/lunduke-term-perf3 50000
+----------------------------------- stdout -----------------------------------
+same: sources (1196589 bytes) at 24x80, log 74000353 bytes + exit status, sha256 8f5ff90c2f73cbaf
+same: sources (1196589 bytes) at 50x132, log 101922133 bytes + exit status, sha256 2aeb1a029da7e492
+same: sources (1196589 bytes) at 7x33, log 49462371 bytes + exit status, sha256 9a63d142caf482e7
+same: sources (1196589 bytes) at 60x211, log 158263286 bytes + exit status, sha256 a2e2832b266f6f3c
+same: seq 1 50000 (288894 bytes) at 24x80, log 110677432 bytes + exit status, sha256 598f479ad28f865c
+same: seq 1 50000 (288894 bytes) at 50x132, log 179682918 bytes + exit status, sha256 f12cab47c13d483e
+same: seq 1 50000 (288894 bytes) at 7x33, log 48153389 bytes + exit status, sha256 8205d9a1d4818756
+same: seq 1 50000 (288894 bytes) at 60x211, log 284439412 bytes + exit status, sha256 4e343b4b983d3839
+==============================================================================
+
+
+Ok:                 28  
+Expected Fail:      0   
+Fail:               0   
+Unexpected Pass:    0   
+Skipped:            0   
+Timeout:            0   
