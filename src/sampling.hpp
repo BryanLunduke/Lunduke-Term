@@ -86,4 +86,28 @@ inline void sampleRepeat(const float* tex, int w, int h, float u, float v, float
     }
 }
 
+// The same lookup for the 8-bit noise table. byte/255 is the float the generator used to store
+// (not byteToFloat's multiply: that rounds differently, and the cpu-hash pins the old values).
+inline void sampleRepeat(const uint8_t* tex, int w, int h, float u, float v, float out[4]) {
+    float x = u * w - 0.5f, y = v * h - 0.5f;
+    int x0 = ifloor(x), y0 = ifloor(y);
+    float fx = x - static_cast<float>(x0), fy = y - static_cast<float>(y0);
+    int x1 = (x0 + 1) & (w - 1), y1 = (y0 + 1) & (h - 1);
+    x0 &= (w - 1);
+    y0 &= (h - 1);
+    const uint8_t* a = tex + (static_cast<size_t>(y0) * w + x0) * 4;
+    const uint8_t* b = tex + (static_cast<size_t>(y0) * w + x1) * 4;
+    const uint8_t* c = tex + (static_cast<size_t>(y1) * w + x0) * 4;
+    const uint8_t* d = tex + (static_cast<size_t>(y1) * w + x1) * 4;
+    for (int i = 0; i < 4; ++i) {
+        const float fa = static_cast<float>(a[i]) / 255.0f;
+        const float fb = static_cast<float>(b[i]) / 255.0f;
+        const float fc = static_cast<float>(c[i]) / 255.0f;
+        const float fd = static_cast<float>(d[i]) / 255.0f;
+        float top = fa + (fb - fa) * fx;
+        float bot = fc + (fd - fc) * fx;
+        out[i] = top + (bot - top) * fy;
+    }
+}
+
 }  // namespace lterm

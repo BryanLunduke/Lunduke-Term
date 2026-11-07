@@ -253,6 +253,7 @@ private:
     void onScaleChanged();     // notify::scale-factor
     void applyScale();
     void allocateSurfaces();
+    void syncCpuOutput();     // out_ exists only while the C++ renderer is selected
     bool updateContent();      // grid -> source image, changed rows only; true if anything changed
     void requestFrame();       // capped content frame
     void onFrameTimer();
@@ -307,8 +308,8 @@ private:
     int lw_ = 0, lh_ = 0;      // logical allocation
     int scale_ = 1;            // GTK scale factor (HiDPI)
     int marginX_ = 0, marginY_ = 0;
-    cairo_surface_t* src_ = nullptr;   // RGB24 source image (what the plain view shows)
-    cairo_surface_t* out_ = nullptr;   // RGB24 C++ effects output
+    cairo_surface_t* src_ = nullptr;   // RGB24 source image (what the plain view shows, GL upload)
+    cairo_surface_t* out_ = nullptr;   // RGB24 C++ effects output; null on the GL and plain paths
     bool contentDirty_ = true;
     bool fullRepaint_ = true;
     int srcDirtyY0_ = 0, srcDirtyY1_ = 0;  // source rows not yet handed to the effects
