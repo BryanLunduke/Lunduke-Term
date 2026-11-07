@@ -1,6 +1,6 @@
-# Memory review after the 80×24 default (not implemented here)
+# Memory review after the 80×24 default
 
-Read-only recommendations for a later change. Nothing in this file is a patch. The UX work in the same PR (80×24 window, 16 px font, “color” spelling, slightly tighter IBM DOS bloom) is separate; the smaller window is called out below because it changes the RAM picture, and it should be remeasured before any of these cuts.
+The two cuts the editor approved are done: the noise table is bytes (item 1) and the CPU output surface is not allocated on the GL path (item 2). The rest of this file is still a note, not a patch. The UX work in PR #12 (80×24 window, 16 px font, “color” spelling, slightly tighter IBM DOS bloom) is unchanged. The smaller window is called out below because it changes the RAM picture, and it should be remeasured before any further cut.
 
 Compared with the review from 2026-11-03 (master `21eff10`, before PRs #7–#11). That review’s completed items are listed so they are not redone. Numbers below that are not from a process listing are **estimates from the allocation sizes in the code**, not new RSS measurements. The editor’s LCOS 1.0.1 figure (Lunduke Terminal about 42 MB, Cool Retro Term about 31 MB, default launch) was taken on the previous default window and is not remeasured here.
 
@@ -11,8 +11,10 @@ Compared with the review from 2026-11-03 (master `21eff10`, before PRs #7–#11)
 - **PR #9** `texOut_` / `fboOut_` created only in `renderToMemory` (`gl_pipeline.cpp`). `--help` / `--version`, F11, font zoom. CPU budget default 0.15. Uniform locations cached once (`lookUpUniforms`).
 - **PR #10** Bundled libvterm 0.3.3, REP crash fix, full-screen scroll by ring rotation (`third_party/libvterm-patches`).
 - **PR #11** CPU path: no per-pixel warp table, bloom and static buffers are RGB floats (no alpha), blur no longer needs a third half-res image. `GL_R11F_G11F_B10F` / `RGB10_A2` for the GL float targets, and 16-bit fixed point for the CPU static buffer, were measured and missed the GL-vs-CPU PSNR bar (`gl_pipeline.cpp` comment, `docs/bench/perf3`). Leave those formats as they are.
+- **Noise table (done).** `noiseTexture()` in `effects.cpp` is a process-lifetime `vector<uint8_t>` of 512×512×4 (**1,048,576 bytes**, was 4,194,304). Each byte is `xorshift >> 24`, the same 8-bit quantity the old float table stored as `(byte / 255)`. `texNoise_` is `GL_RGBA8` (**1,048,576 bytes**, was 2,097,152 as RGBA16F), uploaded with `GL_UNSIGNED_BYTE`. The CPU sampler and `frameUniforms()` divide by 255 before the lerp, so flicker (one sample per frame) and the grain match the old generator. The 512 tile is unchanged. About **4 MB** less on every effects launch, independent of window size.
+- **CPU output surface (done).** `TerminalView::allocateSurfaces` and `syncCpuOutput` create `out_` (Cairo RGB24, 4 × W × H) only while the C++ renderer is selected, and drop it when a resize or a mode change stays on GL or plain. `src_` stays: it is the glyph target and the GL upload source. About **1.7 MB** at 868×494 on the GL path, which is the default when a GPU is present. The 2026-11-03 review called this saving nil; that was wrong for an image surface, which is allocated up front.
 
-## What this PR already changes for RAM
+## What the 80×24 default changes for RAM
 
 The old default window was a fixed 1280×800. Effects storage scales with pixels. A first launch with no `--size` and no window-manager restore is now an 80×24 grid:
 
@@ -33,29 +35,19 @@ GL textures that scale with the window, full quality, bezel off (`GlPipeline::re
 | two burn targets, RGBA16F, half res | 2 × W × H each |
 | `texStatic_` RGBA16F, full res | 8 × W × H |
 | **scaled total** | **20 × W × H** |
-| `texNoise_` 512² RGBA16F | 2,097,152, fixed |
+| `texNoise_` 512² RGBA8 | 1,048,576, fixed |
 
-That is about **22.6 MB** at 1280×800 and about **10.7 MB** at 868×494 (8.6 MB scaled + 2.1 MB noise). Estimated saving from the smaller window: **about 12 MB of those textures**, plus the Cairo images shrinking with them (below). Driver overhead on a real GPU moves with the textures but was not measured. **Remeasure default launch on LCOS 1.0.1 before writing more memory patches.** The 42 vs 31 MB gap may already be much smaller, and CRT’s own window is an 80×24, so the comparison becomes the same kind of window.
+That is about **21.5 MB** at 1280×800 and about **9.6 MB** at 868×494 (8.6 MB scaled + 1.0 MB noise). The noise texture does not shrink with the window. Estimated saving from the smaller window: **about 12 MB of the scaled textures**, plus `src_` shrinking with them. On the GL path there is one Cairo RGB24 image (`src_`, 4 × W × H, about **1.7 MB** at 868×494); `out_` is the same size and exists only for the CPU renderer. Driver overhead on a real GPU moves with the textures but was not measured. **Remeasure default launch on LCOS 1.0.1 before writing more memory patches.** The 42 vs 31 MB gap may already be much smaller, and CRT’s own window is an 80×24, so the comparison becomes the same kind of window.
 
 ## Ranked remaining cuts
 
-### 1. The noise image is 8-bit data kept as floats, plus a half-float texture
+### 1. The noise image is 8-bit data kept as floats, plus a half-float texture — done
 
-`noiseTexture()` in `effects.cpp` fills a process-lifetime `vector<float>` of 512×512×4. Each value is `(xorshift >> 24) / 255`, so it is an 8-bit quantity stored in 4 bytes. That vector is **4,194,304 bytes**. `GlPipeline`’s constructor uploads it and does not free it. `frameUniforms()` then samples **one** texel from it per frame for flicker and horizontal sync. The per-pixel grain is the GL texture (or the CPU path walking the same vector).
+Shipped. See “Noise table” above. Do not shrink the 512 tile or drop the grain.
 
-The GL texture is RGBA16F: **2,097,152 bytes**. A normalized `GL_RGBA8` upload of the same bytes is what the generator already produced. The shader samples a 0..1 color either way.
+### 2. The CPU output surface is allocated on the GL path — done
 
-**Estimate:** about **3 MB** by storing `uint8_t` (1 MB) instead of `float`, plus about **1 MB** by uploading RGBA8 instead of RGBA16F. About **4 MB** together, on every effects launch, independent of window size. Lossless relative to today’s generator. The CPU path pays one byte-to-float conversion per noise tap; blur, not this lookup, is the expensive pass. Do not shrink the 512 tile or drop the grain: that would change the picture, and amber’s `staticNoise` is on.
-
-This is the best code change still on the table. It was not part of PRs #8–#11 (those cut window-sized buffers, not this fixed table).
-
-### 2. The CPU output surface is allocated on the GL path
-
-`TerminalView::allocateSurfaces` always creates two Cairo `RGB24` images, `src_` and `out_`. The GL path paints `src_` and uploads it. `out_` is only the target of `CpuEffects::renderTo`. An image surface is allocated at creation, so `out_` is resident even when the renderer is GL.
-
-**Estimate:** 4 × W × H, about **1.7 MB** at 868×494 and about **4.1 MB** at the old 1280×800. Create `out_` only after the CPU renderer is chosen, and drop it if a later resize stays on GL. No quality change. The 2026-11-03 review called this saving nil; that was wrong for an image surface, which is allocated up front. It is still a small item next to the noise table.
-
-`src_` stays. It is the glyph target and the GL upload source.
+Shipped. See “CPU output surface” above. `src_` stays.
 
 ### 3. Leave the window-sized float targets alone
 
@@ -78,4 +70,4 @@ Turning the bezel on allocates three more full-res RGBA16F images (`texFrameBase
 
 Keep the effects pipeline. The CRT look is the product. Plain mode was already the cheap path in the earlier measurements (on the order of 10 MB, idle CPU at 0); it is not the configuration being compared with Cool Retro Term.
 
-Do not retry the packed-float and fixed-point cuts that missed the PSNR bar. Do not drop bloom, noise, curvature, or the burn-in buffers to “get to 31 MB.” The two items above that are still clean are the noise representation (about 4 MB, lossless against the current generator) and not allocating `out_` on the GL path (about 1.7 MB at the LCOS default size). Together they are a few megabytes. The window shrink in this PR is larger than both, and it needs a real RSS reading on LCOS before anything else is scheduled.
+Do not retry the packed-float and fixed-point cuts that missed the PSNR bar. Do not drop bloom, noise, curvature, or the burn-in buffers to “get to 31 MB.” The noise representation (about 4 MB, lossless against the generator that stored `(xorshift >> 24) / 255`) and not allocating `out_` on the GL path (about 1.7 MB at the LCOS default size) are done. What is left above is not a clean cut at this window size. The window shrink in PR #12 is larger than both, and it needs a real RSS reading on LCOS before anything else is scheduled.

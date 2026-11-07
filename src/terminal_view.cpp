@@ -463,6 +463,7 @@ void TerminalView::chooseMode() {
         if (w_ > 0) cpu_->resize(w_, h_);
     }
     if (m != Mode::Cpu) cpu_.reset();  // frees ~45 MB of float buffers when not in use
+    syncCpuOutput();
     const bool hadFocus = area_.has_focus() || gl_.has_focus();
     mode_ = m;
     if (m == Mode::Gl) {
@@ -642,8 +643,28 @@ void TerminalView::layoutGrid() {
 void TerminalView::allocateSurfaces() {
     if (src_) cairo_surface_destroy(src_);
     if (out_) cairo_surface_destroy(out_);
+    out_ = nullptr;
     src_ = cairo_image_surface_create(CAIRO_FORMAT_RGB24, w_, h_);
-    out_ = cairo_image_surface_create(CAIRO_FORMAT_RGB24, w_, h_);
+    cpuOutValid_ = false;
+    syncCpuOutput();
+}
+
+// The GL path paints src_ and uploads it. out_ is only the target of CpuEffects::renderTo, so it
+// is created when the C++ renderer is chosen and dropped on a resize (or a mode change) that
+// stays on GL or plain.
+void TerminalView::syncCpuOutput() {
+    if (mode_ == Mode::Cpu && w_ > 0 && h_ > 0) {
+        if (!out_) {
+            out_ = cairo_image_surface_create(CAIRO_FORMAT_RGB24, w_, h_);
+            cpuOutValid_ = false;
+        }
+        return;
+    }
+    if (out_) {
+        cairo_surface_destroy(out_);
+        out_ = nullptr;
+        cpuOutValid_ = false;
+    }
 }
 
 void TerminalView::on_size_allocate(Gtk::Allocation& a) {

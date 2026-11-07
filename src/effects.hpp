@@ -139,8 +139,10 @@ inline float rgbShiftPx(const EffectParams& p) { return 12.0f * 0.75f * p.rgbShi
 void frameLayerRows(const EffectParams& p, int width, int height, int y0, int y1, float* base, float* refl);
 
 // Deterministic 512x512 RGBA noise texture (stand-in for CRT's allNoise512.png).
+// Each channel is one byte, the high byte of xorshift32. Samplers turn it back into byte/255,
+// the float this table used to store. 512 stays: shrinking the tile would change the grain.
 constexpr int kNoiseSize = 512;
-const std::vector<float>& noiseTexture();   // RGBA float, kNoiseSize^2*4
+const std::vector<uint8_t>& noiseTexture();   // RGBA8, kNoiseSize^2*4
 
 // Per-frame uniforms computed on the CPU (identical for both back-ends).
 struct FrameUniforms {

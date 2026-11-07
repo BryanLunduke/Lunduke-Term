@@ -9,10 +9,10 @@
 
 namespace lterm {
 
-// Review item 3: the float textures (down/bloom, burn-in, static and the noise) are half floats (8 B per
+// The window-sized float textures (down/bloom, burn-in, static, and the bezel) are half floats (8 B per
 // texel, was 16). Every value is a colour in 0..~4 (bloom sums) or a burn-in level; the gl-match test
-// checks the result against the C++ reference (PSNR). The source and output textures are RGBA8
-// (M6 item 6: the source comes from an 8-bit Cairo image).
+// checks the result against the C++ reference (PSNR). The source, the output, and the noise texture
+// are RGBA8 (M6 item 6: the source comes from an 8-bit Cairo image; the noise table is 8-bit data).
 static constexpr GLenum kSizedFmt = GL_RGBA16F;
 // Perf step 3: no separate "bloom A" target any more. The blur ping-pongs down -> bloomB (horizontal)
 // -> down (vertical), so texDown_ holds the bloom once the blur has run; the half-res burn-in, the
@@ -35,8 +35,11 @@ GlPipeline::GlPipeline(const EffectParams& params)
     ok_ = progDown_ && progBlur_ && progBurn_ && progStatic_ && progDyn_ && progFrame_ && progFrameComp_;
     if (!ok_) return;
     lookUpUniforms();
-    texNoise_ = makeTex(kNoiseSize, kNoiseSize, kSizedFmt, true, true);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, kNoiseSize, kNoiseSize, GL_RGBA, GL_FLOAT, noiseTexture().data());
+    // The generator's bytes, normalised to 0..1 when the shader samples. RGBA16F was 2 MB for
+    // values that are already 8-bit (noiseTexture()).
+    texNoise_ = makeTex(kNoiseSize, kNoiseSize, GL_RGBA8, true, true);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, kNoiseSize, kNoiseSize, GL_RGBA, GL_UNSIGNED_BYTE,
+                    noiseTexture().data());
 }
 
 GlPipeline::~GlPipeline() = default;

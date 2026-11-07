@@ -111,16 +111,16 @@ void frameLayerRows(const EffectParams& p, int width, int height, int y0, int y1
     }
 }
 
-const std::vector<float>& noiseTexture() {
-    static const std::vector<float> tex = [] {
-        std::vector<float> t(static_cast<size_t>(kNoiseSize) * kNoiseSize * 4);
+const std::vector<uint8_t>& noiseTexture() {
+    static const std::vector<uint8_t> tex = [] {
+        std::vector<uint8_t> t(static_cast<size_t>(kNoiseSize) * kNoiseSize * 4);
         uint32_t s = 0x4c544d30u;  // "LTM0"
         for (auto& v : t) {
-            // xorshift32, quantised to 8 bits like a PNG texture would be.
+            // xorshift32. The high byte is the 8-bit value the old table stored as (byte / 255).
             s ^= s << 13;
             s ^= s >> 17;
             s ^= s << 5;
-            v = static_cast<float>(s >> 24) / 255.0f;
+            v = static_cast<uint8_t>(s >> 24);
         }
         return t;
     }();
