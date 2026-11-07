@@ -33,7 +33,7 @@ cache, 10000-match cap), the governor measures render cost only and recovers, cl
 does not wait for the shell (SIGHUP, SIGKILL after 2 s), tabs close by id, and a corrupt settings
 file no longer blocks Save.
 
-M4 (see [`docs/M4-NOTES.md`](docs/M4-NOTES.md)): Unicode (wide CJK, combining marks, colour emoji
+M4 (see [`docs/M4-NOTES.md`](docs/M4-NOTES.md)): Unicode (wide CJK, combining marks, color emoji
 in the glyph cache, invalid UTF-8, copy and search round-trips; the behaviour table there lists
 what libvterm 0.3.3 cannot do: no ZWJ sequences, flags, variation-selector width or bidi), and a
 libFuzzer harness (`tools/fuzz/`, [`docs/FUZZING.md`](docs/FUZZING.md)) whose findings in front
@@ -87,7 +87,7 @@ Without them, the profiles fall back to DejaVu Sans Mono. See `docs/FONTS.md`.
     build/lunduke-terminal                         # amber CRT look (default since M5; GLSL, C++ fallback)
     build/lunduke-terminal --profile plain         # no effects at all
     build/lunduke-terminal --list-profiles         # profiles and the font each resolves to here
-    build/lunduke-terminal --effects               # plain colours with the CRT effects
+    build/lunduke-terminal --effects               # plain colors with the CRT effects
     build/lunduke-terminal --profile green --renderer cpu --threads 4
     build/lunduke-terminal --effects-fps 10 --max-fps 60 --no-pause-unfocused --stats -e htop
     build/lunduke-terminal --profile amber --frame                  # with the monitor bezel
@@ -100,7 +100,7 @@ Without them, the profiles fall back to DejaVu Sans Mono. See `docs/FONTS.md`.
 
 Options: `--profile ID`, `--effects`/`--no-effects`, `--renderer auto|gl|cpu`, `--threads N`
 (C++ fallback), `--effects-fps N` (default 20), `--max-fps N` (default 60), `--no-pause-unfocused`,
-`--font FAMILY`, `--font-px N`, `--size WxH`, `--quit-after MS` (close the window after MS **milliseconds**), `--stats`, `--scrollback N` (default 5000 lines; a `scrollback-lines` already saved in settings.ini is used as is),
+`--font FAMILY`, `--font-px N`, `--size WxH` (default: an 80×24 grid of the profile's font, plus that profile's margins and bezel; `--size` or a size the window manager restored is kept), `--quit-after MS` (close the window after MS **milliseconds**), `--stats`, `--scrollback N` (default 5000 lines; a `scrollback-lines` already saved in settings.ini is used as is),
 `--login`, `--cwd DIR`, `--on-exit close|hold|hold-on-error`, `--hold`, `--bell visual,urgent,audible|none`,
 `--cursor-shape block|underline|bar`, `--cursor-blink`/`--no-cursor-blink`,
 `--effects-quality auto|full|reduced|static`, `--cpu-budget PCT` (software rendering only, percent of one core, default 15, 0 = off), `--frame`/`--no-frame`

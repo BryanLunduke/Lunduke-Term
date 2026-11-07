@@ -135,7 +135,12 @@ std::vector<Profile> makeProfiles() {
     amber.cursor = amber.fg;
     amber.minFgGrey = 0.45f;
     setFonts(amber, {}, kTerminus);
-    amber.fontPx = 22;
+    // 16 px is the desktop size: xfce4-terminal's default "Monospace 12" is 12 pt, which at 96 dpi
+    // is 16 px, and DejaVu Sans Mono at 16 px absolute (what GridPainter asks Pango for) is the
+    // same 10x19 cell. LCOS 1.0 has no Terminus, so this is the font the default profile actually
+    // paints. The first-launch window is then 80x24 of these cells plus the margins below
+    // (windowSizeForGrid), close to xfce4-terminal's own 80x24 client window.
+    amber.fontPx = 16;
     amber.marginFrac = 0.04f;
     amber.marginMinPx = 12;
     // The bezel is an option on the monochrome tubes: dark warm plastic, a satin finish.
@@ -165,13 +170,18 @@ std::vector<Profile> makeProfiles() {
         v.push_back(p);
     }
     {
-        Profile p = amber;  // "IBM Dos": full colour (chroma 1), lighter effects
+        Profile p = amber;  // "IBM Dos": full color (chroma 1), lighter effects
         p.id = "ibm-dos";
-        p.label = "IBM DOS (colour)";
+        p.label = "IBM DOS (color)";
         p.fx.fontColor = hex(0xffffff);
         p.fx.chromaColor = 1.0f;
         p.fx.ambientLight = 0.151f;
-        p.fx.bloom = 0.2969f;
+        // CRT 1.2.0 "IBM Dos" bloom is 0.2969 with the shared radius of 20 (a ~40 px halo at
+        // full resolution). That reads as a blur over DOS text. Eased slightly: a bit less glow
+        // and a tighter kernel. Scanlines stay off (rasterization 0, from amber). The RGB shift
+        // below is still CRT's value, so the misconverged color stays.
+        p.fx.bloom = 0.25f;
+        p.fx.bloomRadiusHalfRes = 16;
         p.fx.burnIn = 0.0469f;
         p.fx.flickering = 0.0955f;
         p.fx.glowingLine = 0.1545f;
@@ -186,7 +196,9 @@ std::vector<Profile> makeProfiles() {
         p.cursor = p.fg;
         p.minFgGrey = 0.30f;
         // fonts-pc names it "Px IBM VGA8"; the int10h originals ("Px437"/"PxPlus") work if the
-        // user installed them. 32 px = exactly 2x the 8x16 VGA glyphs (crisp, ~80x25 on 1280x800).
+        // user installed them. 32 px = exactly 2x the 8x16 VGA glyphs (crisp). The window is
+        // sized to 80x24 of whatever face resolves, so the VGA font gets a larger window and the
+        // DejaVu fallback stays at the profile's 16 px.
         setFonts(p, {{"Px IBM VGA8", 32}, {"Px437 IBM VGA8", 32}, {"PxPlus IBM VGA8", 32}}, kTerminus);
         v.push_back(p);
     }
@@ -242,7 +254,7 @@ std::vector<Profile> makeProfiles() {
         // saturationColor 0.4983, contrast 0.85, windowOpacity 0.7 (no translucent windows).
         Profile p = amber;
         p.id = "futuristic";
-        p.label = "Futuristic (colour)";
+        p.label = "Futuristic (color)";
         p.bezelOption = false;  // flat glass, frameMargin 0
         p.fx.ambientLight = 0.0f;
         p.fx.bloom = 0.5017f;
@@ -386,7 +398,7 @@ std::string applyTubeOverrides(Profile& p, const TubeOverrides& o) {
     }
     if (o.frameSize >= 0) p.fx.frameSize = std::min(200.0f, o.frameSize);
     if (!o.frameColor.empty() && !parseHexColor(o.frameColor, p.fx.frameColor))
-        msg += "frame colour must be #rrggbb. ";
+        msg += "frame color must be #rrggbb. ";
     if (o.frameShininess >= 0) p.fx.frameShininess = std::min(1.0f, o.frameShininess);
     if (o.rgbShift >= 0) p.fx.rgbShift = std::min(1.0f, o.rgbShift);
     return msg;
@@ -401,6 +413,16 @@ FontPick profileFont(const Profile& p) {
     FontPick f = pickFont(p.fonts);
     if (f.px <= 0) f.px = p.fontPx;
     return f;
+}
+
+FontPick resolveViewFont(const Profile& profile, const std::string& familyOverride) {
+    if (familyOverride.empty()) return profileFont(profile);
+    std::vector<FontChoice> v;
+    for (auto& f : splitFamilies(familyOverride)) v.push_back(FontChoice{f, 0});
+    v.insert(v.end(), profile.fonts.begin(), profile.fonts.end());
+    FontPick pick = pickFont(v);
+    if (pick.px <= 0) pick.px = profile.fontPx;
+    return pick;
 }
 
 namespace {

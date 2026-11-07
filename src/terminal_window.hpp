@@ -27,6 +27,11 @@ bool saveSettings(const ViewOptions& o, const std::string& path, std::string* er
 // just deleted), sets it to the default (amber), keeping every other key. True if it changed.
 bool resetDeletedDefaultProfile(const std::string& path, const std::string& deletedId, std::string* error = nullptr);
 
+// Logical size of a new window: kDefaultCols x kDefaultRows cells of the font this launch will
+// use, plus that profile's margins and (when the bezel is on) its frame. Used when nothing else
+// has a size: no --size, and no geometry a window manager restored over the default.
+WindowSize defaultWindowSize(const ViewOptions& opts);
+
 class SettingsDialog;
 
 class TerminalWindow : public Gtk::Window {

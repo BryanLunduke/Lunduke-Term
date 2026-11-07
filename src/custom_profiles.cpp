@@ -101,11 +101,11 @@ struct Reader {
     }
     void color(const char* g, const char* k, Color8& out) {
         if (!has(g, k)) return;
-        if (!parseColor8(str(g, k), out)) fail(g, k, "bad colour (want #rrggbb)");
+        if (!parseColor8(str(g, k), out)) fail(g, k, "bad color (want #rrggbb)");
     }
     void color(const char* g, const char* k, Rgb& out) {
         if (!has(g, k)) return;
-        if (!parseHexColor(str(g, k), out)) fail(g, k, "bad colour (want #rrggbb)");
+        if (!parseHexColor(str(g, k), out)) fail(g, k, "bad color (want #rrggbb)");
     }
     void palette(const char* g, const char* k, std::array<Color8, 16>& out) {
         if (!has(g, k)) return;
@@ -113,12 +113,12 @@ struct Reader {
         char** v = g_key_file_get_string_list(kf, g, k, &n, nullptr);
         if (!v || n != 16) {
             g_strfreev(v);
-            return fail(g, k, "want 16 colours");
+            return fail(g, k, "want 16 colors");
         }
         for (gsize i = 0; i < n; ++i)
             if (!parseColor8(v[i], out[i])) {
                 g_strfreev(v);
-                return fail(g, k, "bad colour (want #rrggbb)");
+                return fail(g, k, "bad color (want #rrggbb)");
             }
         g_strfreev(v);
     }

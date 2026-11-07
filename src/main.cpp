@@ -47,7 +47,7 @@ const char kUsage[] =
     "A terminal emulator with CRT effects.\n"
     "\n"
     "Profile and effects:\n"
-    "  --profile ID              colour/effects profile (see --list-profiles)\n"
+    "  --profile ID              color/effects profile (see --list-profiles)\n"
     "  --list-profiles           list the built-in and custom profiles and exit\n"
     "  --effects, --no-effects   force the CRT effects on or off (default: the profile decides)\n"
     "  --renderer auto|gl|cpu    effects back-end (default auto: GL, the C++ path if GL fails)\n"
@@ -66,7 +66,8 @@ const char kUsage[] =
     "Text and window:\n"
     "  --font FAMILY             font family (default: the profile's)\n"
     "  --font-px N               font size in pixels (default: the profile's)\n"
-    "  --size WxH                initial window size in pixels (default 1280x800)\n"
+    "  --size WxH                initial window size in pixels (default: 80x24 cells,\n"
+    "                            plus the profile's margins and bezel)\n"
     "  -T, --title TITLE         window title\n"
     "  --scrollback N            scrollback lines (default 5000)\n"
     "  --cursor-shape block|underline|bar, --cursor-blink, --no-cursor-blink\n"
@@ -182,7 +183,8 @@ int main(int argc, char** argv) {
         for (const auto& w : warnings) std::fprintf(stderr, "lunduke-terminal: profile %s\n", w.c_str());
     }
     loadSettings(opts);
-    int w = 1280, h = 800, quitAfter = 0;
+    int w = 0, h = 0, quitAfter = 0;
+    bool sizeSet = false;
     int statsEvery = 0;  // --stats-every: seconds between memory lines (M4 item 4)
     std::string title = "Lunduke Terminal";  // -T/--title (x-terminal-emulator interface)
     for (int i = 1; i < argc; ++i) {
@@ -203,7 +205,9 @@ int main(int argc, char** argv) {
         } else if (a == "--cpu-budget" && i + 1 < argc) opts.cpuBudget = std::atof(argv[++i]) / 100.0;
         else if (a == "--font" && i + 1 < argc) opts.fontFamily = argv[++i];
         else if (a == "--font-px" && i + 1 < argc) opts.fontPx = std::atoi(argv[++i]);
-        else if (a == "--size" && i + 1 < argc) std::sscanf(argv[++i], "%dx%d", &w, &h);
+        else if (a == "--size" && i + 1 < argc) {
+            if (std::sscanf(argv[++i], "%dx%d", &w, &h) == 2 && w > 0 && h > 0) sizeSet = true;
+        }
         else if (a == "--quit-after" && i + 1 < argc) quitAfter = std::atoi(argv[++i]);
         else if (a == "--stats") opts.stats = true;
         else if (a == "--stats-every" && i + 1 < argc) statsEvery = std::atoi(argv[++i]);
@@ -250,6 +254,13 @@ int main(int argc, char** argv) {
     auto app = Gtk::Application::create(gargc, argv, "org.lunduke.LundukeTerminal", Gio::APPLICATION_NON_UNIQUE);
     Gtk::Window::set_default_icon_name("org.lunduke.LundukeTerminal");  // data/icons (meson install)
     lterm::TerminalWindow win(opts, title);
+    // First launch only. A --size wins. A window manager that restores a previous size paints
+    // over this default; nothing here writes a geometry back, so a saved size is not reset.
+    if (!sizeSet) {
+        const lterm::WindowSize s = lterm::defaultWindowSize(opts);
+        w = s.width;
+        h = s.height;
+    }
     win.set_default_size(w, h);
     win.show();
     if (!win.newTab(true)) return 1;

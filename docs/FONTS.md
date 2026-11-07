@@ -26,7 +26,7 @@ recommend depending on the Debian package instead.
 | fonts-pc-extra | 1.0-2 | CC-BY-SA-4.0 | yes (as fonts-pc) | https://int10h.org/oldschool-pc-fonts/ | More PC/BIOS faces (Phoenix, AMI, Tandy, Verite…). Optional. On the ISO. |
 | fonts-3270 | 3.0.1-1 | BSD-3-Clause OR OFL-1.1 (Debian: `BSD3\|SIL`) | yes | https://github.com/rbanffy/3270font | Family `IBM 3270` (+ Condensed / Semi-Condensed). No Reserved Font Name. On the ISO. |
 | fonts-terminus | 1.2.0+ds2-4 (src cool-retro-term) | OFL-1.1 | yes, but **needs-check of Debian's copyright file** | https://github.com/Swordfish90/cool-retro-term | `TerminusTTF-4.46.0.ttf`, family `Terminus (TTF)`. Its name table says "Copyright 2016 Dimitar Toshkov Zhekov; 2017 Tilman Blumenbach; … SIL Open Font License, Version 1.1". **Copyright-file gap:** `debian/copyright` has no stanza for this file, so formally it falls under `Files: *` = GPL-3 (Scognamiglio). That is a Debian packaging bug, not a licence problem, because the font itself says OFL-1.1. Upstream Terminus is OFL-1.1, see fonts-terminus-otb. A Debian bug report would fix it (not filed). We only depend on the package. **Not on the ISO.** |
-| fonts-terminus-otb | 4.48-3.1 (src xfonts-terminus) | OFL-1.1 | yes (Reserved Font Name "Terminus Font") | https://terminus-font.sourceforge.net/ | Bitmap OTB, family `Terminus`. Clean copyright: "Copyright (c) 2010-2014 Dimitar Toshkov Zhekov, with Reserved Font Name "Terminus Font"". Debian's `70-no-bitmaps-except-emoji.conf` rejects bitmap fonts, but the package re-enables itself with `71-enable-terminus.conf`. Verified with that file: amber resolves to `Terminus` 22 px, spacing charcell (`bench/font-fallback.txt`, screenshot c-06). Second choice after the TTF. |
+| fonts-terminus-otb | 4.48-3.1 (src xfonts-terminus) | OFL-1.1 | yes (Reserved Font Name "Terminus Font") | https://terminus-font.sourceforge.net/ | Bitmap OTB, family `Terminus`. Clean copyright: "Copyright (c) 2010-2014 Dimitar Toshkov Zhekov, with Reserved Font Name "Terminus Font"". Debian's `70-no-bitmaps-except-emoji.conf` rejects bitmap fonts, but the package re-enables itself with `71-enable-terminus.conf`. Verified with that file: amber resolves to `Terminus`, spacing charcell (`bench/font-fallback.txt`, screenshot c-06; that check used 22 px, the profile size is 16 px now). Second choice after the TTF. |
 | fonts-hermit | 1.2.0+ds2-4 (src cool-retro-term) | OFL-1.1 | yes (Reserved Font Name "Hermit") | https://pcaro.es/p/hermit/ | Stanza `app/qml/fonts/modern-hermit/*`: 2013 Pablo Caro, OFL-1.1. Family `Hermit`. **Clean.** |
 | fonts-proggy | 1.2.0+ds2-4 (src cool-retro-term) | MIT | yes | https://github.com/bluescan/proggyfonts | Stanza `app/qml/fonts/modern-proggy-tiny/*`: 2004-2005 Tristan Grimmer, MIT. Family `ProggyTinyTT`. **Clean.** |
 | fonts-sixtyfour | 1.0-3 (src fonts-homecomputer) | OFL-1.1 | yes; trademark note | https://github.com/jenskutilek/homecomputer-fonts | `Files: *` OFL-1.1, "2019 The Homecomputer Fonts Project Authors". A *redrawing* inspired by the C64 screen font. Family `C-64`. "Commodore"/"C64" are trademarks: fine as a font name, but don't brand a profile with Commodore marks. On the ISO. |
@@ -87,9 +87,9 @@ at integer multiples of their design size.
 | Profile | 1st choice (package) | then | Suggested relation |
 |---|---|---|---|
 | plain | `DejaVu Sans Mono` 16 px (fonts-dejavu-core) | `Monospace` | Depends: fonts-dejavu-core |
-| amber (default since M5), green, green-scanlines | `Terminus (TTF)` 22 px (fonts-terminus) | `Terminus` (fonts-terminus-otb), `DejaVu Sans Mono`, `Monospace` | Recommends: fonts-terminus \| fonts-terminus-otb |
-| ibm-dos | `Px IBM VGA8` **32 px** (fonts-pc): exactly 2× the 8×16 VGA glyphs, about 80×25 at 1280×800 | `Px437 IBM VGA8` and `PxPlus IBM VGA8` at 32 px (int10h originals, if the user installed them), then the Terminus chain at 22 px | Recommends: fonts-pc |
-| ibm-3278 | `IBM 3270` 22 px (fonts-3270) | `3270`, then the Terminus chain | Recommends: fonts-3270 |
+| amber (default since M5), green, green-scanlines | `Terminus (TTF)` 16 px (fonts-terminus) | `Terminus` (fonts-terminus-otb), `DejaVu Sans Mono`, `Monospace` | Recommends: fonts-terminus \| fonts-terminus-otb |
+| ibm-dos | `Px IBM VGA8` **32 px** (fonts-pc): exactly 2× the 8×16 VGA glyphs. The window is 80×24 of the face that resolves | `Px437 IBM VGA8` and `PxPlus IBM VGA8` at 32 px (int10h originals, if the user installed them), then the Terminus chain at 16 px | Recommends: fonts-pc |
+| ibm-3278 | `IBM 3270` 16 px (fonts-3270) | `3270`, then the Terminus chain | Recommends: fonts-3270 |
 
 ## M5: retro-font profiles (licence-clean only)
 
@@ -114,9 +114,9 @@ copyright/licence strings) were read. Quotes below are from those files (REAL).
 | Apple II PrintChar21/PRNumber3, PetMe (Kreative), C64 Pro Mono (Style64), AtariClassic | not in Debian (`Files-Excluded` of cool-retro-term's copyright) | — | **no** (non-free, see below) | none, and `profiles_test` forbids them |
 
 **What the new profiles are.** Five mono tubes on amber's values (amber's phosphor palette) with
-their own phosphor colour, each naming one Debian family first at a whole multiple of its design
+their own phosphor color, each naming one Debian family first at a whole multiple of its design
 size and then the Terminus chain (`Terminus (TTF)`, `Terminus`, `DejaVu Sans Mono`, `Monospace`).
-Nothing is shipped. Without the font the profile falls back to DejaVu Sans Mono 22 px
+Nothing is shipped. Without the font the profile falls back to DejaVu Sans Mono 16 px
 (`tests/fonts_test.cpp`, and [`bench/font-fallback.txt`](bench/font-fallback.txt) "M5" section).
 
 **Naming (editor, please check).** The ids and labels are neutral (`pixel-8bit`,
@@ -147,7 +147,7 @@ Screenshots (fonts from the unpacked `.deb`s via `FONTCONFIG_FILE`, Xvfb, llvmpi
   fonts-agave, fonts-sixtyfour, fonts-pc, fonts-pc-extra, fonts-amiga and fonts-atarismall, not
   on fonts-terminus. That is why those fonts are on the ISO.
 - There is no Terminus file in the ISO contents list.
-- So on LCOS today amber and green fall back to DejaVu Sans Mono 22 px. The VM benchmark used a
+- So on LCOS today amber and green fall back to DejaVu Sans Mono 16 px (the same cell size as xfce4-terminal's Monospace 12). The VM benchmark used a
   Terminus TTF copied onto its private payload disk.
 - Adding fonts-terminus (80 kB .deb) is a later packaging decision. Nothing was changed here.
 
@@ -202,5 +202,5 @@ from the `dpkg-deb -x` scratch dir via `FONTCONFIG_FILE`:
 | `c-04` | ibm-dos, Px IBM VGA8 32 px |
 | `c-05` | ibm-3278, IBM 3270 |
 | `c-06` | amber with only fonts-terminus-otb |
-| `c-07` | ibm-dos with DejaVu only → DejaVu Sans Mono 22 px |
+| `c-07` | ibm-dos with DejaVu only → DejaVu Sans Mono (the saved shot is from when that fallback was 22 px; it is 16 px now) |
 | `c-08` | amber with no monospace font → warning, proportional text |
