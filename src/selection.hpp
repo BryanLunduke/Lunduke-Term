@@ -99,4 +99,19 @@ struct GridLayout {
 GridLayout computeGridLayout(int devW, int devH, int scale, int cellW, int cellH, int marginMinPx, float marginFrac,
                              int frameInset = 0);
 
+// First-launch character grid. The window is sized to this (windowSizeForGrid), not the other
+// way round, so a new window is a standard terminal. A size the user already has (the window
+// manager, or --size) is left alone.
+constexpr int kDefaultCols = 80;
+constexpr int kDefaultRows = 24;
+
+// Logical pixel size of a window whose computeGridLayout is exactly `cols` x `rows`.
+// The smallest such size: the aspect is the character grid plus the profile's margins and the
+// bezel inset, with no spare row or column. cellW/cellH are device pixels at `scale`.
+struct WindowSize {
+    int width = 0, height = 0;  // logical pixels
+};
+WindowSize windowSizeForGrid(int cols, int rows, int cellW, int cellH, int scale, int marginMinPx, float marginFrac,
+                             int frameInset = 0);
+
 }  // namespace lterm

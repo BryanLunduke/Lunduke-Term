@@ -2,6 +2,7 @@
 #include "terminal_window.hpp"
 
 #include "custom_profiles.hpp"
+#include "grid_painter.hpp"
 
 #include <gdk/gdkkeysyms.h>
 #include <glib/gstdio.h>
@@ -11,6 +12,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <set>
 #include <sys/wait.h>
@@ -87,6 +89,45 @@ bool resetDeletedDefaultProfile(const std::string& path, const std::string& dele
         if (error) *error = e.what();
         return false;
     }
+}
+
+WindowSize defaultWindowSize(const ViewOptions& opts) {
+    const Profile* found = findProfile(opts.profile);
+    if (!found) found = findProfile(kDefaultProfile);
+    Profile profile = found ? *found : Profile{};
+    applyTubeOverrides(profile, opts.tube);
+    const bool effectsOn = opts.effects < 0 ? profile.effects : opts.effects != 0;
+    const FontPick pick = resolveViewFont(profile, opts.fontFamily);
+    int px = opts.fontPx > 0 ? opts.fontPx : pick.px;
+    if (px < 1) px = profile.fontPx > 0 ? profile.fontPx : 16;
+    const std::string family = pick.family.empty() ? std::string("Monospace") : pick.family;
+    // Scale 1: set_default_size is in logical pixels, and a later GDK scale keeps the same
+    // rows and columns (computeGridLayout).
+    GridPainter painter(family, px, 1);
+    const int cellW = std::max(1, painter.cellWidth());
+    const int cellH = std::max(1, painter.cellHeight());
+    // layoutGrid takes the inset from frameGeometry on the finished window, which caps it at a
+    // quarter of the shorter side. Start from the profile's frame size and repeat until the
+    // inset the window will actually use is the one it was sized for.
+    int inset = 0;
+    if (effectsOn && profile.fx.frame && profile.fx.frameSize > 0)
+        inset = static_cast<int>(std::ceil(profile.fx.frameSize));
+    WindowSize s{};
+    for (int n = 0; n < 4; ++n) {
+        s = windowSizeForGrid(kDefaultCols, kDefaultRows, cellW, cellH, 1, profile.marginMinPx,
+                              profile.marginFrac, inset);
+        int next = 0;
+        if (effectsOn && profile.fx.frame && profile.fx.frameSize > 0) {
+            EffectParams fx = profile.fx;
+            fx.pixelScale = 1.0f;
+            next = static_cast<int>(std::ceil(frameGeometry(fx, s.width, s.height).inset));
+        }
+        if (next == inset) break;
+        inset = next;
+    }
+    if (s.width < 1) s.width = 640;
+    if (s.height < 1) s.height = 384;
+    return s;
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -35,6 +35,27 @@ int main() {
     CHECK(findProfile("nope") == nullptr);
     CHECK(findProfile("ibm-3278") && !findProfile("ibm-3278")->fx.animated());
     CHECK(findProfile("amber") && findProfile("amber")->fx.animated());
+    // Desktop font: same pixel size as xfce4-terminal's Monospace 12 (12 pt = 16 px at 96 dpi).
+    CHECK(findProfile("amber")->fontPx == 16);
+    CHECK(findProfile("plain")->fontPx == 16);
+    // User-visible spelling is American. The ids stay "ibm-dos" / "futuristic", which is what
+    // settings.ini and --profile store, so a saved profile still loads.
+    CHECK(findProfile("ibm-dos") && findProfile("ibm-dos")->label == "IBM DOS (color)");
+    CHECK(findProfile("futuristic") && findProfile("futuristic")->label == "Futuristic (color)");
+    for (const auto& p : all) {
+        CHECK(p.label.find("colour") == std::string::npos);
+        CHECK(p.label.find("Colour") == std::string::npos);
+        CHECK(p.id.find("colour") == std::string::npos);
+    }
+    if (const Profile* dos = findProfile("ibm-dos")) {
+        // Slightly less bloom than CRT 1.2.0's 0.2969 / radius 20. Scanlines stay off; the RGB
+        // shift stays CRT's 0.3524 so the DOS color fringes remain.
+        CHECK(dos->fx.bloom > 0.15f && dos->fx.bloom < 0.2969f);
+        CHECK(dos->fx.bloomRadiusHalfRes >= 12 && dos->fx.bloomRadiusHalfRes < 20);
+        CHECK(dos->fx.rasterization == 0);
+        CHECK(std::fabs(dos->fx.rgbShift - 0.3524f) < 1e-4f);
+        CHECK(dos->id == "ibm-dos");
+    }
 
     {
         const Profile& plain = all.front();

@@ -71,7 +71,7 @@ TerminalView::TerminalView(const ViewOptions& opts)
     }
     effectsOn_ = opts_.effects < 0 ? profile_.effects : opts_.effects != 0;
     glFailed_ = opts_.renderer == "cpu";
-    session_.reset(new VtermSession(24, 80));
+    session_.reset(new VtermSession(kDefaultRows, kDefaultCols));
     session_->onTitle = [this] { signalTitle.emit(session_->title()); };
     session_->onBell = [this] { onBell(); };
     const size_t sb = clampScrollbackLines(opts_.scrollbackLines);
@@ -397,23 +397,14 @@ void TerminalView::noteBlinkActivity() {
 }
 
 void TerminalView::applyProfile() {
-    FontPick pick;
-    if (!opts_.fontFamily.empty()) {
-        // A user font that is not installed falls back to the profile's fonts, never to the
-        // proportional default sans that fontconfig would substitute.
-        std::vector<FontChoice> v;
-        for (auto& f : splitFamilies(opts_.fontFamily)) v.push_back(FontChoice{f, 0});
-        const auto first = v.empty() ? std::string() : v.front().family;
-        v.insert(v.end(), profile_.fonts.begin(), profile_.fonts.end());
-        pick = pickFont(v);
-        if (pick.px <= 0) pick.px = profile_.fontPx;
-        if (pick.fallback && fontWarned_ != opts_.fontFamily) {
-            std::fprintf(stderr, "lunduke-terminal: font '%s' is not installed, using '%s'\n",
-                         first.c_str(), pick.family.c_str());
-            fontWarned_ = opts_.fontFamily;
-        }
-    } else {
-        pick = profileFont(profile_);
+    // A user font that is not installed falls back to the profile's fonts, never to the
+    // proportional default sans that fontconfig would substitute (resolveViewFont).
+    const FontPick pick = resolveViewFont(profile_, opts_.fontFamily);
+    if (!opts_.fontFamily.empty() && pick.fallback && fontWarned_ != opts_.fontFamily) {
+        const auto names = splitFamilies(opts_.fontFamily);
+        std::fprintf(stderr, "lunduke-terminal: font '%s' is not installed, using '%s'\n",
+                     (names.empty() ? opts_.fontFamily : names.front()).c_str(), pick.family.c_str());
+        fontWarned_ = opts_.fontFamily;
     }
     if (!pick.monospace)
         std::fprintf(stderr, "lunduke-terminal: font '%s' is not monospaced\n", pick.family.c_str());

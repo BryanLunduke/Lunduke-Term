@@ -56,7 +56,7 @@ struct ToggleSpec {
 const ToggleSpec kToggles[] = {
     {"bloom", "Bloom", &EffectParams::bloom},
     {"burn-in", "Burn-in", &EffectParams::burnIn},
-    {"chroma-color", "Chroma colour", &EffectParams::chromaColor},
+    {"chroma-color", "Chroma color", &EffectParams::chromaColor},
     {"ambient-light", "Ambient light", &EffectParams::ambientLight},
     {"flickering", "Flickering", &EffectParams::flickering},
     {"glowing-line", "Glowing line", &EffectParams::glowingLine},
@@ -103,7 +103,7 @@ ProfileEditor::ProfileEditor(Gtk::Window& parent, const Profile& p)
     const EffectParams& x = p.fx;
     const EffectParams defaults;
 
-    // ---- Text & colours ----
+    // ---- Text & colors ----
     {
         Gtk::Grid* g = newGrid();
         int row = 0;
@@ -117,7 +117,7 @@ ProfileEditor::ProfileEditor(Gtk::Window& parent, const Profile& p)
         fg.set_rgba(rgbaOf(p.fg));
         bg.set_rgba(rgbaOf(p.bg));
         cursor.set_rgba(rgbaOf(p.cursor));
-        addRow(*g, row, "Text colour", fg);
+        addRow(*g, row, "Text color", fg);
         addRow(*g, row, "Background", bg);
         addRow(*g, row, "Cursor", cursor);
         setupSpin(marginFrac, 0, 0.3, 0.01, 2, p.marginFrac);
@@ -137,14 +137,14 @@ ProfileEditor::ProfileEditor(Gtk::Window& parent, const Profile& p)
             box->set_column_spacing(2);
             for (int i = 0; i < 16; ++i) {
                 v.push_back(std::make_unique<Gtk::ColorButton>(rgbaOf(pal[static_cast<size_t>(i)])));
-                v.back()->set_tooltip_text("ANSI colour " + std::to_string(i));
+                v.back()->set_tooltip_text("ANSI color " + std::to_string(i));
                 box->attach(*v.back(), i % 8, i / 8, 1, 1);
             }
             return box;
         };
-        addRow(*g, row, "ANSI colours 0-15", *addPalette(palette, p.palette));
+        addRow(*g, row, "ANSI colors 0-15", *addPalette(palette, p.palette));
         setupScale(minFgGrey, 0, 1, p.minFgGrey);
-        minFgGrey.set_tooltip_text("Other colours (256-colour, truecolor) are lifted to at least this grey; 0 = untouched");
+        minFgGrey.set_tooltip_text("Other colors (256-color, truecolor) are lifted to at least this grey; 0 = untouched");
         addRow(*g, row, "Minimum text grey", minFgGrey);
         hasEffectsPalette.set_active(p.hasEffectsPalette);
         g->attach(hasEffectsPalette, 1, row++, 1, 1);
@@ -162,9 +162,9 @@ ProfileEditor::ProfileEditor(Gtk::Window& parent, const Profile& p)
         setupScale(brightness, 0, 1, x.brightness);
         addRow(*g, row, "Brightness", brightness);
         phosphor.set_rgba(rgbaOf(x.fontColor));
-        addRow(*g, row, "Phosphor colour", phosphor);
+        addRow(*g, row, "Phosphor color", phosphor);
         effectsBackground.set_rgba(rgbaOf(x.backgroundColor));
-        addRow(*g, row, "Screen colour", effectsBackground);
+        addRow(*g, row, "Screen color", effectsBackground);
         for (const auto& s : kToggles) {
             auto t = std::make_unique<Toggle>();
             const float v = x.*(s.field);
@@ -206,7 +206,7 @@ ProfileEditor::ProfileEditor(Gtk::Window& parent, const Profile& p)
         setupSpin(frameSize, 0, 200, 1, 0, x.frameSize);
         addRow(*g, row, "Size (px)", frameSize);
         frameColor.set_rgba(rgbaOf(x.frameColor));
-        addRow(*g, row, "Colour", frameColor);
+        addRow(*g, row, "Color", frameColor);
         setupScale(frameShininess, 0, 1, x.frameShininess);
         addRow(*g, row, "Shininess", frameShininess);
         pages.append_page(*g, "Bezel");

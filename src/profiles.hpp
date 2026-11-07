@@ -57,6 +57,10 @@ bool parseHexColor(const std::string& s, Rgb& out);
 
 // The profile used when nothing (command line, settings.ini) picks one.
 inline constexpr const char* kDefaultProfile = "amber";
+// Font a view will paint with. An override that is not installed falls back along the profile's
+// own list (never to a proportional sans). px is the family's size, or the profile's when the
+// chosen face has none. TerminalView::applyProfile and the first-launch window size both use this.
+FontPick resolveViewFont(const Profile& profile, const std::string& familyOverride);
 const std::vector<Profile>& builtinProfiles();
 // The installed font this profile will use (falls back along `fonts`, then to Monospace).
 FontPick profileFont(const Profile& p);

@@ -184,4 +184,36 @@ GridLayout computeGridLayout(int devW, int devH, int scale, int cellW, int cellH
     return g;
 }
 
+namespace {
+// Smallest logical inner size (inside the bezel) that holds `cells` of `cell` logical px,
+// using the same margin rule as computeGridLayout.
+int tightInner(int cells, int cell, int marginMin, float frac) {
+    auto count = [&](int inner) {
+        if (inner < 1) return 0;
+        const int mx = std::max(marginMin, static_cast<int>(inner * static_cast<double>(frac)));
+        if (inner <= 2 * mx) return 0;
+        return (inner - 2 * mx) / std::max(1, cell);
+    };
+    int inner = cells * std::max(1, cell) + 2 * std::max(0, marginMin);
+    if (frac > 0.0f && frac < 0.49f) {
+        const int guess = static_cast<int>(std::ceil((cells * std::max(1, cell)) / (1.0 - 2.0 * frac)));
+        if (guess > inner) inner = guess;
+    }
+    for (int n = 0; n < 100000 && count(inner) < cells; ++n) ++inner;
+    while (inner > 1 && count(inner - 1) >= cells) --inner;
+    return std::max(1, inner);
+}
+}  // namespace
+
+WindowSize windowSizeForGrid(int cols, int rows, int cellW, int cellH, int scale, int marginMinPx, float marginFrac,
+                             int frameInset) {
+    const int s = std::max(1, scale);
+    const int cw = std::max(1, cellW / s), ch = std::max(1, cellH / s);
+    const int fi = std::max(0, frameInset);
+    WindowSize out;
+    out.width = tightInner(std::max(1, cols), cw, marginMinPx, marginFrac) + 2 * fi;
+    out.height = tightInner(std::max(1, rows), ch, marginMinPx, marginFrac) + 2 * fi;
+    return out;
+}
+
 }  // namespace lterm

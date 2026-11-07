@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Checkpoint B: scrollback, selection text, mouse encoding, paste bracketing, DECSCUSR, PTY spawn.
 #include "effects.hpp"
+#include "grid_painter.hpp"
+#include "profiles.hpp"
 #include "selection.hpp"
 #include "vterm_session.hpp"
+
+#include <cmath>
 
 #include <cerrno>
 #include <cstdio>
@@ -197,6 +201,67 @@ static void testPointToCell() {
 }
 
 // M2 HiDPI: the layout and the mouse mapping at scale 2 equal the scale-1 ones.
+// The default window is the smallest 80x24 grid for the profile's cells, margins and bezel.
+static void testWindowForGrid() {
+    auto roundTrip = [](int cols, int rows, int cellW, int cellH, int scale, int marginMin, float frac, int inset) {
+        const WindowSize s = windowSizeForGrid(cols, rows, cellW, cellH, scale, marginMin, frac, inset);
+        const GridLayout g = computeGridLayout(s.width * scale, s.height * scale, scale, cellW, cellH, marginMin, frac, inset);
+        CHECK_EQ(g.cols, cols);
+        CHECK_EQ(g.rows, rows);
+        // One logical pixel less on either axis drops a column or a row (no spare cell).
+        if (s.width > 1) {
+            const GridLayout narrow =
+                computeGridLayout((s.width - 1) * scale, s.height * scale, scale, cellW, cellH, marginMin, frac, inset);
+            CHECK(narrow.cols < cols);
+        }
+        if (s.height > 1) {
+            const GridLayout shortH =
+                computeGridLayout(s.width * scale, (s.height - 1) * scale, scale, cellW, cellH, marginMin, frac, inset);
+            CHECK(shortH.rows < rows);
+        }
+        return s;
+    };
+    // plain: no fractional margin, 4 px minimum. 10x19 cells are DejaVu Sans Mono at 16 px.
+    const WindowSize plain = roundTrip(80, 24, 10, 19, 1, 4, 0.0f, 0);
+    CHECK_EQ(plain.width, 80 * 10 + 8);
+    CHECK_EQ(plain.height, 24 * 19 + 8);
+    // amber: 4% margin, at least 12 px. Same cells. Scale 2 uses device cells and the same logical size.
+    const WindowSize amber = roundTrip(80, 24, 10, 19, 1, 12, 0.04f, 0);
+    const WindowSize amber2 = roundTrip(80, 24, 20, 38, 2, 12, 0.04f, 0);
+    CHECK_EQ(amber.width, amber2.width);
+    CHECK_EQ(amber.height, amber2.height);
+    // The character grid's aspect, not the old 1280x800 (1.60). Margins move it only a little.
+    const double grid = (80.0 * 10) / (24.0 * 19);
+    const double win = static_cast<double>(amber.width) / amber.height;
+    CHECK(std::fabs(win - grid) / grid < 0.08);
+    CHECK(std::fabs(win - 1280.0 / 800.0) > 0.05);
+    // Bezel on every side, on top of the same margins.
+    const WindowSize bezel = roundTrip(80, 24, 10, 19, 1, 12, 0.04f, 28);
+    CHECK_EQ(bezel.width, amber.width + 56);
+    CHECK_EQ(bezel.height, amber.height + 56);
+    // The font the default profile resolves to here produces that 80x24 window.
+    if (const Profile* p = findProfile(kDefaultProfile)) {
+        const FontPick f = profileFont(*p);
+        GridPainter gp(f.family, f.px);
+        const WindowSize s = windowSizeForGrid(kDefaultCols, kDefaultRows, gp.cellWidth(), gp.cellHeight(), 1,
+                                               p->marginMinPx, p->marginFrac, 0);
+        const GridLayout g = computeGridLayout(s.width, s.height, 1, gp.cellWidth(), gp.cellHeight(), p->marginMinPx,
+                                               p->marginFrac, 0);
+        CHECK_EQ(g.cols, kDefaultCols);
+        CHECK_EQ(g.rows, kDefaultRows);
+        std::printf("default window: %s %d px, cell %dx%d, logical %dx%d (80x24)\n", f.family.c_str(), f.px,
+                    gp.cellWidth(), gp.cellHeight(), s.width, s.height);
+        // DejaVu Sans Mono 16 px is 10x19 on this box (same cell as Monospace 12). xfce4-terminal's
+        // default 80x24 client window measured 818x485; the extra pixels here are amber's 4% margin.
+        if (f.family == "DejaVu Sans Mono" && f.px == 16) {
+            CHECK_EQ(gp.cellWidth(), 10);
+            CHECK_EQ(gp.cellHeight(), 19);
+            CHECK_EQ(s.width, amber.width);
+            CHECK_EQ(s.height, amber.height);
+        }
+    }
+}
+
 static void testScale2Mapping() {
     for (float frac : {0.0f, 0.05f}) {
         const GridLayout g1 = computeGridLayout(808, 464, 1, 10, 19, 4, frac);
@@ -659,6 +724,7 @@ int main() {
     testScrollbackCombiningLookup();
     testSelection();
     testPointToCell();
+    testWindowForGrid();
     testScale2Mapping();
     testBezelMapping();
     testMouse();

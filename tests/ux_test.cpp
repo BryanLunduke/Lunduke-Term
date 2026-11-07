@@ -152,6 +152,11 @@ static void testPlainRenders(const char* renderer) {
 
 // ---- item 3: the Font size field follows the profile ----
 static void testSettingsFontPx() {
+    Profile big = *findProfile("plain");
+    big.id = "custom:Bigger";
+    big.label = "Bigger";
+    big.fontPx = 24;
+    setCustomProfiles({big});
     ViewOptions o;
     o.profile = "amber";
     o.command = {"/bin/sh", "-c", "exec sleep 30"};
@@ -168,16 +173,18 @@ static void testSettingsFontPx() {
     if (!d || !v) return;
     const int amberPx = v->autoFontPx();
     const int shownAmber = d->fontPx.get_value_as_int();
-    d->profile.set_active_id("plain");
+    // amber and plain now share the desktop 16 px size, so a custom profile with its own size is
+    // what shows the field following the profile.
+    d->profile.set_active_id("custom:Bigger");
     pump(200);
-    const int plainPx = v->autoFontPx();
-    const int shownPlain = d->fontPx.get_value_as_int();
-    std::printf("settings font size: amber uses %d px, field %d; plain uses %d px, field %d\n", amberPx, shownAmber,
-                plainPx, shownPlain);
-    CHECK(amberPx > 0 && plainPx > 0 && amberPx != plainPx);  // else the test proves nothing
+    const int bigPx = v->autoFontPx();
+    const int shownBig = d->fontPx.get_value_as_int();
+    std::printf("settings font size: amber uses %d px, field %d; custom uses %d px, field %d\n", amberPx, shownAmber,
+                bigPx, shownBig);
+    CHECK(amberPx > 0 && bigPx > 0 && amberPx != bigPx);  // else the test proves nothing
     CHECK(shownAmber == amberPx);
-    CHECK(v->profile().id == "plain");
-    CHECK(shownPlain == plainPx);
+    CHECK(v->profile().id == "custom:Bigger");
+    CHECK(shownBig == bigPx);
     CHECK(w.options().fontPx == 0);  // showing the profile's size is no override
     // An override is applied; a profile change then shows (and uses) the new profile's size.
     d->fontPx.set_value(30);
@@ -192,6 +199,7 @@ static void testSettingsFontPx() {
     CHECK(w.options().fontPx == 0);
     CHECK(v->autoFontPx() == amberPx);
     d->response(Gtk::RESPONSE_CLOSE);
+    setCustomProfiles({});
 }
 
 // ---- perf step 1: F11 toggles fullscreen ----
@@ -883,6 +891,38 @@ int main(int argc, char** argv) {
     testPlainRenders("gl");
     testPlainRenders("cpu");
     testSettingsFontPx();
+    {
+        // First launch, no --size: the window's default size is an 80x24 grid of the profile font.
+        ViewOptions o;
+        o.profile = "amber";
+        o.renderer = "cpu";
+        o.command = {"/bin/sh", "-c", "exec sleep 30"};
+        const WindowSize want = defaultWindowSize(o);
+        TerminalWindow w(o);
+        w.settingsFile = "/dev/null";
+        w.set_default_size(want.width, want.height);
+        w.show();
+        TerminalView* v = w.newTab(true);
+        const int waitMs = ltermWaitMs(3000, 10000);
+        CHECK(waitFor([&] { return v && v->session().cols() == kDefaultCols && v->session().rows() == kDefaultRows; }, waitMs));
+        std::printf("default geometry: %dx%d logical -> %d cols x %d rows\n", want.width, want.height,
+                    v ? v->session().cols() : -1, v ? v->session().rows() : -1);
+        if (v) {
+            CHECK(v->session().cols() == kDefaultCols);
+            CHECK(v->session().rows() == kDefaultRows);
+        }
+        // --frame adds the bezel and the window grows so the grid stays 80x24.
+        ViewOptions framed = o;
+        framed.tube.frame = 1;
+        const WindowSize withFrame = defaultWindowSize(framed);
+        CHECK(withFrame.width > want.width && withFrame.height > want.height);
+        const Profile* amber = findProfile("amber");
+        if (amber && amber->fx.frameSize > 0) {
+            const int grow = 2 * static_cast<int>(std::lround(amber->fx.frameSize));
+            CHECK(withFrame.width >= want.width + grow - 2);
+            CHECK(withFrame.height >= want.height + grow - 2);
+        }
+    }
     testFullscreenKey();
     testFontZoom();
     testZoomOutOfRange();
