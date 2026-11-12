@@ -38,3 +38,6 @@ Description: retro CRT-style terminal emulator
  monitor: phosphor glow, scanlines, burn-in, curvature, RGB shift and an
  optional monitor bezel. The effects run on OpenGL 3.3 with a C++ fallback.
  The default profile is a plain terminal without effects.
+ .
+ This is the default terminal on LCOS 1.1.0. It provides the
+ x-terminal-emulator alternative and an XFCE preferred-application helper.

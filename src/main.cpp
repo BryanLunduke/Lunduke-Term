@@ -4,12 +4,14 @@
 //                    [--threads N] [--effects-fps N] [--max-fps N] [--no-pause-unfocused]
 //                    [--effects-quality auto|full|reduced|static] [--cpu-budget PERCENT]
 //                    [--font FAMILY] [--font-px N] [--size WxH] [--quit-after MS] [--stats] [--stats-every S]
-//                    [--scrollback N] [--login] [--cwd DIR] [--on-exit close|hold|hold-on-error]
+//                    [--scrollback N] [--login]
+//                    [--cwd|--workdir|--working-directory DIR] [--on-exit close|hold|hold-on-error]
 //                    [--hold] [--bell LIST] [--cursor-shape block|underline|bar]
 //                    [--cursor-blink|--no-cursor-blink]
 //                    [--frame|--no-frame] [--frame-size PX] [--frame-color #RRGGBB]
 //                    [--frame-shininess 0..1] [--rgb-shift 0..1]
-//                    [-T|--title TITLE] [--list-profiles] [-h|--help] [--version] [-e COMMAND ARGS...]
+//                    [-T|--title TITLE] [--list-profiles] [-h|--help] [--version]
+//                    [-e|-x|--execute COMMAND ARGS...]
 // --quit-after is in milliseconds. --help/--version print to stdout and exit 0; an unknown
 // option exits 2, and so does a bad --renderer, --on-exit, --cursor-shape or --effects-quality
 // value (other values are not checked).
@@ -68,15 +70,20 @@ const char kUsage[] =
     "  --font-px N               font size in pixels (default: the profile's)\n"
     "  --size WxH                initial window size in pixels (default: 80x24 cells,\n"
     "                            plus the profile's margins and bezel)\n"
-    "  -T, --title TITLE         window title\n"
+    "  -T, --title TITLE         window title (also --title=TITLE)\n"
     "  --scrollback N            scrollback lines (default 5000)\n"
     "  --cursor-shape block|underline|bar, --cursor-blink, --no-cursor-blink\n"
     "  --bell LIST               comma list of visual, urgent, audible or none\n"
     "\n"
     "Session:\n"
-    "  -e COMMAND [ARGS...]      run COMMAND instead of the shell (must be last)\n"
+    "  -e COMMAND [ARGS...]      run COMMAND instead of the shell. The rest of the line is\n"
+    "                            the command and its arguments (passed to exec, not a shell)\n"
+    "                            and must be last. -x and --execute are the same form, which\n"
+    "                            exo and xfce4-terminal pass\n"
     "  --login                   start the shell as a login shell\n"
-    "  --cwd DIR                 working directory\n"
+    "  --cwd DIR, --workdir DIR, --working-directory DIR\n"
+    "                            working directory (also --cwd=DIR, --workdir=DIR,\n"
+    "                            --working-directory=DIR). Thunar and other launchers use these\n"
     "  --on-exit close|hold|hold-on-error\n"
     "                            what the tab does when the command exits (default hold-on-error)\n"
     "  --hold                    same as --on-exit hold\n"
@@ -158,13 +165,47 @@ void loadSettings(lterm::ViewOptions& o) {
     }
 }
 
+// An option as a separate argument (`--name value`) or, for a long option, `--name=value`.
+// 1 = matched and *value set, 0 = not this option, -1 = this option, argument missing
+// (a message was printed).
+int takeOpt(const std::string& a, const char* name, int& i, int argc, char** argv, std::string& value) {
+    const std::string n = name;
+    if (a == n) {
+        if (i + 1 >= argc) {
+            std::fprintf(stderr, "lunduke-terminal: %s requires an argument\nTry 'lunduke-terminal --help'.\n", name);
+            return -1;
+        }
+        value = argv[++i];
+        return 1;
+    }
+    if (n.compare(0, 2, "--") != 0) return 0;
+    const std::string pref = n + "=";
+    if (a.compare(0, pref.size(), pref) == 0) {
+        value = a.substr(pref.size());
+        return 1;
+    }
+    return 0;
+}
+
+// First match wins, so the longer directory option is listed before --workdir.
+int takeDir(const std::string& a, int& i, int argc, char** argv, std::string& value) {
+    if (int t = takeOpt(a, "--working-directory", i, argc, argv, value)) return t;
+    if (int t = takeOpt(a, "--workdir", i, argc, argv, value)) return t;
+    return takeOpt(a, "--cwd", i, argc, argv, value);
+}
+
+int takeTitle(const std::string& a, int& i, int argc, char** argv, std::string& value) {
+    if (int t = takeOpt(a, "--title", i, argc, argv, value)) return t;
+    return takeOpt(a, "-T", i, argc, argv, value);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
     // --help / --version before anything reads settings or profiles (their warnings would be noise).
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
-        if (a == "-e") break;  // the rest belongs to the command
+        if (a == "-e" || a == "-x" || a == "--execute") break;  // the rest belongs to the command
         if (a == "-h" || a == "--help") {
             std::fputs(kUsage, stdout);
             return 0;
@@ -187,6 +228,7 @@ int main(int argc, char** argv) {
     bool sizeSet = false;
     int statsEvery = 0;  // --stats-every: seconds between memory lines (M4 item 4)
     std::string title = "Lunduke Terminal";  // -T/--title (x-terminal-emulator interface)
+    std::string optArg;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         if (a == "--no-effects") opts.effects = 0;
@@ -211,11 +253,15 @@ int main(int argc, char** argv) {
         else if (a == "--quit-after" && i + 1 < argc) quitAfter = std::atoi(argv[++i]);
         else if (a == "--stats") opts.stats = true;
         else if (a == "--stats-every" && i + 1 < argc) statsEvery = std::atoi(argv[++i]);
-        else if ((a == "-T" || a == "--title") && i + 1 < argc) title = argv[++i];
         else if (a == "--scrollback" && i + 1 < argc) opts.scrollbackLines = std::strtoll(argv[++i], nullptr, 10);
         else if (a == "--login") opts.loginShell = true;
-        else if (a == "--cwd" && i + 1 < argc) opts.cwd = argv[++i];
-        else if (a == "--on-exit" && i + 1 < argc) opts.onExit = argv[++i];
+        else if (int taken = takeDir(a, i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.cwd = optArg;
+        } else if (int taken = takeTitle(a, i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            title = optArg;
+        } else if (a == "--on-exit" && i + 1 < argc) opts.onExit = argv[++i];
         else if (a == "--hold") opts.onExit = "hold";
         else if (a == "--bell" && i + 1 < argc) parseBell(opts, argv[++i]);
         else if (a == "--cursor-shape" && i + 1 < argc) opts.cursorShape = argv[++i];
@@ -230,7 +276,7 @@ int main(int argc, char** argv) {
         else if (a == "--list-profiles") {
             std::fputs(lterm::profileListText().c_str(), stdout);
             return 0;
-        } else if (a == "-e") {
+        } else if (a == "-e" || a == "-x" || a == "--execute") {
             for (++i; i < argc; ++i) opts.command.push_back(argv[i]);
         } else {
             std::fprintf(stderr, "lunduke-terminal: unknown option %s\nTry 'lunduke-terminal --help'.\n",

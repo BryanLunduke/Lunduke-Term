@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# XFCE preferred applications (exo-open / xfce4-settings).
+# helpers.rc selects this file by name: TerminalEmulator=lunduke-terminal
+# %s for a terminal helper is a command line (exo-open --launch TerminalEmulator CMD),
+# not a directory. "Open Terminal Here" is exo-open --working-directory DIR --launch
+# TerminalEmulator, which chdirs and then runs X-XFCE-Commands with no parameter.
+[Desktop Entry]
+Version=1.0
+Type=X-XFCE-Helper
+Name=Lunduke Terminal
+Icon=org.lunduke.LundukeTerminal
+StartupNotify=true
+X-XFCE-Binaries=lunduke-terminal;
+X-XFCE-Category=TerminalEmulator
+X-XFCE-Commands=%B;
+X-XFCE-CommandsWithParameter=%B -x %s;

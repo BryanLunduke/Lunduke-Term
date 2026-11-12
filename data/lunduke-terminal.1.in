@@ -1,0 +1,101 @@
+.\" SPDX-License-Identifier: GPL-3.0-or-later
+.TH LUNDUKE-TERMINAL 1 "2026-11-12" "Lunduke Terminal @VERSION@" "User Commands"
+.SH NAME
+lunduke-terminal \- retro CRT-style terminal emulator
+.SH SYNOPSIS
+.B lunduke-terminal
+.RI [ OPTION ]...
+.RB [ \-e | \-x
+.IR COMMAND " [" ARG ]...]
+.SH DESCRIPTION
+.B lunduke-terminal
+is a GTK 3 terminal emulator with optional CRT effects.
+It is the default terminal on LCOS 1.1.0.
+The package provides the Debian
+.B x-terminal-emulator
+alternative and an XFCE preferred-application helper, so a panel launcher,
+Thunar's "Open Terminal Here" and
+.B exo-open \-\-launch TerminalEmulator
+can all start it.
+.PP
+.B lunduke-terminal \-\-help
+lists every option and key.
+The options below are the ones
+.B x-terminal-emulator
+callers, Thunar and exo pass.
+.SH OPTIONS
+.TP
+.BR \-e " " \fICOMMAND\fR " [" \fIARG\fR ...]
+Run
+.I COMMAND
+instead of the user's shell.
+Everything after
+.B \-e
+is the command and its arguments.
+Those arguments are passed to
+.BR execvp (3)
+and are not interpreted by a shell.
+This option must be last.
+.TP
+.BR \-x " " \fICOMMAND\fR " [" \fIARG\fR ...]
+.PD 0
+.TP
+.BR \-\-execute " " \fICOMMAND\fR " [" \fIARG\fR ...]
+.PD
+Same as
+.BR \-e .
+XFCE's helper runs
+.B %B \-x %s
+, which is this form.
+.TP
+.BR \-T " " \fITITLE\fR
+.PD 0
+.TP
+.BR \-\-title " " \fITITLE\fR
+.PD 0
+.TP
+.BR \-\-title= \fITITLE\fR
+.PD
+Set the window title.
+.TP
+.BR \-\-cwd " " \fIDIR\fR
+.PD 0
+.TP
+.BR \-\-workdir " " \fIDIR\fR
+.PD 0
+.TP
+.BR \-\-working-directory " " \fIDIR\fR
+.PD
+Working directory of the shell or
+.IR COMMAND .
+.BR \-\-cwd= \fIDIR\fR,
+.BR \-\-workdir= \fIDIR\fR
+and
+.BR \-\-working-directory= \fIDIR\fR
+are accepted as well.
+.TP
+.BR \-h ", " \-\-help
+Show the full help and exit.
+.TP
+.B \-\-version
+Print
+.B lunduke-terminal @VERSION@
+and exit.
+.SH FILES
+.TP
+.I /usr/share/applications/org.lunduke.LundukeTerminal.desktop
+Menu and panel launcher
+.RB ( Categories=System;TerminalEmulator; ).
+.TP
+.I /usr/share/xfce4/helpers/lunduke-terminal.desktop
+XFCE preferred-application helper
+.RB ( "X-XFCE-Category=TerminalEmulator" ).
+Select it with
+.B TerminalEmulator=lunduke-terminal
+in
+.IR ~/.config/xfce4/helpers.rc .
+.TP
+.I $XDG_CONFIG_HOME/lunduke-terminal/settings.ini
+Saved settings. Command-line options override it.
+.SH SEE ALSO
+.BR x-terminal-emulator (1)

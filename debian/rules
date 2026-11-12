@@ -1,15 +1,14 @@
 #!/usr/bin/make -f
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Packaging prep only: not built or uploaded yet (see docs/PACKAGING.md).
+# Binary package for LCOS 1.1.0. See docs/PACKAGING.md and packaging/build-deb.sh.
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
 %:
 	dh $@ --buildsystem=meson
 
-override_dh_auto_configure:
-	dh_auto_configure -- -Dbuildtype=plain
-
-# view_test needs an X display; the GL match test runs on llvmpipe.
+# debhelper's meson buildsystem already passes --buildtype=plain, so Debian's
+# CFLAGS/CXXFLAGS (including hardening) are what the compiler sees. Passing
+# -Dbuildtype=plain as well makes meson 1.3 reject the setup.
 override_dh_auto_test:
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	xvfb-run -a -s "-screen 0 1280x1024x24" dh_auto_test --no-parallel

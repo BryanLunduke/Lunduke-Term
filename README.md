@@ -2,7 +2,7 @@
 
 A retro CRT-style terminal emulator for LCOS (C++17, gtkmm-3.0, libvterm), aiming to match the effects of Cool-Retro-Term without Qt.
 
-Work in progress, not part of LCOS 1.0.
+Version 1.1.0 is the default terminal emulator on LCOS 1.1.0.
 
 License: GPL-3.0-or-later (see `LICENSE`). Bundled libvterm 0.3.3 (`third_party/libvterm`) is MIT, Copyright Paul Evans; see `third_party/README.md`.
 
@@ -63,7 +63,7 @@ from a built-in, edit every option, rename, delete); the amber entry is no longe
 | Profiles and palettes | `src/profiles.*` |
 | Window: tabs, search bar, settings dialog | `src/terminal_window.*` |
 | Scrollback search (wrap-joined, case-folded) | `src/search.*` |
-| Desktop file, metainfo, icon; Debian packaging prep | `data/`, `debian/`, `docs/PACKAGING.md` |
+| Desktop file, XFCE helper, metainfo, icon; Debian package 1.1.0-1 | `data/`, `debian/`, `packaging/build-deb.sh`, `docs/PACKAGING.md` |
 | Font choice and fallback (fontconfig) | `src/font_resolve.*` |
 | Benchmarks | `tools/m1_bench.cpp`, `tools/bench-m1.sh`, `tools/m0_bench.cpp` |
 | Fuzzing (libFuzzer harness, seeds) | `tools/fuzz/`, `docs/FUZZING.md` |
@@ -106,7 +106,7 @@ Options: `--profile ID`, `--effects`/`--no-effects`, `--renderer auto|gl|cpu`, `
 `--effects-quality auto|full|reduced|static`, `--cpu-budget PCT` (software rendering only, percent of one core, default 15, 0 = off), `--frame`/`--no-frame`
 (bezel; amber/green/green-scanlines/vintage/paper-white only, ignored with a warning elsewhere), `--frame-size PX`
 (logical px, default 28), `--frame-color #RRGGBB`, `--frame-shininess 0..1` (reflection and
-highlights), `--rgb-shift X` (CRT `rbgShift`, 0 = off), `-T/--title TEXT`, `-e COMMAND...`, `-h/--help` (all options and keys), `--version`.
+highlights), `--rgb-shift X` (CRT `rbgShift`, 0 = off), `-T/--title TEXT` (also `--title=TEXT`), `--cwd DIR`, `--workdir DIR`, `--working-directory DIR` (also `--opt=DIR`), `-e COMMAND...`, `-x COMMAND...`, `--execute COMMAND...` (`-e`/`-x`/`--execute` must be last; the rest of the line is the command, passed to exec), `-h/--help` (all options and keys), `--version`.
 An unknown option exits with status 2, and so does a bad value for `--renderer`, `--on-exit`, `--cursor-shape`
 or `--effects-quality`; other option values are not checked.
 A press on the bezel neither selects nor is reported to the application; a drag that leaves the

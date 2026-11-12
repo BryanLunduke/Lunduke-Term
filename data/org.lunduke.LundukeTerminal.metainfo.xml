@@ -31,6 +31,11 @@
   </categories>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.1.0" date="2026-11-12">
+      <description>
+        <p>First release of Lunduke Terminal for LCOS 1.1.0.</p>
+      </description>
+    </release>
     <release version="0.0.1" date="2026-10-28">
       <description>
         <p>Development snapshot (M2): effects quality levels, HiDPI, RGB shift, bezel, tabs, search and a settings dialog.</p>

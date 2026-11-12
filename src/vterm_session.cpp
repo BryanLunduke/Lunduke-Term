@@ -22,6 +22,10 @@
 
 extern char** environ;
 
+#ifndef LTERM_VERSION
+#define LTERM_VERSION "unknown"
+#endif
+
 namespace lterm {
 
 std::vector<std::string> childEnvironment(char** base) {
@@ -39,7 +43,7 @@ std::vector<std::string> childEnvironment(char** base) {
     env.push_back("TERM=xterm-256color");
     env.push_back("COLORTERM=truecolor");
     env.push_back("TERM_PROGRAM=lunduke-terminal");
-    env.push_back("TERM_PROGRAM_VERSION=0.1");
+    env.push_back("TERM_PROGRAM_VERSION=" LTERM_VERSION);
     if (!haveLocale) env.push_back("LANG=C.UTF-8");
     return env;
 }
