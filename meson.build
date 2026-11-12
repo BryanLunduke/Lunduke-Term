@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 project('lunduke-terminal', 'cpp',
-  version : '0.0.1',
+  version : '1.1.0',
   license : 'GPL-3.0-or-later',
   meson_version : '>=0.56',
   default_options : ['cpp_std=c++17', 'warning_level=2', 'buildtype=release'])
@@ -12,6 +12,8 @@ pangocairo_dep = dependency('pangocairo')
 if get_option('b_sanitize') != 'none'
   add_project_arguments('-DLTERM_SANITIZED_BUILD=1', language : 'cpp')
 endif
+# --version and TERM_PROGRAM_VERSION. Before any target: meson only allows project arguments there.
+add_project_arguments('-DLTERM_VERSION="@0@"'.format(meson.project_version()), language : 'cpp')
 
 # libvterm: bundled by default (third_party/README.md): the pristine 0.3.3 source plus the patches
 # in third_party/libvterm-patches, applied at build time to a copy in the build directory.
@@ -103,7 +105,6 @@ lterm_exe = executable('lunduke-terminal',
   'src/main.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep],
-  cpp_args : ['-DLTERM_VERSION="@0@"'.format(meson.project_version())],
   install : true)
 
 # Desktop integration (installed by `meson install`; see docs/PACKAGING.md).
@@ -112,12 +113,24 @@ install_data('data/' + app_id + '.desktop', install_dir : get_option('datadir') 
 install_data('data/' + app_id + '.metainfo.xml', install_dir : get_option('datadir') / 'metainfo')
 install_data('data/icons/hicolor/scalable/apps/' + app_id + '.svg',
   install_dir : get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps')
+# XFCE preferred applications looks this name up (helpers.rc: TerminalEmulator=lunduke-terminal).
+xfce_helper = 'data/xfce4/helpers/lunduke-terminal.desktop'
+install_data(xfce_helper, install_dir : get_option('datadir') / 'xfce4' / 'helpers')
+man_ver = configuration_data()
+man_ver.set('VERSION', meson.project_version())
+man_page = configure_file(input : 'data/lunduke-terminal.1.in', output : 'lunduke-terminal.1',
+  configuration : man_ver, install : true, install_dir : get_option('mandir') / 'man1')
+test('man-page', find_program('grep'), args : ['-q', 'Lunduke Terminal ' + meson.project_version(), man_page])
 install_data('README.md', 'docs/FONTS.md', 'docs/PACKAGING.md',
   install_dir : get_option('datadir') / 'doc' / 'lunduke-terminal')
 desktop_validate = find_program('desktop-file-validate', required : false)
 if desktop_validate.found()
   test('desktop-file', desktop_validate, args : [meson.current_source_dir() / 'data' / app_id + '.desktop'])
 endif
+# Type=X-XFCE-Helper is an XFCE extension. desktop-file-validate rejects it (and rejects the
+# helpers XFCE itself ships), so this checks the keys exo looks up instead.
+test('xfce-helper', find_program('sh'), args : [files('tests/xfce_helper_test.sh'),
+  meson.current_source_dir() / xfce_helper])
 appstreamcli = find_program('appstreamcli', required : false)
 if appstreamcli.found()
   test('metainfo', appstreamcli, args : ['validate', '--no-net', '--explain',

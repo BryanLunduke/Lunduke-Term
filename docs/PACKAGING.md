@@ -1,8 +1,9 @@
-# Lunduke Terminal — packaging notes (M2, item 6)
+# Lunduke Terminal — packaging notes
 
-This is **packaging prep only**. Nothing here has been built as a `.deb` and nothing touches
-lcos-live, apt repositories or the ISO. The `debian/` directory is a starting point for whoever
-packages it for LCOS.
+Version **1.1.0** (Debian package **1.1.0-1**) is the first release and the default terminal
+on LCOS 1.1.0, in place of Cool Retro Term. `packaging/build-deb.sh` builds the binary `.deb`
+(`VERSION=1.1.0` in that script; the changelog revision is `-1`). Nothing here is uploaded,
+and this repository does not change lcos-live, apt or the ISO.
 
 ## What `meson install` puts where
 
@@ -11,7 +12,9 @@ packages it for LCOS.
 | Path | From |
 |---|---|
 | `/usr/bin/lunduke-terminal` | `src/main.cpp` and friends |
-| `/usr/share/applications/org.lunduke.LundukeTerminal.desktop` | `data/` |
+| `/usr/share/applications/org.lunduke.LundukeTerminal.desktop` | `data/` (`Categories=System;TerminalEmulator;GTK;`) |
+| `/usr/share/xfce4/helpers/lunduke-terminal.desktop` | `data/xfce4/helpers/` (XFCE preferred terminal) |
+| `/usr/share/man/man1/lunduke-terminal.1` | `data/lunduke-terminal.1.in` (the `.deb` ships it gzipped) |
 | `/usr/share/metainfo/org.lunduke.LundukeTerminal.metainfo.xml` | `data/` (AppStream, CC0-1.0) |
 | `/usr/share/icons/hicolor/scalable/apps/org.lunduke.LundukeTerminal.svg` | `data/icons/` (original M3 icon, CC0-1.0) |
 | `/usr/share/doc/lunduke-terminal/{README.md,FONTS.md,PACKAGING.md}` | repo |
@@ -24,14 +27,54 @@ The benches (`lterm-m0-bench`, `lterm-m1-bench`) and tests are not installed.
 - `appstreamcli validate --pedantic` has one pedantic note: the id contains upper-case letters.
   The id was chosen by the project, so the note stays.
 - Validation runs as meson tests `desktop-file` and `metainfo` when `desktop-file-validate` and
-  `appstreamcli` are on `PATH`. Both are skipped (not failed) when they are missing.
+  `appstreamcli` are on `PATH`. They are skipped (not failed) when the tools are missing.
+  `desktop-file-validate` rejects `Type=X-XFCE-Helper` (it rejects XFCE's own helpers the same
+  way), so `xfce-helper` checks the keys exo reads instead. `man-page` checks that the
+  installed page names this version.
+
+## Default terminal
+
+Wiring for the lcos-live image (this package does not edit that repository):
+
+| Piece | Name |
+|---|---|
+| Binary | `/usr/bin/lunduke-terminal` |
+| Package | `lunduke-terminal` `1.1.0-1`, `Provides: x-terminal-emulator` |
+| Alternative | `x-terminal-emulator` → `/usr/bin/lunduke-terminal`, priority **40** |
+| Man-page slave | link `/usr/share/man/man1/x-terminal-emulator.1.gz`, slave name `x-terminal-emulator.1.gz`, path `/usr/share/man/man1/lunduke-terminal.1.gz` |
+| Menu / panel launcher | `/usr/share/applications/org.lunduke.LundukeTerminal.desktop` |
+| XFCE helper | `/usr/share/xfce4/helpers/lunduke-terminal.desktop` |
+| helpers.rc | `TerminalEmulator=lunduke-terminal` |
+
+`debian/lunduke-terminal.postinst` registers the alternative on `configure`; `prerm` removes it
+on `remove` or `deconfigure` (the slave goes with the master). Priority 40 is the priority
+gnome-terminal and xfce4-terminal use, above xterm's 20, so this terminal is the automatic
+choice when those are not installed. Debian policy 11.8.3's suggested priority is 20; 40 is
+the desktop-terminal priority, which is what makes it the default.
+
+The helper's `X-XFCE-Category` is `TerminalEmulator`. `X-XFCE-Commands` is `%B;` (just the
+binary). `X-XFCE-CommandsWithParameter` is `%B -x %s;`. For a terminal helper, `%s` is a
+command (`exo-open --launch TerminalEmulator htop`), not a directory. Thunar's "Open Terminal
+Here" action is `exo-open --working-directory %f --launch TerminalEmulator`: exo changes to
+that directory and then runs `X-XFCE-Commands`, so the terminal inherits the directory. A
+caller that execs the binary itself can pass the directory with `--working-directory` or
+`--workdir`.
+
+Flags those callers use, all accepted (`-e` was already there):
+
+| Flag | Meaning |
+|---|---|
+| `-e COMMAND [ARG...]` | rest of the line is the command, passed to `execvp` (must be last) |
+| `-x COMMAND [ARG...]`, `--execute COMMAND [ARG...]` | same as `-e` (the XFCE helper's form) |
+| `-T TITLE`, `--title TITLE`, `--title=TITLE` | window title |
+| `--cwd DIR`, `--workdir DIR`, `--working-directory DIR` | working directory; `=` forms of all three work too |
 
 ## x-terminal-emulator
 
-`debian/lunduke-terminal.postinst` registers `/usr/bin/lunduke-terminal` as an
-`x-terminal-emulator` alternative with priority 20, below xfce4-terminal and gnome-terminal.
-Debian policy 11.8.3 wants `-e command [args]` and `-T title`. Both are supported (`-T` was added
-for this).
+See the table above. Policy 11.8.3 requires `-e command [args]` and `-T title`, a
+`Provides: x-terminal-emulator`, and a working man-page slave. The slave path is the gzipped
+page `dh_compress` writes; `update-alternatives` skips a slave whose file is missing, so the
+page is installed by `meson install` (`data/lunduke-terminal.1.in`).
 
 ## Font dependencies
 
@@ -94,11 +137,19 @@ then the REP fix and the scroll speed-up are missing.
 A `-Dlibvterm=system` build still has the REP crash: a NULL dereference at screen.c:190 when REP
 repeats a wide character at the right margin (patch 0001, test `libvterm-rep`).
 
+## Build
+
+`packaging/build-deb.sh` checks that `VERSION`, `meson.build`, `debian/changelog` (`VERSION-1`)
+and the AppStream `<release>` agree, then runs `dpkg-buildpackage -us -uc -b`. The `.deb`
+lands in the parent directory. The source format stays `3.0 (native)`; a native *source*
+build rejects a Debian revision, so the script builds the binary package only. The package
+version is still `1.1.0-1`.
+
 ## Not done (on purpose)
 
-- No `dpkg-buildpackage` or `sbuild` run, no lintian, no upload, no apt or ISO changes.
-- `debian/source/format` is `3.0 (native)` for now. A real LCOS package will probably want
-  `3.0 (quilt)` with a release tarball.
+- No upload, no apt repository and no ISO / lcos-live change.
+- `debian/source/format` is still `3.0 (native)`. A quilt package with an orig tarball can
+  wait until the archive layout wants one.
 - The icon (M3) is an original drawing: a CRT with an amber `>_` prompt, hand-written SVG paths,
   CC0-1.0, no third-party artwork. Only the scalable SVG is installed; PNG previews at
   16/32/48/128/256 were rendered for review outside the repo and are not shipped.

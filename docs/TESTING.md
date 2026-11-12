@@ -20,7 +20,7 @@ xvfb-run -a -s "-screen 0 1280x1024x24" meson test -C build --print-errorlogs
 | `view` | GTK `TerminalView` lifetime, built with AddressSanitizer; skips without `$DISPLAY` | yes |
 | `review` | M5 code-review fixes: output flood + Ctrl+C, input method (gtk-im-context-simple), hidden-tab memory and painting, cursor blink timeout, confirm close, scrollback maximum/lazy trim, selection compare, `--stats`, default profile; not parallel; skips without `$DISPLAY` | yes |
 | `scrollback-default` | runs `lunduke-terminal`: default scrollback is 5000 lines; a `scrollback-lines` saved in settings.ini (10000, 7000) is used as is and the file is not rewritten; not parallel; skips without `$DISPLAY` | yes |
-| `cli` | runs `lunduke-terminal`: `--help`/`-h` and `--version` print to stdout and exit 0 without a display; an unknown option and a bad `--renderer` exit 2 | no |
+| `cli` | runs `lunduke-terminal`: `--help`/`-h` and `--version` print to stdout and exit 0 without a display; an unknown option and a bad `--renderer` exit 2; `-e`, `-x`/`--execute`, `--working-directory`/`--workdir` and `-T`/`--title` are accepted. The exec checks (the command runs, the directory flags are the child's cwd) run only when `$DISPLAY` is set | no, except the exec checks |
 | `libvterm-pristine` | `third_party/libvterm` is byte-identical to the 0.3.3 tarball (`libvterm-SHA256SUMS`) | no |
 | `libvterm-rep` | patch 0001: REP of a wide glyph at the right margin (raw libvterm, a session, the fuzz reproducer `tests/data/fuzz/crash-46ca723d-libvterm-rep.bin`) | no |
 | `libvterm-t-patched`, `libvterm-t-stock` | upstream's own `t/` suite (`make test`) on the patched and on the stock library | no |

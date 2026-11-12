@@ -1,5 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
+# Removing the master alternative drops its man-page slave as well.
 set -e
 if [ "$1" = "remove" ] || [ "$1" = "deconfigure" ]; then
     update-alternatives --remove x-terminal-emulator /usr/bin/lunduke-terminal

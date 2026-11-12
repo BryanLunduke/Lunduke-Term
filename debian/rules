@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Packaging prep only: not built or uploaded yet (see docs/PACKAGING.md).
+# Binary package for LCOS 1.1.0. See docs/PACKAGING.md and packaging/build-deb.sh.
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
 %:

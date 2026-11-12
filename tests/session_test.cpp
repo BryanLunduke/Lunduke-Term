@@ -18,6 +18,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#ifndef LTERM_VERSION
+#define LTERM_VERSION "unknown"
+#endif
+
 using namespace lterm;
 
 static int failures = 0;
@@ -473,6 +477,8 @@ static void testEnvironment() {
     };
     CHECK(has("TERM=xterm-256color"));
     CHECK(has("COLORTERM=truecolor"));
+    CHECK(has("TERM_PROGRAM=lunduke-terminal"));
+    CHECK(has("TERM_PROGRAM_VERSION=" LTERM_VERSION));
     CHECK(has("LANG=C.UTF-8"));
     CHECK(has("PATH=/bin"));
     CHECK(!has("TERM=dumb") && !has("COLUMNS=10") && !has("LINES=3"));
