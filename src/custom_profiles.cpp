@@ -256,6 +256,9 @@ std::string profileToIni(const Profile& p) {
     for (const auto& f : p.fonts) fonts += (fonts.empty() ? "" : ";") + f.family + (f.px > 0 ? ":" + std::to_string(f.px) : "");
     setS(kGP, "fonts", fonts);
     g_key_file_set_integer(kf, kGP, "font-px", p.fontPx);
+    g_key_file_set_integer(kf, kGP, "term-cols", p.termCols);
+    g_key_file_set_integer(kf, kGP, "term-rows", p.termRows);
+    g_key_file_set_boolean(kf, kGP, "crt-aspect", p.crtAspect);
     setF(kGP, "margin-fraction", p.marginFrac);
     g_key_file_set_integer(kf, kGP, "margin-min-px", p.marginMinPx);
     g_key_file_set_boolean(kf, kGP, "bezel-option", p.bezelOption);
@@ -342,6 +345,9 @@ bool profileFromIni(const std::string& data, const std::string& name, Profile& o
         }
     }
     r.integer(kGP, "font-px", p.fontPx, 4, 96);
+    r.integer(kGP, "term-cols", p.termCols, 1, 500);
+    r.integer(kGP, "term-rows", p.termRows, 1, 500);
+    r.boolean(kGP, "crt-aspect", p.crtAspect);
     r.number(kGP, "margin-fraction", p.marginFrac, 0, 0.3f);
     r.integer(kGP, "margin-min-px", p.marginMinPx, 0, 200);
     r.boolean(kGP, "bezel-option", p.bezelOption);

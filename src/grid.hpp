@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// A renderer-neutral character grid: filled from libvterm (or a synthetic test frame) and
+// A renderer-neutral character grid: filled from the VT engine (or a synthetic test frame) and
 // painted with Pango/Cairo by GridPainter.
 #pragma once
 
@@ -16,18 +16,31 @@ struct Color8 {
     bool operator!=(const Color8& o) const { return !(*this == o); }
 };
 
+// SGR underline. Drawn by the painter; None is the only style that is not a line.
+enum class Underline : uint8_t { None = 0, Single, Double, Curly, Dotted, Dashed };
+
 struct Cell {
     std::string text;  // UTF-8, empty = blank
     Color8 fg{208, 208, 208};
     Color8 bg{0, 0, 0};
     bool bold = false;
     bool italic = false;
-    bool underline = false;
+    bool faint = false;           // SGR 2
+    Underline underline = Underline::None;
+    bool underlineColored = false;
+    Color8 underlineColor{};      // SGR 58, when underlineColored
+    bool strikethrough = false;   // SGR 9
+    bool overline = false;        // SGR 53
+    bool blink = false;           // SGR 5; stored, not animated
+    bool conceal = false;        // SGR 8; text is kept for copy, not drawn
     int width = 1;     // 2 for wide characters; the following cell has width 0
     bool selected = false;  // painted with fg/bg swapped
     bool operator==(const Cell& o) const {
-        return width == o.width && selected == o.selected && bold == o.bold && italic == o.italic && underline == o.underline &&
-               fg == o.fg && bg == o.bg && text == o.text;
+        return width == o.width && selected == o.selected && bold == o.bold && italic == o.italic && faint == o.faint &&
+               underline == o.underline && underlineColored == o.underlineColored && underlineColor == o.underlineColor &&
+               strikethrough == o.strikethrough && overline == o.overline && blink == o.blink && conceal == o.conceal &&
+               fg == o.fg && bg == o.bg &&
+               text == o.text;
     }
     bool operator!=(const Cell& o) const { return !(*this == o); }
 };

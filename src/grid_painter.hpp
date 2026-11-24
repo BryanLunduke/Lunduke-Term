@@ -17,7 +17,9 @@ public:
     // pixelSize is in logical pixels. scale is the GTK scale factor (HiDPI): the cell metrics
     // are measured at pixelSize and multiplied by scale, the glyphs are rasterised at
     // pixelSize * scale, so a scale-2 grid is exactly the scale-1 grid at twice the resolution.
-    GridPainter(const std::string& fontFamily, int pixelSize, int scale = 1);
+    // cellBoxW/H: device-pixel cell to draw into. 0 keeps the font's own cell. A different box
+    // scales the glyph (a 4:3 CRT stretches the raster; a small screen shrinks it).
+    GridPainter(const std::string& fontFamily, int pixelSize, int scale = 1, int cellBoxW = 0, int cellBoxH = 0);
     ~GridPainter();
     GridPainter(const GridPainter&) = delete;
     GridPainter& operator=(const GridPainter&) = delete;
@@ -33,7 +35,8 @@ public:
     void paint(cairo_t* cr, const Grid& g, int originX, int originY, Color8 cursorColor) const;
 
     // M1 renderer: glyphs are rasterised once into A8 masks (key: text, bold, italic,
-    // underline, width) and composited with cairo_mask_surface. Only rows with rows[r] != 0 are
+    // width). Underlines, strike and overline are stroked afterwards so SGR 58 can color
+    // them. Only rows with rows[r] != 0 are
     // repainted (rows == nullptr: all). Each painted row band is first cleared to `clear`
     // across the whole surface width so margins stay clean.
     void paintRows(cairo_t* cr, const Grid& g, int originX, int originY, Color8 cursorColor, Color8 clear,
@@ -45,7 +48,7 @@ public:
 private:
     struct GlyphKey {
         std::string text;
-        uint8_t flags;  // 1 bold, 2 italic, 4 underline
+        uint8_t flags;  // 1 bold, 2 italic
         uint8_t width;
         bool operator==(const GlyphKey& o) const { return flags == o.flags && width == o.width && text == o.text; }
     };
@@ -64,6 +67,7 @@ private:
     PangoFontDescription* bold_ = nullptr;
     PangoContext* ctx_ = nullptr;
     int cellW_ = 8, cellH_ = 16, ascent_ = 12;
+    int natW_ = 8, natH_ = 16;  // the font's cell, before a CRT or fit-to-screen box
     int scale_ = 1;
 };
 

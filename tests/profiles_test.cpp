@@ -48,14 +48,24 @@ int main() {
         CHECK(p.id.find("colour") == std::string::npos);
     }
     if (const Profile* dos = findProfile("ibm-dos")) {
-        // Slightly less bloom than CRT 1.2.0's 0.2969 / radius 20. Scanlines stay off; the RGB
-        // shift stays CRT's 0.3524 so the DOS color fringes remain.
-        CHECK(dos->fx.bloom > 0.15f && dos->fx.bloom < 0.2969f);
-        CHECK(dos->fx.bloomRadiusHalfRes >= 12 && dos->fx.bloomRadiusHalfRes < 20);
+        // Sharper than CRT 1.2.0 (bloom 0.2969, radius 20, rgb shift 0.3524): a small halo and
+        // a little misconvergence, scanlines off, the DOS curvature and chroma kept.
+        CHECK(dos->fx.bloom > 0.04f && dos->fx.bloom < 0.15f);
+        CHECK(dos->fx.bloomRadiusHalfRes >= 4 && dos->fx.bloomRadiusHalfRes <= 8);
+        CHECK(dos->fx.glowingLine < 0.08f);
         CHECK(dos->fx.rasterization == 0);
-        CHECK(std::fabs(dos->fx.rgbShift - 0.3524f) < 1e-4f);
+        CHECK(dos->fx.screenCurvature > 0.2f);
+        CHECK(dos->fx.chromaColor > 0.9f);
+        CHECK(std::fabs(dos->fx.rgbShift - 0.12f) < 1e-4f);
+        CHECK(dos->fonts.front().px == 16);
         CHECK(dos->id == "ibm-dos");
     }
+    CHECK(findProfile("plain") && !findProfile("plain")->crtAspect);
+    CHECK(findProfile("modern") && !findProfile("modern")->crtAspect);
+    CHECK(findProfile("amber") && findProfile("amber")->crtAspect && findProfile("amber")->termCols == 80 &&
+          findProfile("amber")->termRows == 24);
+    CHECK(findProfile("pixel-40col") && findProfile("pixel-40col")->termCols == 40 &&
+          findProfile("pixel-40col")->termRows == 25 && findProfile("pixel-40col")->crtAspect);
 
     {
         const Profile& plain = all.front();

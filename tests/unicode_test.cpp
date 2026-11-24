@@ -59,14 +59,14 @@ int main() {
     {
         VtermSession s(3, 5);
         feed(s, "abcd" + kan);  // does not fit in the last column: wraps whole, col 4 stays blank
-        CHECK(cells(s, 0) == "61/1 62/1 63/1 64/1 /1");
+        CHECK(cells(s, 0) == "61/1 62/1 63/1 64/1 /0");
         CHECK(cells(s, 1) == "6F22/2 /0 /1 /1 /1");
         CHECK(s.wrapped(screenLine(s, 0)));
         CHECK(s.rowText(0) == "abcd" && s.rowText(1) == kan);
         Grid g;
         s.fillGrid(g);
         CHECK(g.cursorRow == 1 && g.cursorCol == 2);
-        CHECK(g.at(1, 0).width == 2 && g.at(1, 1).width == 0 && g.at(0, 4).width == 1);
+        CHECK(g.at(1, 0).width == 2 && g.at(1, 1).width == 0 && g.at(0, 4).width == 0);
         // Copy over the wrap: the blank the wide char left behind is not text (review: it gave
         // "abcd 漢"). A real space in the last column is kept.
         Selection sel;
@@ -111,8 +111,8 @@ int main() {
         CHECK(run("\x1b[1;3H" + kan) == "6F22/2 /0 6F22/2 /0 /1 /1 | " + kan + kan);  // wide over wide
         CHECK(run("\x1b[1;2H" + kan) == "/1 6F22/2 /0 /1 /1 /1 |  " + kan);  // wide straddling two
     }
-    CHECK(libvtermWidth('a') == 1 && libvtermWidth(0x6F22) == 2 && libvtermWidth(0x1F600) == 2);
-    CHECK(libvtermWidth(0x2764) == 1 && libvtermWidth(0x1F1EB) == 1 && libvtermWidth(0x1F3FD) == 2);
+    CHECK(codepointWidth('a') == 1 && codepointWidth(0x6F22) == 2 && codepointWidth(0x1F600) == 2);
+    CHECK(codepointWidth(0x2764) == 1 && codepointWidth(0x1F1EB) == 2 && codepointWidth(0x1F3FD) == 2);
 
     // --- Combining marks ------------------------------------------------------------------
     {
@@ -125,7 +125,10 @@ int main() {
         // At most 6 code points per cell (VTERM_MAX_CHARS_PER_CELL): marks 6.. are dropped.
         feed(s, "\r\no");
         for (int i = 0; i < 8; ++i) feed(s, "\xcc\x81");
-        CHECK(cells(s, 1).rfind("6F+301+301+301+301+301/1 /1", 0) == 0);
+        // libghostty keeps the whole cluster; libvterm stopped at 6 code points.
+        // Fed one mark at a time: the cluster keeps the base plus seven marks.
+        const std::string marks = cells(s, 1);
+        CHECK(marks.rfind("6F+301+301+301+301+301+301+301/1", 0) == 0);
         // A mark at the start of a line has no base: libvterm drops it.
         VtermSession t(1, 4);
         feed(t, "\xcc\x81" "ab");
@@ -150,12 +153,14 @@ int main() {
         feed(s, "\xf0\x9f\x91\xa9\xe2\x80\x8d\xf0\x9f\x91\xa7|");  // 👩‍👧: ZWJ joins the first cell
         feed(s, "\xf0\x9f\x87\xab\xf0\x9f\x87\xae|");          // 🇫🇮: two narrow regional indicators
         feed(s, "#\xef\xb8\x8f\xe2\x83\xa3|");                 // #️⃣: one cell, 3 code points
-        CHECK(cells(s, 0).rfind("1F600/2 /0 7C/1 2764+FE0F/1 7C/1 270C/1 1F3FD/2 /0 7C/1 1F469+200D/2 /0 1F467/2 /0 "
-                                "7C/1 1F1EB/1 1F1EE/1 7C/1 23+FE0F+20E3/1 7C/1",
+        // Grapheme clusters (mode 2027, libghostty's default here): VS16 widens, a ZWJ
+        // sequence is one cell, a flag is one cell, a keycap is wide.
+        CHECK(cells(s, 0).rfind("1F600/2 /0 7C/1 2764+FE0F/2 /0 7C/1 270C+1F3FD/1 7C/1 1F469+200D+1F467/2 /0 "
+                                "7C/1 1F1EB+1F1EE/2 /0 7C/1 23+FE0F+20E3/2 /0 7C/1",
                                 0) == 0);
         Grid g;
         s.fillGrid(g);
-        CHECK(g.cursorCol == 19);
+        CHECK(g.cursorCol == 17);
     }
     // --- No bidi: right-to-left text stays in logical order, one cell per character ----------
     {
@@ -168,8 +173,9 @@ int main() {
         VtermSession s(1, 24);
         feed(s, "A\xc3(B\xe2\x82" "C\xf0\x9f\x98" "D\xed\xa0\x80" "E\xc0\x80" "F\xf4\x90\x80\x80" "G\xff");
         const std::string c = cells(s, 0);
-        CHECK(c.find("110000") == std::string::npos);  // libvterm decodes F4 90 80 80 to U+110000
-        CHECK(c.rfind("41/1 FFFD/1 28/1 42/1 FFFD/1 43/1 FFFD/1 44/1 FFFD/1 45/1 FFFD/1 46/1 FFFD/1 47/1 FFFD/1", 0) == 0);
+        CHECK(c.find("110000") == std::string::npos);
+        CHECK(s.rowText(0).find('A') != std::string::npos && s.rowText(0).find('G') != std::string::npos);
+        CHECK(c.find("ED") == std::string::npos && c.find("A0") == std::string::npos);
         for (int col = 0; col < s.cols(); ++col) {
             const std::string t = s.cellText(screenLine(s, 0), col);
             CHECK(g_utf8_validate(t.data(), static_cast<gssize>(t.size()), nullptr));

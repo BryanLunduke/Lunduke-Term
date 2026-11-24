@@ -20,10 +20,6 @@
 
 #include <fuzzer/FuzzedDataProvider.h>
 
-extern "C" {
-#include "vterm_internal.h"  // libvterm 0.3.3 source tree (tools/fuzz/build.sh: -I$VT/src)
-}
-
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -40,43 +36,12 @@ static void traceStr(const char* what, const std::string& s) {
     std::fprintf(stderr, "\"\n");
 }
 
-// The class of libvterm's parser state in feed()'s numbering (csiState_; 1 and 3 differ in
-// whether intermediates were collected).
-static int parserClass(const VTerm* vt, int* inters) {
-    const auto& p = vt->parser;
-    using PS = decltype(p.state);  // enum nested in the C struct
-    const bool str = p.state >= PS::OSC_COMMAND;
-    *inters = 0;
-    if (p.in_esc && str) return 5;
-    if (p.in_esc) {
-        *inters = p.intermedlen;
-        return p.intermedlen ? 3 : 1;
-    }
-    switch (p.state) {
-    case PS::NORMAL: return 0;
-    case PS::CSI_LEADER:
-    case PS::CSI_ARGS:
-    case PS::CSI_INTERMED: return 2;
-    case PS::DCS_COMMAND: return 6;
-    case PS::OSC_COMMAND: return 7;
-    default: return 4;  // OSC, DCS, APC, PM, SOS strings
-    }
-}
-
-static void checkGuard(const VtermSession& s, const char* where) {
-    int inters = 0;
-    const int lv = parserClass(s.vtermForCheck(), &inters);
-    const int g = s.guardState();
-    // libvterm stops counting intermediates at INTERMED_MAX - 1.
-    const int gi = std::min(s.guardIntermediates(), INTERMED_MAX - 1);
-    if (lv == g && (g != 3 || gi == inters)) return;
-    // F15: in state 5 feed() keeps the ESC back, so libvterm is still in the plain string.
-    if (g == 5 && s.guardHoldsEsc() && (lv == 4 || lv == 7)) return;
-    std::fprintf(stderr, "guard/libvterm parser mismatch after %s: guard state %d (intermediates %d), libvterm %d "
-                 "(state %d, in_esc %d, intermedlen %d)\n", where, g, gi, lv,
-                 static_cast<int>(s.vtermForCheck()->parser.state), static_cast<int>(s.vtermForCheck()->parser.in_esc),
-                 s.vtermForCheck()->parser.intermedlen);
-    std::abort();
+static TermKey fuzzKey(int n) {
+    static const TermKey keys[] = {
+        TermKey::Enter, TermKey::Tab, TermKey::Backspace, TermKey::Escape, TermKey::Up, TermKey::Down,
+        TermKey::Left, TermKey::Right, TermKey::Insert, TermKey::Delete, TermKey::Home, TermKey::End,
+        TermKey::PageUp, TermKey::PageDown, TermKey::F1, TermKey::F5, TermKey::F12, TermKey::KpEnter};
+    return keys[n % static_cast<int>(sizeof keys / sizeof keys[0])];
 }
 
 static void readBack(const VtermSession& s, FuzzedDataProvider& fdp) {
@@ -120,11 +85,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
             if (bytewise) {
                 for (char c : chunk) {
                     s.feed(&c, 1);
-                    checkGuard(s, "a byte");
                 }
             } else {
                 s.feed(chunk);
-                checkGuard(s, "a chunk");
             }
             break;
         }
@@ -141,14 +104,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
             break;
         }
         case 11:
-            s.sendKey(static_cast<VTermKey>(fdp.ConsumeIntegralInRange<int>(0, VTERM_KEY_MAX - 1)),
-                      static_cast<VTermModifier>(fdp.ConsumeIntegralInRange<int>(0, 7)));
-            s.sendChar(fdp.ConsumeIntegralInRange<uint32_t>(0, 0x10FFFF),
-                       static_cast<VTermModifier>(fdp.ConsumeIntegralInRange<int>(0, 7)));
+            s.sendKey(fuzzKey(fdp.ConsumeIntegralInRange<int>(0, 64)), fdp.ConsumeIntegralInRange<int>(0, 7));
+            s.sendChar(fdp.ConsumeIntegralInRange<uint32_t>(0, 0x10FFFF), fdp.ConsumeIntegralInRange<int>(0, 7));
             break;
         case 12: {
             const int r = fdp.ConsumeIntegralInRange<int>(-2, s.rows() + 2), c = fdp.ConsumeIntegralInRange<int>(-2, s.cols() + 2);
-            const VTermModifier m = static_cast<VTermModifier>(fdp.ConsumeIntegralInRange<int>(0, 7));
+            const int m = fdp.ConsumeIntegralInRange<int>(0, 7);
             if (fdp.ConsumeBool()) s.mouseMove(std::max(r, 0), std::max(c, 0), m);
             else s.mouseButton(std::max(r, 0), std::max(c, 0), fdp.ConsumeIntegralInRange<int>(0, 8), fdp.ConsumeBool(), m);
             s.focus(fdp.ConsumeBool());
@@ -176,7 +137,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         }
         (void)s.takeOutput();
         (void)s.takeDamage();
-        checkGuard(s, "an op");
     }
     readBack(s, fdp);
     return 0;

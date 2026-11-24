@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "terminal_view.hpp"
+#include "terminal_window.hpp"
 
 #include <epoxy/gl.h>
 #include <gdk/gdkkeysyms.h>
@@ -24,34 +25,51 @@ static double processCpuMs() {
 }
 
 namespace {
-VTermModifier modsOf(guint state) {
-    int m = VTERM_MOD_NONE;
-    if (state & GDK_SHIFT_MASK) m |= VTERM_MOD_SHIFT;
-    if (state & GDK_CONTROL_MASK) m |= VTERM_MOD_CTRL;
-    if (state & GDK_MOD1_MASK) m |= VTERM_MOD_ALT;
-    return static_cast<VTermModifier>(m);
+int modsOf(guint state) {
+    int m = ModNone;
+    if (state & GDK_SHIFT_MASK) m |= ModShift;
+    if (state & GDK_CONTROL_MASK) m |= ModCtrl;
+    if (state & GDK_MOD1_MASK) m |= ModAlt;
+    return m;
 }
 
-bool mapKey(guint keyval, VTermKey& out) {
+bool mapKey(guint keyval, TermKey& out) {
     switch (keyval) {
-    case GDK_KEY_Return: case GDK_KEY_KP_Enter: out = VTERM_KEY_ENTER; return true;
-    case GDK_KEY_Tab: case GDK_KEY_ISO_Left_Tab: out = VTERM_KEY_TAB; return true;
-    case GDK_KEY_BackSpace: out = VTERM_KEY_BACKSPACE; return true;
-    case GDK_KEY_Escape: out = VTERM_KEY_ESCAPE; return true;
-    case GDK_KEY_Up: case GDK_KEY_KP_Up: out = VTERM_KEY_UP; return true;
-    case GDK_KEY_Down: case GDK_KEY_KP_Down: out = VTERM_KEY_DOWN; return true;
-    case GDK_KEY_Left: case GDK_KEY_KP_Left: out = VTERM_KEY_LEFT; return true;
-    case GDK_KEY_Right: case GDK_KEY_KP_Right: out = VTERM_KEY_RIGHT; return true;
-    case GDK_KEY_Insert: out = VTERM_KEY_INS; return true;
-    case GDK_KEY_Delete: case GDK_KEY_KP_Delete: out = VTERM_KEY_DEL; return true;
-    case GDK_KEY_Home: case GDK_KEY_KP_Home: out = VTERM_KEY_HOME; return true;
-    case GDK_KEY_End: case GDK_KEY_KP_End: out = VTERM_KEY_END; return true;
-    case GDK_KEY_Page_Up: case GDK_KEY_KP_Page_Up: out = VTERM_KEY_PAGEUP; return true;
-    case GDK_KEY_Page_Down: case GDK_KEY_KP_Page_Down: out = VTERM_KEY_PAGEDOWN; return true;
+    case GDK_KEY_Return: out = TermKey::Enter; return true;
+    case GDK_KEY_KP_Enter: out = TermKey::KpEnter; return true;
+    case GDK_KEY_Tab: case GDK_KEY_ISO_Left_Tab: out = TermKey::Tab; return true;
+    case GDK_KEY_BackSpace: out = TermKey::Backspace; return true;
+    case GDK_KEY_Escape: out = TermKey::Escape; return true;
+    case GDK_KEY_Up: out = TermKey::Up; return true;
+    case GDK_KEY_KP_Up: out = TermKey::Up; return true;
+    case GDK_KEY_Down: case GDK_KEY_KP_Down: out = TermKey::Down; return true;
+    case GDK_KEY_Left: case GDK_KEY_KP_Left: out = TermKey::Left; return true;
+    case GDK_KEY_Right: case GDK_KEY_KP_Right: out = TermKey::Right; return true;
+    case GDK_KEY_Insert: out = TermKey::Insert; return true;
+    case GDK_KEY_Delete: case GDK_KEY_KP_Delete: out = TermKey::Delete; return true;
+    case GDK_KEY_Home: case GDK_KEY_KP_Home: out = TermKey::Home; return true;
+    case GDK_KEY_End: case GDK_KEY_KP_End: out = TermKey::End; return true;
+    case GDK_KEY_Page_Up: case GDK_KEY_KP_Page_Up: out = TermKey::PageUp; return true;
+    case GDK_KEY_Page_Down: case GDK_KEY_KP_Page_Down: out = TermKey::PageDown; return true;
+    case GDK_KEY_KP_0: out = TermKey::Kp0; return true;
+    case GDK_KEY_KP_1: out = TermKey::Kp1; return true;
+    case GDK_KEY_KP_2: out = TermKey::Kp2; return true;
+    case GDK_KEY_KP_3: out = TermKey::Kp3; return true;
+    case GDK_KEY_KP_4: out = TermKey::Kp4; return true;
+    case GDK_KEY_KP_5: out = TermKey::Kp5; return true;
+    case GDK_KEY_KP_6: out = TermKey::Kp6; return true;
+    case GDK_KEY_KP_7: out = TermKey::Kp7; return true;
+    case GDK_KEY_KP_8: out = TermKey::Kp8; return true;
+    case GDK_KEY_KP_9: out = TermKey::Kp9; return true;
+    case GDK_KEY_KP_Multiply: out = TermKey::KpMultiply; return true;
+    case GDK_KEY_KP_Add: out = TermKey::KpAdd; return true;
+    case GDK_KEY_KP_Subtract: out = TermKey::KpSubtract; return true;
+    case GDK_KEY_KP_Decimal: out = TermKey::KpDecimal; return true;
+    case GDK_KEY_KP_Divide: out = TermKey::KpDivide; return true;
     default: break;
     }
     if (keyval >= GDK_KEY_F1 && keyval <= GDK_KEY_F12) {
-        out = static_cast<VTermKey>(VTERM_KEY_FUNCTION(static_cast<int>(keyval - GDK_KEY_F1 + 1)));
+        out = static_cast<TermKey>(static_cast<int>(TermKey::F1) + static_cast<int>(keyval - GDK_KEY_F1));
         return true;
     }
     return false;
@@ -412,7 +430,10 @@ void TerminalView::applyProfile() {
     const int base = opts_.fontPx > 0 ? opts_.fontPx : pick.px;
     const int px = zoomedFontPx(base, zoomPx_);
     fontPxInUse_ = px;
-    painter_.reset(new GridPainter(pick.family, px, scale_));  // px stays logical
+    // The same cell box defaultWindowSize used, so a 4:3 window (or a tight one) holds the
+    // profile's grid. px stays logical; the box is in device pixels at this scale.
+    const LaunchGrid launch = launchGrid(profile_, pick.family, px, effectsOn_, scale_);
+    painter_.reset(new GridPainter(pick.family, px, scale_, launch.cellW, launch.cellH));
     applyColors();
     cpu_.reset();
     glParamsStale_ = true;
@@ -424,6 +445,10 @@ void TerminalView::applyColors() {
     const bool fxPal = effectsOn_ && profile_.hasEffectsPalette;
     session_->setColors(profile_.fg, profile_.bg, fxPal ? profile_.effectsPalette : profile_.palette,
                         fxPal ? profile_.effectsMinFgGrey : profile_.minFgGrey);
+    session_->setDefaultCursor(opts_.cursorShape == "underline" ? CursorShape::Underline
+                                : opts_.cursorShape == "bar"    ? CursorShape::Bar
+                                                                 : CursorShape::Block,
+                               opts_.cursorBlink);
 }
 
 void TerminalView::setProfile(const std::string& id) {
@@ -432,8 +457,8 @@ void TerminalView::setProfile(const std::string& id) {
     profile_ = *p;
     applyTubeOverrides(profile_, opts_.tube);
     zoomPx_ = 0;  // perf step 1: a new profile starts at its own size
-    applyProfile();
     if (opts_.effects < 0) effectsOn_ = profile_.effects;
+    applyProfile();
     applyColors();
     chooseMode();
     if (w_ > 0) layoutGrid();  // the bezel (if any) takes room
@@ -743,7 +768,7 @@ bool TerminalView::updateContent() {
             }
         }
     }
-    // DECSCNM: libvterm already reverses every cell (attrs.reverse ^ global reverse), so only the
+    // DECSCNM: the session already reverses every cell (cell inverse XOR the mode), so only the
     // margins need it here. The visual bell inverts the cells and the margins.
     if (bellFlash_)
         for (Cell& cell : next_.cells) std::swap(cell.fg, cell.bg);
@@ -754,9 +779,9 @@ bool TerminalView::updateContent() {
     }
     const Color8 clearColor = inverse ? profile_.fg : profile_.bg;
     const int shape = session_->cursorShape();
-    if (shape == VTERM_PROP_CURSORSHAPE_UNDERLINE) next_.cursorShape = Grid::CursorShape::Underline;
-    else if (shape == VTERM_PROP_CURSORSHAPE_BAR_LEFT) next_.cursorShape = Grid::CursorShape::Bar;
-    else if (shape == VTERM_PROP_CURSORSHAPE_BLOCK) next_.cursorShape = Grid::CursorShape::Block;
+    if (shape == static_cast<int>(CursorShape::Underline)) next_.cursorShape = Grid::CursorShape::Underline;
+    else if (shape == static_cast<int>(CursorShape::Bar)) next_.cursorShape = Grid::CursorShape::Bar;
+    else if (shape == static_cast<int>(CursorShape::Block)) next_.cursorShape = Grid::CursorShape::Block;
     else
         next_.cursorShape = opts_.cursorShape == "underline" ? Grid::CursorShape::Underline
                             : opts_.cursorShape == "bar"     ? Grid::CursorShape::Bar
@@ -1238,7 +1263,7 @@ bool TerminalView::cellAt(double x, double y, int& row, int& col) const {
 }
 
 bool TerminalView::mouseReporting(guint state) const {
-    return session_->mouseMode() != VTERM_PROP_MOUSE_NONE && !(state & GDK_SHIFT_MASK) && !holding_ && !exited_;
+    return session_->mouseMode() != static_cast<int>(MouseMode::None) && !(state & GDK_SHIFT_MASK) && !holding_ && !exited_;
 }
 
 bool TerminalView::onButtonPress(GdkEventButton* ev) {
@@ -1252,7 +1277,7 @@ bool TerminalView::onButtonPress(GdkEventButton* ev) {
         if (ev->button == 3 && ev->type == GDK_BUTTON_PRESS) showContextMenu(ev);
         return true;
     }
-    const VTermModifier mod = modsOf(ev->state);
+    const int mod = modsOf(ev->state);
     if (mouseReporting(ev->state)) {
         if (ev->type != GDK_BUTTON_PRESS) return true;  // GTK's extra 2/3-click events
         if (ev->button >= 1 && ev->button <= 3) {
@@ -1318,7 +1343,8 @@ bool TerminalView::onMotion(GdkEventMotion* ev) {
     int row, col;
     cellAt(ev->x, ev->y, row, col);
     if (pressedButtons_ || mouseReporting(ev->state)) {
-        // libvterm only emits for ?1002 (with a button held) / ?1003 and only on cell changes.
+        // The encoder emits motion for ?1002 only while a button is held, and for ?1003 always,
+        // and only when the cell changes.
         session_->mouseMove(row, col, modsOf(ev->state));
         ensureWriteWatch();
         return true;
@@ -1356,7 +1382,7 @@ bool TerminalView::onScroll(GdkEventScroll* ev) {
     if (session_->altScreen() && !exited_) {
         // Alternate scroll: full-screen programs without mouse mode (less, man) get arrow keys.
         for (int i = 0; i < 3 * std::abs(steps); ++i)
-            session_->sendKey(steps > 0 ? VTERM_KEY_UP : VTERM_KEY_DOWN, VTERM_MOD_NONE);
+            session_->sendKey(steps > 0 ? TermKey::Up : TermKey::Down, ModNone);
         ensureWriteWatch();
         return true;
     }
@@ -1434,8 +1460,8 @@ bool TerminalView::onKey(GdkEventKey* ev) {
         // (dead acute, Ctrl+C, q sent "^C" then "´q"); drop it before the chord goes out.
         gtk_im_context_reset(im_);
     }
-    const VTermModifier mod = modsOf(ev->state);
-    VTermKey key;
+    const int mod = modsOf(ev->state);
+    TermKey key;
     if (mapKey(ev->keyval, key)) {
         session_->sendKey(key, mod);
         sendKeyInput();
@@ -1444,7 +1470,7 @@ bool TerminalView::onKey(GdkEventKey* ev) {
     const guint32 uc = gdk_keyval_to_unicode(ev->keyval);
     if (uc) {
         // Shift is already reflected in the character itself.
-        session_->sendChar(uc, static_cast<VTermModifier>(mod & ~VTERM_MOD_SHIFT));
+        session_->sendChar(uc, mod & ~ModShift);
         sendKeyInput();
         return true;
     }
@@ -1454,7 +1480,7 @@ bool TerminalView::onKey(GdkEventKey* ev) {
 void TerminalView::onImCommit(const char* text) {
     if (holding_ || exited_ || !text || !*text || !g_utf8_validate(text, -1, nullptr)) return;
     ++imCommits_;
-    for (const char* p = text; *p; p = g_utf8_next_char(p)) session_->sendChar(g_utf8_get_char(p), VTERM_MOD_NONE);
+    for (const char* p = text; *p; p = g_utf8_next_char(p)) session_->sendChar(g_utf8_get_char(p), ModNone);
     sendKeyInput();
 }
 

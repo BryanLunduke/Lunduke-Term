@@ -440,7 +440,7 @@ static void testSearchView() {
     CHECK(searchSync(v, "row 1", false) >= 100);  // row 1, row 10.., row 100..
     // Output while the search is open re-runs it (debounced).
     CHECK(v.setSearch("zebra", false) == 0);
-    for (char ch : std::string("zebra\r")) v.session().sendChar(static_cast<unsigned char>(ch), VTERM_MOD_NONE);
+    for (char ch : std::string("zebra\r")) v.session().sendChar(static_cast<unsigned char>(ch), ModNone);
     v.session().flushWrites();
     for (int i = 0; i < 100 && v.searchCount() == 0; ++i) pump(20);
     CHECK(v.searchCount() >= 1);
@@ -450,7 +450,7 @@ static void testSearchView() {
     for (const Cell& c : v.shownGrid().cells) CHECK(c.bg != (Color8{0xf5, 0x79, 0x00}) && c.bg != (Color8{0xc4, 0xa0, 0x00}));
     // A pending debounced refresh when the view goes away (ASan).
     v.setSearch("zebra", false);
-    for (char ch : std::string("zebra\r")) v.session().sendChar(static_cast<unsigned char>(ch), VTERM_MOD_NONE);
+    for (char ch : std::string("zebra\r")) v.session().sendChar(static_cast<unsigned char>(ch), ModNone);
     v.session().flushWrites();
     pump(60);
     w.dropView();

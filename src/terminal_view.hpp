@@ -41,7 +41,9 @@ struct ViewOptions {
     bool loginShell = false;
     std::string cwd;
     std::string onExit = "hold-on-error";  // close | hold | hold-on-error
-    bool bellVisual = true, bellUrgent = true, bellAudible = false;
+    // Screen flash and beep are off unless settings or --bell ask for them. urgent is the
+    // window-manager hint only (no flash while the window is focused).
+    bool bellVisual = false, bellUrgent = true, bellAudible = false;
     std::string cursorShape = "block";  // block | underline | bar (DECSCUSR overrides)
     bool cursorBlink = false;           // DECSCUSR / ?12 override
     // Review item 5: blinking stops (cursor solid) this long after the last key, output or
@@ -78,7 +80,7 @@ struct ViewMemory {
     size_t statSamples = 0;   // ViewStats vectors (doubles)
 };
 
-// The terminal widget. Pipeline: libvterm -> Grid -> glyph-cached Pango/Cairo source image
+// The terminal widget. Pipeline: libghostty-vt -> Grid -> glyph-cached Pango/Cairo source image
 // (changed rows only) -> either a plain blit (DrawingArea), the GLSL effects on a GtkGLArea
 // (main path), or the multithreaded C++ effects (fallback, same output).
 class TerminalView : public Gtk::Box {

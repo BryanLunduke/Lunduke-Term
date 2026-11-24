@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Binary package for LCOS 1.1.0. See docs/PACKAGING.md and packaging/build-deb.sh.
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+# This image's /usr/bin/c++ is clang, which is not linked to libstdc++.
+# g++ is the compiler the package is built and tested with.
+export CC = gcc
+export CXX = g++
 
 %:
 	dh $@ --buildsystem=meson

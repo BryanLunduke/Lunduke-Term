@@ -27,9 +27,17 @@ bool saveSettings(const ViewOptions& o, const std::string& path, std::string* er
 // just deleted), sets it to the default (amber), keeping every other key. True if it changed.
 bool resetDeletedDefaultProfile(const std::string& path, const std::string& deletedId, std::string* error = nullptr);
 
-// Logical size of a new window: kDefaultCols x kDefaultRows cells of the font this launch will
-// use, plus that profile's margins and (when the bezel is on) its frame. Used when nothing else
-// has a size: no --size, and no geometry a window manager restored over the default.
+// A new window: the profile's grid (80x24, or 40x25 for pixel-40col) in a 4:3 CRT for retro
+// profiles, or a tight window for plain and modern. Shrunk so it fits the monitor work area.
+// cellW/H are the device pixels the painter must use so that grid really fits. scale 1 is the
+// logical size passed to set_default_size.
+struct LaunchGrid {
+    int cols = kDefaultCols, rows = kDefaultRows;
+    int cellW = 1, cellH = 1;
+    int scale = 1;
+    WindowSize window;
+};
+LaunchGrid launchGrid(const Profile& profile, const std::string& family, int fontPx, bool effectsOn, int scale);
 WindowSize defaultWindowSize(const ViewOptions& opts);
 
 class SettingsDialog;

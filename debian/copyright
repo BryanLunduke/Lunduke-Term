@@ -13,24 +13,16 @@ License: CC0-1.0
  On Debian systems, the complete text of the CC0 1.0 Universal licence can be
  found in "/usr/share/common-licenses/CC0-1.0".
 
-Files: third_party/libvterm/*
-Copyright: 2008 Paul Evans <leonerd@leonerd.org.uk>
-License: MIT
-
-Files: third_party/libvterm/src/unicode.c
-Copyright: 2008 Paul Evans <leonerd@leonerd.org.uk>
-           2007 Markus Kuhn (wcwidth tables)
-License: MIT and Kuhn-permissive
-
-Files: third_party/libvterm-patches/*
+Files: third_party/ghostty-vt.pins
+       tools/build-libghostty-vt.sh
 Copyright: 2026 The Lunduke Journal
-License: MIT
-Comment: Patches to libvterm, under libvterm's licence.
-
-License: Kuhn-permissive
- Permission to use, copy, modify, and distribute this software
- for any purpose and without fee is hereby granted. The author
- disclaims all warranties with regard to this software.
+License: GPL-3+
+Comment: The binary statically links libghostty-vt 1.0.1 (MIT, stable C ABI).
+ Copyright 2024 Mitchell Hashimoto and the Ghostty contributors.
+ That source is fetched at build time from the URLs and SHA256 pins in
+ third_party/ghostty-vt.pins. It is not shipped as files in this source
+ package. Zig 0.17.1, used only to compile the library, is fetched the
+ same way and is not linked into the package.
 
 License: MIT
  Permission is hereby granted, free of charge, to any person obtaining a

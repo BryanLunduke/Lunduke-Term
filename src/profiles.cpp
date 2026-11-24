@@ -112,6 +112,7 @@ std::vector<Profile> makeProfiles() {
         p.cursor = p.fg;
         setFonts(p, {{"DejaVu Sans Mono", 0}}, {{"Monospace", 0}});
         p.fontPx = 16;
+        p.crtAspect = false;  // a normal terminal window, not a 4:3 tube
         p.marginFrac = 0.0f;
         p.marginMinPx = 4;
         // Effects stay off unless asked for; toggling them on (Ctrl+Shift+E / --effects) uses the
@@ -138,8 +139,8 @@ std::vector<Profile> makeProfiles() {
     // 16 px is the desktop size: xfce4-terminal's default "Monospace 12" is 12 pt, which at 96 dpi
     // is 16 px, and DejaVu Sans Mono at 16 px absolute (what GridPainter asks Pango for) is the
     // same 10x19 cell. LCOS 1.0 has no Terminus, so this is the font the default profile actually
-    // paints. The first-launch window is then 80x24 of these cells plus the margins below
-    // (windowSizeForGrid), close to xfce4-terminal's own 80x24 client window.
+    // paints. A new window is a 4:3 CRT around an 80x24 grid of these cells: the raster is
+    // stretched to fill the glass, the way a real tube shows 80x24.
     amber.fontPx = 16;
     amber.marginFrac = 0.04f;
     amber.marginMinPx = 12;
@@ -176,30 +177,29 @@ std::vector<Profile> makeProfiles() {
         p.fx.fontColor = hex(0xffffff);
         p.fx.chromaColor = 1.0f;
         p.fx.ambientLight = 0.151f;
-        // CRT 1.2.0 "IBM Dos" bloom is 0.2969 with the shared radius of 20 (a ~40 px halo at
-        // full resolution). That reads as a blur over DOS text. Eased slightly: a bit less glow
-        // and a tighter kernel. Scanlines stay off (rasterization 0, from amber). The RGB shift
-        // below is still CRT's value, so the misconverged color stays.
-        p.fx.bloom = 0.25f;
-        p.fx.bloomRadiusHalfRes = 16;
+        // CRT 1.2.0 "IBM Dos" bloom is 0.2969 with radius 20, and its RGB shift is 0.3524.
+        // On a laptop that reads as a blur over the text. The tube stays (curvature, chroma,
+        // a little noise and burn-in, scanlines off) but the halo, the sweep and the
+        // misconvergence are pulled down so the glyphs stay readable.
+        p.fx.bloom = 0.08f;
+        p.fx.bloomRadiusHalfRes = 6;
         p.fx.burnIn = 0.0469f;
-        p.fx.flickering = 0.0955f;
-        p.fx.glowingLine = 0.1545f;
+        p.fx.flickering = 0.05f;
+        p.fx.glowingLine = 0.04f;
         p.fx.horizontalSync = 0.0f;
-        p.fx.jitter = 0.1545f;
+        p.fx.jitter = 0.06f;
         p.fx.screenCurvature = 0.4f;
-        p.fx.staticNoise = 0.0503f;
-        p.fx.rgbShift = 0.3524f;  // CRT 1.2.0 "IBM Dos" rbgShift
+        p.fx.staticNoise = 0.025f;
+        p.fx.rgbShift = 0.12f;
         p.bezelOption = false;
         p.palette = legibleColourPalette(kCga);
         p.fg = Color8{0xaa, 0xaa, 0xaa};
         p.cursor = p.fg;
         p.minFgGrey = 0.30f;
         // fonts-pc names it "Px IBM VGA8"; the int10h originals ("Px437"/"PxPlus") work if the
-        // user installed them. 32 px = exactly 2x the 8x16 VGA glyphs (crisp). The window is
-        // sized to 80x24 of whatever face resolves, so the VGA font gets a larger window and the
-        // DejaVu fallback stays at the profile's 16 px.
-        setFonts(p, {{"Px IBM VGA8", 32}, {"Px437 IBM VGA8", 32}, {"PxPlus IBM VGA8", 32}}, kTerminus);
+        // user installed them. 16 px is 1x the 8x16 VGA glyphs (the sharp size). 32 px made
+        // the 80x24 grid larger than a laptop screen, so the rest of the text was off it.
+        setFonts(p, {{"Px IBM VGA8", 16}, {"Px437 IBM VGA8", 16}, {"PxPlus IBM VGA8", 16}}, kTerminus);
         v.push_back(p);
     }
     {
@@ -358,7 +358,9 @@ std::vector<Profile> makeProfiles() {
         p.fx.rasterization = 1;
         p.fx.screenCurvature = 0.25f;
         p.fx.frameColor = hex(0xc8bca0);  // beige case
-        setFonts(p, {{"C-64", 32}}, kTerminus);  // 8x8 design grid on a 1 em advance: 32 px = 4x, 40 columns at 1280 px
+        setFonts(p, {{"C-64", 32}}, kTerminus);  // 8x8 design grid on a 1 em advance: 32 px = 4x
+        p.termCols = 40;
+        p.termRows = 25;  // a 40-column home-computer text mode
         v.push_back(p);
     }
     {
@@ -373,6 +375,7 @@ std::vector<Profile> makeProfiles() {
         p.fx.jitter = 0.05f;
         // Hermit is an outline font (any size); ProggyTiny is a 16 px pixel font.
         setFonts(p, {{"Hermit", 20}, {"ProggyTinyTT", 32}}, kTerminus);
+        p.crtAspect = false;  // a daily-driver window: tight 80x24, not a 4:3 tube
         v.push_back(p);
     }
     return v;

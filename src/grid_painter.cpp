@@ -7,7 +7,8 @@
 
 namespace lterm {
 
-GridPainter::GridPainter(const std::string& family, int pixelSize, int scale) : scale_(std::max(1, scale)) {
+GridPainter::GridPainter(const std::string& family, int pixelSize, int scale, int cellBoxW, int cellBoxH)
+    : scale_(std::max(1, scale)) {
     font_ = pango_font_description_new();
     pango_font_description_set_family(font_, family.c_str());
     pango_font_description_set_absolute_size(font_, pixelSize * PANGO_SCALE);
@@ -34,11 +35,15 @@ GridPainter::GridPainter(const std::string& family, int pixelSize, int scale) : 
     cellW_ *= scale_;
     cellH_ *= scale_;
     ascent_ *= scale_;
+    natW_ = cellW_;
+    natH_ = cellH_;
+    if (cellBoxW > 0) cellW_ = cellBoxW;
+    if (cellBoxH > 0) cellH_ = cellBoxH;
     if (scale_ > 1) {  // rasterise at device resolution
         pango_font_description_set_absolute_size(font_, double(pixelSize) * scale_ * PANGO_SCALE);
         pango_font_description_set_absolute_size(bold_, double(pixelSize) * scale_ * PANGO_SCALE);
     }
-    padX_ = std::max(1, cellW_ / 2);
+    padX_ = std::max(1, natW_ / 2);
     glyphLayout_ = pango_layout_new(ctx_);
 }
 
@@ -69,6 +74,89 @@ static void setColor(cairo_t* cr, Color8 c) {
     cairo_set_source_rgb(cr, c.r / 255.0, c.g / 255.0, c.b / 255.0);
 }
 
+static Color8 dimmed(Color8 c) {
+    return Color8{static_cast<uint8_t>(c.r * 3 / 5), static_cast<uint8_t>(c.g * 3 / 5), static_cast<uint8_t>(c.b * 3 / 5)};
+}
+
+// The cached mask is the font's own cell. A CRT box or a screen-fit box scales it into the
+// cell the layout uses. An unstretched cell takes the integer blit, so the pixels do not move.
+static void paintMask(cairo_t* cr, cairo_surface_t* m, bool colour, int destX, int destY, int cellW, int cellH,
+                      int natW, int natH, int padX) {
+    if (cellW == natW && cellH == natH) {
+        if (colour) {
+            cairo_set_source_surface(cr, m, destX - padX, destY);
+            cairo_paint(cr);
+        } else {
+            cairo_mask_surface(cr, m, destX - padX, destY);
+        }
+        return;
+    }
+    const double sx = static_cast<double>(cellW) / std::max(1, natW);
+    const double sy = static_cast<double>(cellH) / std::max(1, natH);
+    cairo_save(cr);
+    cairo_translate(cr, destX - padX * sx, destY);
+    cairo_scale(cr, sx, sy);
+    if (colour) {
+        cairo_set_source_surface(cr, m, 0, 0);
+        cairo_pattern_set_filter(cairo_get_source(cr), CAIRO_FILTER_GOOD);
+        cairo_paint(cr);
+    } else {
+        cairo_mask_surface(cr, m, 0, 0);
+    }
+    cairo_restore(cr);
+}
+
+// Lines the glyph mask does not carry: faint is a tint, the rest are stroked so a colored
+// underline (SGR 58) can differ from the text.
+static void drawDecorations(cairo_t* cr, const Cell& cell, int x, int y, int w, int h, int scale, Color8 textColor) {
+    const bool ul = cell.underline != Underline::None;
+    if (!ul && !cell.strikethrough && !cell.overline) return;
+    const int t = std::max(scale, std::max(1, h / 14));
+    auto bar = [&](int yy, int hh, Color8 c) {
+        setColor(cr, c);
+        cairo_rectangle(cr, x, yy, w, std::max(1, hh));
+        cairo_fill(cr);
+    };
+    if (cell.overline) bar(y, t, textColor);
+    if (cell.strikethrough) bar(y + h / 2 - t / 2, t, textColor);
+    if (!ul) return;
+    const Color8 c = cell.underlineColored ? cell.underlineColor : textColor;
+    const int base = y + h - 2 * t;
+    if (cell.underline == Underline::Double) {
+        bar(base - t - std::max(1, t / 2), t, c);
+        bar(base, t, c);
+        return;
+    }
+    if (cell.underline == Underline::Curly) {
+        setColor(cr, c);
+        cairo_set_line_width(cr, std::max(1.0, t * 0.8));
+        cairo_new_path(cr);
+        const int amp = std::max(1, t);
+        const int period = std::max(4 * scale, 4);
+        cairo_move_to(cr, x, base + amp);
+        for (int i = 0; i <= w; i += std::max(1, period / 4)) {
+            const double phase = (i % period) / static_cast<double>(period);
+            const double yy = base + amp * (phase < 0.5 ? 1.0 - 4 * phase : 4 * phase - 3.0);
+            cairo_line_to(cr, x + i, yy);
+        }
+        cairo_stroke(cr);
+        return;
+    }
+    if (cell.underline == Underline::Dotted || cell.underline == Underline::Dashed) {
+        setColor(cr, c);
+        cairo_set_line_width(cr, t);
+        const double dash[2] = {cell.underline == Underline::Dotted ? static_cast<double>(t) : static_cast<double>(3 * t),
+                                static_cast<double>(2 * t)};
+        cairo_set_dash(cr, dash, 2, 0);
+        cairo_move_to(cr, x, base + t / 2.0);
+        cairo_line_to(cr, x + w, base + t / 2.0);
+        cairo_stroke(cr);
+        cairo_set_dash(cr, nullptr, 0, 0);
+        return;
+    }
+    bar(base, t, c);
+}
+
 void GridPainter::paint(cairo_t* cr, const Grid& g, int ox, int oy, Color8 cursorColor) const {
     PangoLayout* layout = pango_layout_new(ctx_);
     for (int r = 0; r < g.rows; ++r) {
@@ -95,46 +183,56 @@ void GridPainter::paint(cairo_t* cr, const Grid& g, int ox, int oy, Color8 curso
                 cairo_rectangle(cr, ox + c * cellW_, y, cellW_ * (cell.width == 2 ? 2 : 1), cellH_);
                 cairo_fill(cr);
             }
-            if (cell.width == 0 || cell.text.empty() || cell.text == " ") continue;
-            pango_layout_set_font_description(layout, cell.bold ? bold_ : font_);
-            PangoAttrList* attrs = nullptr;
-            if (cell.underline || cell.italic) {
-                attrs = pango_attr_list_new();
-                if (cell.underline) pango_attr_list_insert(attrs, pango_attr_underline_new(PANGO_UNDERLINE_SINGLE));
-                if (cell.italic) pango_attr_list_insert(attrs, pango_attr_style_new(PANGO_STYLE_ITALIC));
+            const Color8 tint = cell.faint ? dimmed(isCursor ? cell.bg : cell.fg) : (isCursor ? cell.bg : cell.fg);
+            const int gw = cellW_ * (cell.width == 2 ? 2 : 1);
+            if (!(cell.conceal || cell.width == 0 || cell.text.empty() || cell.text == " ")) {
+                pango_layout_set_font_description(layout, cell.bold ? bold_ : font_);
+                PangoAttrList* attrs = nullptr;
+                if (cell.italic) {
+                    attrs = pango_attr_list_new();
+                    pango_attr_list_insert(attrs, pango_attr_style_new(PANGO_STYLE_ITALIC));
+                }
+                pango_layout_set_attributes(layout, attrs);
+                if (attrs) pango_attr_list_unref(attrs);
+                pango_layout_set_text(layout, cell.text.c_str(), -1);
+                setColor(cr, tint);
+                const int base = pango_layout_get_baseline(layout) / PANGO_SCALE;
+                if (cellW_ == natW_ && cellH_ == natH_) {
+                    cairo_move_to(cr, ox + c * cellW_, y + ascent_ - base);
+                    pango_cairo_show_layout(cr, layout);
+                } else {
+                    cairo_save(cr);
+                    cairo_translate(cr, ox + c * cellW_, y);
+                    cairo_scale(cr, static_cast<double>(cellW_) / natW_, static_cast<double>(cellH_) / natH_);
+                    cairo_move_to(cr, 0, ascent_ - base);
+                    pango_cairo_show_layout(cr, layout);
+                    cairo_restore(cr);
+                }
             }
-            pango_layout_set_attributes(layout, attrs);
-            if (attrs) pango_attr_list_unref(attrs);
-            pango_layout_set_text(layout, cell.text.c_str(), -1);
-            setColor(cr, isCursor ? cell.bg : cell.fg);
-            const int base = pango_layout_get_baseline(layout) / PANGO_SCALE;
-            cairo_move_to(cr, ox + c * cellW_, y + ascent_ - base);
-            pango_cairo_show_layout(cr, layout);
+            if (cell.width != 0) drawDecorations(cr, cell, ox + c * cellW_, y, gw, cellH_, scale_, tint);
         }
     }
     g_object_unref(layout);
 }
 
 cairo_surface_t* GridPainter::glyph(const Cell& cell) {
-    GlyphKey key{cell.text,
-                 static_cast<uint8_t>((cell.bold ? 1 : 0) | (cell.italic ? 2 : 0) | (cell.underline ? 4 : 0)),
+    GlyphKey key{cell.text, static_cast<uint8_t>((cell.bold ? 1 : 0) | (cell.italic ? 2 : 0)),
                  static_cast<uint8_t>(cell.width == 2 ? 2 : 1)};
     auto it = cache_.find(key);
     if (it != cache_.end()) return it->second;
     if (cache_.size() >= 8192) clearCache();  // crude bound; real terminals rarely get here
-    const int w = cellW_ * key.width + 2 * padX_;
+    const int w = natW_ * key.width + 2 * padX_;
     // Rendered in ARGB32 first: a colour glyph (Noto Color Emoji and other colour fonts) is kept
     // as a colour image and painted as-is; anything else becomes an A8 mask tinted with the cell
     // colour. (Before M4 item 5 everything was A8, so emoji came out as fg-coloured silhouettes.)
-    cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, cellH_);
+    cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, natH_);
     cairo_t* cr = cairo_create(s);
     PangoLayout* layout = glyphLayout_;
     pango_layout_set_font_description(layout, cell.bold ? bold_ : font_);
     PangoAttrList* attrs = nullptr;
-    if (cell.underline || cell.italic) {
+    if (cell.italic) {
         attrs = pango_attr_list_new();
-        if (cell.underline) pango_attr_list_insert(attrs, pango_attr_underline_new(PANGO_UNDERLINE_SINGLE));
-        if (cell.italic) pango_attr_list_insert(attrs, pango_attr_style_new(PANGO_STYLE_ITALIC));
+        pango_attr_list_insert(attrs, pango_attr_style_new(PANGO_STYLE_ITALIC));
     }
     pango_layout_set_attributes(layout, attrs);
     if (attrs) pango_attr_list_unref(attrs);
@@ -148,7 +246,7 @@ cairo_surface_t* GridPainter::glyph(const Cell& cell) {
     const int st = cairo_image_surface_get_stride(s);
     const uint8_t* d = cairo_image_surface_get_data(s);
     bool colour = false;
-    for (int y = 0; y < cellH_ && !colour; ++y) {
+    for (int y = 0; y < natH_ && !colour; ++y) {
         const uint32_t* row = reinterpret_cast<const uint32_t*>(d + static_cast<size_t>(y) * st);
         for (int x = 0; x < w; ++x) {
             const uint32_t p = row[x], a = p >> 24, r = (p >> 16) & 0xff, g = (p >> 8) & 0xff, b = p & 0xff;
@@ -160,11 +258,11 @@ cairo_surface_t* GridPainter::glyph(const Cell& cell) {
         }
     }
     if (!colour) {
-        cairo_surface_t* m = cairo_image_surface_create(CAIRO_FORMAT_A8, w, cellH_);
+        cairo_surface_t* m = cairo_image_surface_create(CAIRO_FORMAT_A8, w, natH_);
         cairo_surface_flush(m);
         uint8_t* md = cairo_image_surface_get_data(m);
         const int ms = cairo_image_surface_get_stride(m);
-        for (int y = 0; y < cellH_; ++y) {
+        for (int y = 0; y < natH_; ++y) {
             const uint32_t* row = reinterpret_cast<const uint32_t*>(d + static_cast<size_t>(y) * st);
             for (int x = 0; x < w; ++x) md[static_cast<size_t>(y) * ms + x] = row[x] >> 24;
         }
@@ -207,16 +305,15 @@ void GridPainter::paintRows(cairo_t* cr, const Grid& g, int ox, int oy, Color8 c
                 cairo_rectangle(cr, ox + c * cellW_, y, cellW_ * (cell.width == 2 ? 2 : 1), cellH_);
                 cairo_fill(cr);
             }
-            if (!(cell.width == 0 || cell.text.empty() || (cell.text == " " && !cell.underline))) {
+            const Color8 tint = cell.faint ? dimmed(solid ? cell.bg : cell.fg) : (solid ? cell.bg : cell.fg);
+            const int gw = cellW_ * (cell.width == 2 ? 2 : 1);
+            if (!(cell.conceal || cell.width == 0 || cell.text.empty() || cell.text == " ")) {
                 cairo_surface_t* m = glyph(cell);
-                if (cairo_image_surface_get_format(m) == CAIRO_FORMAT_ARGB32) {  // colour glyph
-                    cairo_set_source_surface(cr, m, ox + c * cellW_ - padX_, y);
-                    cairo_paint(cr);
-                } else {
-                    setColor(cr, solid ? cell.bg : cell.fg);
-                    cairo_mask_surface(cr, m, ox + c * cellW_ - padX_, y);
-                }
+                const bool colour = cairo_image_surface_get_format(m) == CAIRO_FORMAT_ARGB32;
+                if (!colour) setColor(cr, tint);
+                paintMask(cr, m, colour, ox + c * cellW_, y, cellW_, cellH_, natW_, natH_, padX_);
             }
+            if (cell.width != 0) drawDecorations(cr, cell, ox + c * cellW_, y, gw, cellH_, scale_, tint);
             if (isCursor && !solid) {
                 const int w = cellW_ * (cell.width == 2 ? 2 : 1);
                 const int x = ox + c * cellW_;

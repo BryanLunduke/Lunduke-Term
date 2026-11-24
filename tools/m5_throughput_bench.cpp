@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
             last = t;
             if (ctrlc && ctrlcSent < 0 && t - t0 >= 2000) {
                 ctrlcSent = t;
-                view->session().sendChar('c', VTERM_MOD_CTRL);
+                view->session().sendChar('c', ModCtrl);
                 view->session().flushWrites();
             }
             if (!ctrlc && doneAt < 0 && gridHas(view->shownGrid(), "LTERM-DONE")) doneAt = t;
