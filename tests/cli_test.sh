@@ -45,6 +45,15 @@ done
 expect "--profile amber --help" 0 $?
 has "$tmp/help2.out" "Usage: lunduke-terminal"
 
+# --profile=ID is the same option as --profile ID.
+"$bin" --profile=plain --list-profiles > "$tmp/prof.out" 2> "$tmp/prof.err"
+expect "--profile=plain --list-profiles" 0 $?
+has "$tmp/prof.out" "plain"
+if grep -q "unknown option" "$tmp/prof.err"; then echo "--profile=plain was unknown"; fail=1; fi
+"$bin" --profile > "$tmp/profmiss.out" 2> "$tmp/profmiss.err"
+expect "--profile missing argument" 2 $?
+has "$tmp/profmiss.err" "requires an argument"
+
 "$bin" --version > "$tmp/version.out" 2> "$tmp/version.err"
 expect "--version" 0 $?
 echo "--version printed: $(cat "$tmp/version.out")"
