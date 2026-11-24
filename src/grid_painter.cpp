@@ -44,6 +44,9 @@ GridPainter::GridPainter(const std::string& family, int pixelSize, int scale, in
         pango_font_description_set_absolute_size(bold_, double(pixelSize) * scale_ * PANGO_SCALE);
     }
     padX_ = std::max(1, natW_ / 2);
+    prescale_ = cellW_ != natW_ || cellH_ != natH_;
+    if (!prescale_) blitOriginX_ = -padX_;
+    else blitOriginX_ = static_cast<int>(std::floor(-padX_ * static_cast<double>(cellW_) / natW_));
     glyphLayout_ = pango_layout_new(ctx_);
 }
 
@@ -78,32 +81,58 @@ static Color8 dimmed(Color8 c) {
     return Color8{static_cast<uint8_t>(c.r * 3 / 5), static_cast<uint8_t>(c.g * 3 / 5), static_cast<uint8_t>(c.b * 3 / 5)};
 }
 
-// The cached mask is the font's own cell. A CRT box or a screen-fit box scales it into the
-// cell the layout uses. An unstretched cell takes the integer blit, so the pixels do not move.
-static void paintMask(cairo_t* cr, cairo_surface_t* m, bool colour, int destX, int destY, int cellW, int cellH,
-                      int natW, int natH, int padX) {
-    if (cellW == natW && cellH == natH) {
-        if (colour) {
-            cairo_set_source_surface(cr, m, destX - padX, destY);
-            cairo_paint(cr);
-        } else {
-            cairo_mask_surface(cr, m, destX - padX, destY);
-        }
-        return;
-    }
-    const double sx = static_cast<double>(cellW) / std::max(1, natW);
-    const double sy = static_cast<double>(cellH) / std::max(1, natH);
-    cairo_save(cr);
-    cairo_translate(cr, destX - padX * sx, destY);
-    cairo_scale(cr, sx, sy);
+// Masks are already in the cell's pixel grid (a stretched CRT bakes the scale once, into the
+// cache). The blit is an integer copy, so a 4:3 cell does not resample the glyph on every paint.
+static void paintMask(cairo_t* cr, cairo_surface_t* m, bool colour, int x, int y) {
     if (colour) {
-        cairo_set_source_surface(cr, m, 0, 0);
-        cairo_pattern_set_filter(cairo_get_source(cr), CAIRO_FILTER_GOOD);
+        cairo_set_source_surface(cr, m, x, y);
         cairo_paint(cr);
     } else {
-        cairo_mask_surface(cr, m, 0, 0);
+        cairo_mask_surface(cr, m, x, y);
     }
-    cairo_restore(cr);
+}
+
+// Rasterise the natural-size mask through the same translate/scale/filter a per-paint scale used,
+// into an image whose origin is blitOriginX_ relative to the cell. An integer blit of that image
+// lands on the same pixels.
+static cairo_surface_t* prescaleGlyph(cairo_surface_t* src, double sx, double sy, double fracX) {
+    const int nw = cairo_image_surface_get_width(src);
+    const int nh = cairo_image_surface_get_height(src);
+    const int sw = std::max(1, static_cast<int>(std::ceil(nw * sx + fracX)));
+    const int sh = std::max(1, static_cast<int>(std::ceil(nh * sy)));
+    const bool mask = cairo_image_surface_get_format(src) == CAIRO_FORMAT_A8;
+    // A8 destinations ignore cairo_mask. Draw into ARGB32 (white through the mask, or the
+    // colour glyph with the same GOOD filter the per-paint scale used) and, for a mask,
+    // keep only the alpha.
+    cairo_surface_t* argb = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, sw, sh);
+    cairo_t* cr = cairo_create(argb);
+    cairo_translate(cr, fracX, 0);
+    cairo_scale(cr, sx, sy);
+    if (mask) {
+        cairo_set_source_rgba(cr, 1, 1, 1, 1);
+        cairo_mask_surface(cr, src, 0, 0);
+    } else {
+        cairo_set_source_surface(cr, src, 0, 0);
+        cairo_pattern_set_filter(cairo_get_source(cr), CAIRO_FILTER_GOOD);
+        cairo_paint(cr);
+    }
+    cairo_destroy(cr);
+    cairo_surface_destroy(src);
+    if (!mask) return argb;
+    cairo_surface_t* dst = cairo_image_surface_create(CAIRO_FORMAT_A8, sw, sh);
+    cairo_surface_flush(argb);
+    cairo_surface_flush(dst);
+    const int as = cairo_image_surface_get_stride(argb);
+    const int ds = cairo_image_surface_get_stride(dst);
+    const uint8_t* ad = cairo_image_surface_get_data(argb);
+    uint8_t* dd = cairo_image_surface_get_data(dst);
+    for (int y = 0; y < sh; ++y) {
+        const uint32_t* row = reinterpret_cast<const uint32_t*>(ad + static_cast<size_t>(y) * as);
+        for (int x = 0; x < sw; ++x) dd[static_cast<size_t>(y) * ds + x] = static_cast<uint8_t>(row[x] >> 24);
+    }
+    cairo_surface_mark_dirty(dst);
+    cairo_surface_destroy(argb);
+    return dst;
 }
 
 // Lines the glyph mask does not carry: faint is a tint, the rest are stroked so a colored
@@ -270,6 +299,12 @@ cairo_surface_t* GridPainter::glyph(const Cell& cell) {
         cairo_surface_destroy(s);
         s = m;
     }
+    if (prescale_) {
+        const double sx = static_cast<double>(cellW_) / std::max(1, natW_);
+        const double sy = static_cast<double>(cellH_) / std::max(1, natH_);
+        const double x0 = -static_cast<double>(padX_) * sx;
+        s = prescaleGlyph(s, sx, sy, x0 - std::floor(x0));
+    }
     cache_.emplace(std::move(key), s);
     return s;
 }
@@ -311,7 +346,7 @@ void GridPainter::paintRows(cairo_t* cr, const Grid& g, int ox, int oy, Color8 c
                 cairo_surface_t* m = glyph(cell);
                 const bool colour = cairo_image_surface_get_format(m) == CAIRO_FORMAT_ARGB32;
                 if (!colour) setColor(cr, tint);
-                paintMask(cr, m, colour, ox + c * cellW_, y, cellW_, cellH_, natW_, natH_, padX_);
+                paintMask(cr, m, colour, ox + c * cellW_ + blitOriginX_, y);
             }
             if (cell.width != 0) drawDecorations(cr, cell, ox + c * cellW_, y, gw, cellH_, scale_, tint);
             if (isCursor && !solid) {

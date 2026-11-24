@@ -40,7 +40,9 @@ void CpuEffects::resize(int width, int height) {
     burn_.assign(static_cast<size_t>(bw_) * bh_ * 4, 0.0f);
     down_.assign(static_cast<size_t>(hw_) * hh_ * 3, 0.0f);
     bloomB_.assign(down_.size(), 0.0f);
+    bloom_.assign(down_.size(), 0.0f);
     haveBurn_ = false;
+    haveSource_ = false;
     buildLut();
     buildFrame();
 }
@@ -146,6 +148,11 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
     // 0. bytes -> float, only the rows that changed.
     if (rowEnd < 0 || rowEnd > h_) rowEnd = h_;
     rowBegin = std::max(0, rowBegin);
+    // The first pass has no previous downsample or bloom to update a band of.
+    if (!haveSource_) {
+        rowBegin = 0;
+        rowEnd = h_;
+    }
     const bool bgra = order == PixelOrder::BGRA;
     if (rowEnd > rowBegin) {
         pool_->parallelFor(rowEnd - rowBegin, [&](int y0, int y1) {
@@ -165,9 +172,15 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
     // 1. half-resolution 2x2 box downsample (input of the bloom blur and of the half-res burn-in).
     auto t0 = Clock::now();
     const bool halfBurn = p_.burnIn > 0 && p_.burnInHalfRes;
+    int hy0 = 0, hy1 = hh_;
+    if (haveSource_ && (p_.bloom > 0 || halfBurn)) {
+        hy0 = std::max(0, rowBegin / 2);
+        hy1 = std::min(hh_, (std::max(rowBegin, rowEnd) + 1) / 2);
+        if (hy1 <= hy0) hy1 = std::min(hh_, hy0 + 1);
+    }
     if (p_.bloom > 0 || halfBurn) {
-        pool_->parallelFor(hh_, [&](int y0, int y1) {
-            for (int y = y0; y < y1; ++y) {
+        pool_->parallelFor(std::max(0, hy1 - hy0), [&](int y0, int y1) {
+            for (int y = hy0 + y0; y < hy0 + y1; ++y) {
                 int sy0 = clampi(2 * y, 0, h_ - 1), sy1 = clampi(2 * y + 1, 0, h_ - 1);
                 for (int x = 0; x < hw_; ++x) {
                     int sx0 = clampi(2 * x, 0, w_ - 1), sx1 = clampi(2 * x + 1, 0, w_ - 1);
@@ -216,14 +229,19 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
     }
     lastBurnMs = msSince(t0);
 
-    // Bloom: separable Gaussian with transparent border, down_ -> bloomB_ -> down_ (RGB: nothing
-    // reads a bloom alpha).
+    // Bloom: separable Gaussian, down_ -> bloomB_ (horizontal) -> bloom_ (vertical). down_ stays
+    // the plain downsample so the next frame can rebuild one band of it. A changed half-row
+    // spreads by the blur radius, and only that band is recomputed.
     t0 = Clock::now();
     if (p_.bloom > 0) {
         const int R = p_.bloomRadiusHalfRes;
-        // horizontal: down_ -> B
-        pool_->parallelFor(hh_, [&](int y0, int y1) {
-            for (int y = y0; y < y1; ++y) {
+        int vy0 = 0, vy1 = hh_;
+        if (haveSource_) {
+            vy0 = std::max(0, hy0 - R);
+            vy1 = std::min(hh_, hy1 + R);
+        }
+        pool_->parallelFor(std::max(0, hy1 - hy0), [&](int y0, int y1) {
+            for (int y = hy0 + y0; y < hy0 + y1; ++y) {
                 const float* row = &down_[static_cast<size_t>(y) * hw_ * 3];
                 for (int x = 0; x < hw_; ++x) {
                     float acc[3] = {0, 0, 0};
@@ -239,10 +257,9 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
                 }
             }
         });
-        // vertical: B -> down_ (every row of B is complete, so down_ can be overwritten)
-        pool_->parallelFor(hh_, [&](int y0, int y1) {
-            for (int y = y0; y < y1; ++y) {
-                float* o = &down_[static_cast<size_t>(y) * hw_ * 3];
+        pool_->parallelFor(std::max(0, vy1 - vy0), [&](int y0, int y1) {
+            for (int y = vy0 + y0; y < vy0 + y1; ++y) {
+                float* o = &bloom_[static_cast<size_t>(y) * hw_ * 3];
                 std::fill(o, o + hw_ * 3, 0.0f);
                 for (int k = -R; k <= R; ++k) {
                     int sy = y + k;
@@ -261,11 +278,23 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
     const Rgb fc = p_.fontColor, bg = p_.backgroundColor;
     const float chroma = p_.chromaColor;
     const float shift = rgbShiftPx(p_) / std::max(1, w_);  // uv
-    pool_->parallelFor(h_, [&](int y0, int y1) {
+    int sy0 = 0, sy1 = h_;
+    if (haveSource_) {
+        // Barrel warp moves a sample by a few percent of the height. Bloom then spreads
+        // that by the full-resolution radius (two half-resolution texels per step).
+        const float maxD = 0.5f * d_.curvature;
+        const float maxShiftV = 0.5f * (1.0f + maxD) * maxD * std::max(0.0f, 1.0f - 2.0f * geom_.iy);
+        int pad = static_cast<int>(std::ceil(maxShiftV * static_cast<float>(h_))) + 3;
+        if (p_.bloom > 0) pad += 2 * p_.bloomRadiusHalfRes + 2;
+        if (shift != 0.0f) pad += static_cast<int>(std::ceil(std::fabs(rgbShiftPx(p_)))) + 2;
+        sy0 = std::max(0, rowBegin - pad);
+        sy1 = std::min(h_, rowEnd + pad);
+    }
+    pool_->parallelFor(std::max(0, sy1 - sy0), [&](int y0, int y1) {
         float t[4], b[4], rc[4], lc[4];
         // The row's warped coordinates first, in a tight loop (no dependency on the samples below).
         std::vector<float> rowCu(static_cast<size_t>(w_)), rowCv(static_cast<size_t>(w_));
-        for (int y = y0; y < y1; ++y) {
+        for (int y = sy0 + y0; y < sy0 + y1; ++y) {
             warpRow(y, rowCu.data(), rowCv.data(), nullptr, nullptr);
             for (int x = 0; x < w_; ++x) {
                 const size_t idx = static_cast<size_t>(y) * w_ + x;
@@ -298,7 +327,7 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
                 float o1 = mixf(bg.g, fg, g * mask);
                 float o2 = mixf(bg.b, fb, g * mask);
                 if (p_.bloom > 0) {
-                    sampleClamp<3, 3>(down_.data(), hw_, hh_, cu, cv, b);
+                    sampleClamp<3, 3>(bloom_.data(), hw_, hh_, cu, cv, b);
                     const float bg2 = rgb2grey(b[0], b[1], b[2]);
                     float br = fc.r * mixf(bg2, b[0], chroma);
                     float bgc = fc.g * mixf(bg2, b[1], chroma);
@@ -321,7 +350,7 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
             float b[4];
             for (int i = i0; i < i1; ++i) {
                 const Refl& r = refl_[i];
-                sampleClamp<3, 3>(down_.data(), hw_, hh_, r.u, r.v, b);
+                sampleClamp<3, 3>(bloom_.data(), hw_, hh_, r.u, r.v, b);
                 const float g2 = rgb2grey(b[0], b[1], b[2]);
                 const float* s0 = r.base;
                 float* o = &frame_[static_cast<size_t>(r.idx) * 4];
@@ -332,6 +361,7 @@ void CpuEffects::updateSource(const uint8_t* px, int stride, PixelOrder order, f
         });
     }
     lastStaticMs = msSince(t0);
+    haveSource_ = true;
 }
 
 void CpuEffects::renderTo(float timeMs, uint8_t* out, int stride, PixelOrder order) {

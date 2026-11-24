@@ -161,6 +161,45 @@ long appendLogicalLine(const LineSource& src, long line, long limit, bool caseSe
     return l + 1;
 }
 
+namespace {
+// Drop rows that scrolled out of the front of one chunk. The kept rows stay
+// valid: their global line numbers do not change when old history is trimmed.
+void trimChunkFront(SearchIndex::Chunk& c, long first) {
+    size_t drop = 0;
+    while (drop < c.rows.size() && c.rows[drop].line < first) ++drop;
+    if (drop == 0) return;
+    if (drop >= c.rows.size()) {
+        c.text.clear();
+        c.rows.clear();
+        c.maps.clear();
+        c.first = c.end = first;
+        return;
+    }
+    const size_t off = c.rows[drop].off;
+    if (off > c.text.size()) return;
+    c.text.erase(0, off);
+    c.rows.erase(c.rows.begin(), c.rows.begin() + static_cast<long>(drop));
+    for (auto& r : c.rows) r.off -= static_cast<uint32_t>(off);
+    std::vector<int> remap(c.maps.size(), -1);
+    std::vector<std::vector<uint16_t>> maps;
+    for (auto& r : c.rows) {
+        if (r.map < 0) continue;
+        const size_t i = static_cast<size_t>(r.map);
+        if (i >= remap.size()) {
+            r.map = -1;
+            continue;
+        }
+        if (remap[i] < 0) {
+            remap[i] = static_cast<int>(maps.size());
+            maps.push_back(std::move(c.maps[i]));
+        }
+        r.map = remap[i];
+    }
+    c.maps = std::move(maps);
+    c.first = c.rows.front().line;
+}
+}  // namespace
+
 void SearchIndex::reset() {
     chunks_.clear();
     cols_ = -1;
@@ -186,6 +225,8 @@ bool SearchIndex::update(const LineSource& src, bool caseSensitive, long long de
     size_t drop = 0;
     while (drop < chunks_.size() && chunks_[drop].end <= first) ++drop;
     if (drop) chunks_.erase(chunks_.begin(), chunks_.begin() + static_cast<long>(drop));
+    if (!chunks_.empty() && chunks_.front().first < first) trimChunkFront(chunks_.front(), first);
+    if (!chunks_.empty() && chunks_.front().rows.empty()) chunks_.erase(chunks_.begin());
     if (next_ < first) {
         next_ = first;
         frontier_ = false;

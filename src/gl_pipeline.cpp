@@ -5,6 +5,7 @@
 #include <epoxy/gl.h>
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 
 namespace lterm {
@@ -92,6 +93,7 @@ void GlPipeline::setParams(const EffectParams& params) {
     freeSized();
     w_ = h_ = 0;  // the next resize() allocates for the new parameters (burn-in size, bezel)
     haveBurn_ = false;
+    haveSource_ = false;
 }
 
 void GlPipeline::release() {
@@ -199,7 +201,7 @@ void GlPipeline::releaseSized() {
 }
 
 void GlPipeline::freeSized() {
-    for (unsigned* f : {&fboDown_, &fboBloomB_, &fboBurn_[0], &fboBurn_[1], &fboStatic_, &fboOut_,
+    for (unsigned* f : {&fboDownPlain_, &fboDown_, &fboBloomB_, &fboBurn_[0], &fboBurn_[1], &fboStatic_, &fboOut_,
                         &fboFrameBase_, &fboFrameRefl_, &fboFrame_}) {
         if (*f) {
             glDeleteFramebuffers(1, f);
@@ -207,7 +209,7 @@ void GlPipeline::freeSized() {
         }
         *f = 0;
     }
-    for (unsigned* t : {&texSrc_, &texDown_, &texBloomB_, &texBurn_[0], &texBurn_[1], &texStatic_,
+    for (unsigned* t : {&texSrc_, &texDownPlain_, &texDown_, &texBloomB_, &texBurn_[0], &texBurn_[1], &texStatic_,
                         &texOut_, &texFrameBase_, &texFrameRefl_, &texFrame_}) {
         if (*t) deleteTex(t);
     }
@@ -226,17 +228,20 @@ void GlPipeline::resize(int width, int height) {
     // M6 item 6: the source is uploaded from an 8-bit Cairo image (glTexSubImage2D, GL_UNSIGNED_BYTE), so
     // an 8-bit texture holds it exactly; a half-float one cost 4 more bytes per pixel (4 MB at 1280x800).
     texSrc_ = makeTex(w_, h_, GL_RGBA8, true, false);
-    texDown_ = makeTex(hw_, hh_, kSizedFmt, true, false);
+    texDownPlain_ = makeTex(hw_, hh_, kSizedFmt, true, false);  // downsample, kept so a later band can update it
+    texDown_ = makeTex(hw_, hh_, kSizedFmt, true, false);       // bloom result
     texBloomB_ = makeTex(hw_, hh_, kSizedFmt, true, false);
     for (int i = 0; i < 2; ++i) texBurn_[i] = makeTex(bw_, bh_, kSizedFmt, true, false);
     texStatic_ = makeTex(w_, h_, kSizedFmt, true, false);
     // texOut_/fboOut_ (RGBA8, w x h) are only read back by renderToMemory() (headless tests and
     // benchmarks); the window renders to the GtkGLArea framebuffer, so they are made on first use.
+    fboDownPlain_ = makeFbo(texDownPlain_);
     fboDown_ = makeFbo(texDown_);
     fboBloomB_ = makeFbo(texBloomB_);
     for (int i = 0; i < 2; ++i) fboBurn_[i] = makeFbo(texBurn_[i]);
     fboStatic_ = makeFbo(texStatic_);
     haveBurn_ = false;
+    haveSource_ = false;
     geom_ = frameGeometry(p_, w_, h_);
     if (p_.frame) {
         texFrameBase_ = makeTex(w_, h_, kSizedFmt, false, false);
@@ -291,6 +296,33 @@ void GlPipeline::updateSource(const uint8_t* px, int stride, PixelOrder order, f
     if (!ok_ || !texSrc_) return;
     if (rowEnd < 0 || rowEnd > h_) rowEnd = h_;
     rowBegin = std::max(0, rowBegin);
+    if (!haveSource_) {
+        rowBegin = 0;
+        rowEnd = h_;
+    }
+    const bool full = rowBegin <= 0 && rowEnd >= h_;
+    int hy0 = 0, hy1 = hh_, vy0 = 0, vy1 = hh_, sy0 = 0, sy1 = h_;
+    if (!full) {
+        hy0 = std::max(0, rowBegin / 2);
+        hy1 = std::min(hh_, (std::max(rowBegin, rowEnd) + 1) / 2);
+        if (hy1 <= hy0) hy1 = std::min(hh_, hy0 + 1);
+        const int R = std::min(64, p_.bloomRadiusHalfRes);
+        vy0 = std::max(0, hy0 - R);
+        vy1 = std::min(hh_, hy1 + R);
+        const float maxD = 0.5f * d_.curvature;
+        const float maxShiftV = 0.5f * (1.0f + maxD) * maxD * std::max(0.0f, 1.0f - 2.0f * geom_.iy);
+        int pad = static_cast<int>(std::ceil(maxShiftV * static_cast<float>(h_))) + 3;
+        if (p_.bloom > 0) pad += 2 * R + 2;
+        const float shiftPx = rgbShiftPx(p_);
+        if (shiftPx != 0.0f) pad += static_cast<int>(std::ceil(std::fabs(shiftPx))) + 2;
+        sy0 = std::max(0, rowBegin - pad);
+        sy1 = std::min(h_, rowEnd + pad);
+    }
+    auto band = [](int y0, int y1) {
+        if (y1 <= y0) return;
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(0, y0, 100000, y1 - y0);
+    };
     GLint prevFbo = 0;
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
     glDisable(GL_BLEND);
@@ -311,8 +343,11 @@ void GlPipeline::updateSource(const uint8_t* px, int stride, PixelOrder order, f
         glUseProgram(progDown_);
         bindTex(loc_.down.src, 0, texSrc_);
         glUniform2i(loc_.down.srcSize, w_, h_);
-        drawTo(fboDown_, hw_, hh_, progDown_);
+        if (!full) band(hy0, hy1);
+        else glDisable(GL_SCISSOR_TEST);
+        drawTo(fboDownPlain_, hw_, hh_, progDown_);
     }
+    glDisable(GL_SCISSOR_TEST);
     if (p_.burnIn > 0) {
         if (!haveBurn_) {
             for (int i = 0; i < 2; ++i) {
@@ -329,7 +364,7 @@ void GlPipeline::updateSource(const uint8_t* px, int stride, PixelOrder order, f
         const float decay0 = std::clamp((burnLast_ - burnPrev_) * d_.burnInTime, 0.0f, 1.0f);
         const int next = 1 - burnCur_;
         glUseProgram(progBurn_);
-        bindTex(loc_.burn.src, 0, p_.burnInHalfRes ? texDown_ : texSrc_);  // the downsample, before the blur
+        bindTex(loc_.burn.src, 0, p_.burnInHalfRes ? texDownPlain_ : texSrc_);  // downsample, before the blur
         bindTex(loc_.burn.prev, 1, texBurn_[burnCur_]);
         glUniform1f(loc_.burn.decay0, decay0);
         drawTo(fboBurn_[next], bw_, bh_, progBurn_);
@@ -340,11 +375,14 @@ void GlPipeline::updateSource(const uint8_t* px, int stride, PixelOrder order, f
         glUniform1fv(loc_.blur.weights, 65, weights_.data());
         glUniform1i(loc_.blur.radius, std::min(64, p_.bloomRadiusHalfRes));
         glUniform2i(loc_.blur.size, hw_, hh_);
-        bindTex(loc_.blur.src, 0, texDown_);
+        bindTex(loc_.blur.src, 0, texDownPlain_);
         glUniform2i(loc_.blur.dir, 1, 0);
+        if (!full) band(hy0, hy1);
         drawTo(fboBloomB_, hw_, hh_, progBlur_);
         bindTex(loc_.blur.src, 0, texBloomB_);
         glUniform2i(loc_.blur.dir, 0, 1);
+        if (!full) band(vy0, vy1);
+        else glDisable(GL_SCISSOR_TEST);
         drawTo(fboDown_, hw_, hh_, progBlur_);  // the bloom now lives in texDown_
     }
     const GLuint p = progStatic_;
@@ -362,7 +400,10 @@ void GlPipeline::updateSource(const uint8_t* px, int stride, PixelOrder order, f
     glUniform1i(loc_.stat.useBloom, p_.bloom > 0);
     glUniform2f(loc_.stat.inset, geom_.ix, geom_.iy);
     glUniform1f(loc_.stat.rgbShift, rgbShiftPx(p_) / static_cast<float>(w_));
+    if (!full) band(sy0, sy1);
+    else glDisable(GL_SCISSOR_TEST);
     drawTo(fboStatic_, w_, h_, p);
+    glDisable(GL_SCISSOR_TEST);
     if (p_.frame && p_.bloom > 0 && p_.frameShininess > 0) {
         const GLuint c = progFrameComp_;
         glUseProgram(c);
@@ -376,7 +417,9 @@ void GlPipeline::updateSource(const uint8_t* px, int stride, PixelOrder order, f
         glUniform1i(loc_.comp.useRefl, 1);
         drawTo(fboFrame_, w_, h_, c);
     }
+    glDisable(GL_SCISSOR_TEST);
     glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(prevFbo));
+    haveSource_ = true;
 }
 
 void GlPipeline::render(float timeMs, unsigned fbo, bool flipY) {

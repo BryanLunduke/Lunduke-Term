@@ -224,6 +224,30 @@ int main() {
         CHECK(worstSlice < (LTERM_ASAN ? 250.0 : 60.0));
         CHECK(worstKey < 200.0);
     }
+    {
+        // Trimming old scrollback adjusts the cache. It must not rebuild it, so a
+        // deadline that has already passed still leaves the index complete.
+        VtermSession s(8, 40);
+        s.setScrollbackLimit(80);
+        SearchIndex idx;
+        std::string chunk;
+        for (int i = 0; i < 60; ++i) chunk += "keep " + std::to_string(i) + " needle\r\n";
+        s.feed(chunk);
+        CHECK(idx.update(s, false));
+        CHECK(idx.cachedLines() > 40);
+        for (int i = 0; i < 400; ++i) s.feed("later " + std::to_string(i) + " needle\r\n");
+        const auto t0 = std::chrono::steady_clock::now();
+        idx.update(s, false, g_get_monotonic_time());
+        const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        // A reset would re-read from the oldest line and stop after one 64-line
+        // slice. Keeping more than that means the old rows were adjusted in place.
+        std::printf("trim adjust: %.2f ms, cached %zu, scrollback %zu\n", ms, idx.cachedLines(), s.scrollbackSize());
+        CHECK(idx.cachedLines() > 64);
+        CHECK(idx.update(s, false));
+        const auto got = idx.find(s, "needle");
+        const auto all = findAll(s, "needle", false);
+        CHECK(got == all);
+    }
     if (failures == 0) std::printf("search_test: OK\n");
     return failures ? 1 : 0;
 }

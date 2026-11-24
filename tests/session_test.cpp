@@ -6,6 +6,8 @@
 #include "selection.hpp"
 #include "vterm_session.hpp"
 
+#include <ghostty/vt.h>
+
 #include <cmath>
 
 #include <cerrno>
@@ -469,6 +471,75 @@ static void testMouse() {
     CHECK_EQ(s.mouseMode(), int(MouseMode::None));
 }
 
+// The key event is reused. A later key with no ASCII unshifted codepoint must not
+// keep the previous one: kitty disambiguate mode would report Alt+é as Alt+a.
+static void testUnshiftedCodepoint() {
+    VtermSession s(4, 40);
+    s.feed("\x1b[=1u");  // kitty keyboard: disambiguate
+    s.takeOutput();
+    s.sendChar('a', ModCtrl);
+    const std::string ctrlA = s.takeOutput();
+    s.sendChar(0x00E9, ModAlt);  // é
+    const std::string altE = s.takeOutput();
+    std::printf("kitty unshifted: ctrl+a %s, alt+eacute %s\n", ctrlA.c_str(), altE.c_str());
+    CHECK(ctrlA.find("\x1b[97;5u") != std::string::npos);
+    CHECK(altE.find("\x1b[97;") == std::string::npos);  // not the leftover 'a'
+    CHECK(altE.find("233") != std::string::npos);       // U+00E9
+    CHECK(altE.find(";3u") != std::string::npos);       // Alt
+    // A following arrow must not inherit é either.
+    s.sendKey(TermKey::Up, ModNone);
+    const std::string up = s.takeOutput();
+    CHECK(up.find("233") == std::string::npos);
+    CHECK(up.find("\x1b[A") != std::string::npos || up.find("\x1bOA") != std::string::npos);
+}
+
+// Kitty keyboard protocol: Shift is the unshifted key plus the Shift modifier,
+// a fresh Alt/Ctrl chord keeps that modifier, and releases are sent only when
+// the application asks for event types.
+static void testKittyKeyboard() {
+    VtermSession legacy(4, 40);
+    legacy.sendChar('A', ModShift, 'a');
+    CHECK_EQ(legacy.takeOutput(), std::string("A"));  // legacy: the character, not a CSI
+    legacy.sendChar('A', ModCtrl | ModShift, 'a');
+    CHECK_EQ(legacy.takeOutput(), std::string("\x1b[97;6u"));  // Ctrl+Shift+A is not Ctrl+A
+    legacy.sendChar('x', ModAlt);
+    CHECK_EQ(legacy.takeOutput(), std::string("\x1bx"));
+
+    VtermSession s(4, 40);
+    s.feed("\x1b[=5u");  // disambiguate + report alternates
+    s.takeOutput();
+    CHECK(!s.reportsKeyEvents());
+    s.sendChar('A', ModShift, 'a');
+    CHECK_EQ(s.takeOutput(), std::string("\x1b[97:65;2u"));
+    // First chord after the mode switch still carries Alt / Ctrl.
+    s.sendChar('x', ModAlt);
+    CHECK_EQ(s.takeOutput(), std::string("\x1b[120;3u"));
+    s.sendChar('c', ModCtrl);
+    CHECK_EQ(s.takeOutput(), std::string("\x1b[99;5u"));
+    s.sendChar('a', ModNone, 0, KeyAction::Release);
+    CHECK_EQ(s.takeOutput(), std::string(""));  // releases off
+
+    s.feed("\x1b[=31u");  // every kitty flag
+    s.takeOutput();
+    CHECK(s.reportsKeyEvents());
+    CHECK(s.reportsAllKeys());
+    s.sendChar('a', ModNone);
+    CHECK_EQ(s.takeOutput(), std::string("\x1b[97;;97u"));  // associated text, press
+    s.sendChar('a', ModNone, 'a', KeyAction::Release);
+    const std::string up = s.takeOutput();
+    CHECK(up.find(":3") != std::string::npos);  // event type release
+    CHECK(up.find("97") != std::string::npos);
+    s.sendPhysical(GHOSTTY_KEY_CONTROL_LEFT, ModCtrl, nullptr, 0, 0);
+    const std::string ctrl = s.takeOutput();
+    std::printf("kitty ctrl press: %s\n", ctrl.c_str());
+    CHECK(!ctrl.empty());
+    CHECK(ctrl.find(";5") != std::string::npos);  // Ctrl modifier is present on the key itself
+    s.sendPhysical(GHOSTTY_KEY_ALT_LEFT, ModAlt, nullptr, 0, 0);
+    const std::string alt = s.takeOutput();
+    CHECK(!alt.empty());
+    CHECK(alt.find(";3") != std::string::npos);
+}
+
 static void testPaste() {
     VtermSession s(4, 20);
     s.paste("echo hi\nline2\r\nx\x1b[201~y\x03");
@@ -479,6 +550,51 @@ static void testPaste() {
     s.feed("\x1b[?2004l");
     s.paste("plain\t\xc3\xa9");
     CHECK_EQ(s.takeOutput(), std::string("plain\t\xc3\xa9"));
+}
+
+static void testScrollbackCompress() {
+    VtermSession s(24, 40);
+    s.setScrollbackLimit(2000);
+    std::string line(40, 'a');
+    line += "\r\n";
+    std::string chunk;
+    for (int i = 0; i < 1500; ++i) chunk += line;
+    s.feed(chunk);
+    const size_t before = s.scrollbackBytes();
+    s.compressScrollback(true);
+    const size_t after = s.scrollbackBytes();
+    std::printf("scrollback compress: %zu -> %zu bytes\n", before, after);
+    CHECK(after > 0);
+    CHECK(after <= before);
+    CHECK(s.cellText(s.topLine() - 1, 0) == "a");
+}
+
+static void testPasteCap() {
+    VtermSession s(4, 20);
+    s.paste(std::string(1000, 'q'));
+    s.paste("Z");
+    CHECK_EQ(s.takeOutput(), std::string(1000, 'q') + "Z");
+
+    VtermSession big(4, 20);
+    big.paste(std::string(kMaxWriteQueueBytes + 250000, 'a'));
+    big.paste("XYZ");  // the queue is full: this paste must not grow it
+    const std::string out = big.takeOutput();
+    CHECK(out.size() <= kMaxWriteQueueBytes);
+    CHECK(out.size() >= kMaxWriteQueueBytes - 4);
+    CHECK(out.find("XYZ") == std::string::npos);
+    CHECK(out.find_first_not_of('a') == std::string::npos);
+
+    VtermSession br(4, 20);
+    br.feed("\x1b[?2004h");
+    br.takeOutput();
+    br.paste(std::string(kMaxWriteQueueBytes, 'b'));
+    const std::string wrapped = br.takeOutput();
+    CHECK(wrapped.size() <= kMaxWriteQueueBytes);
+    CHECK(wrapped.compare(0, 6, "\x1b[200~") == 0);
+    CHECK(wrapped.size() >= 12);
+    CHECK(wrapped.compare(wrapped.size() - 6, 6, "\x1b[201~") == 0);
+    std::printf("paste cap: plain %zu bytes, bracketed %zu bytes (cap %zu)\n", out.size(), wrapped.size(),
+                kMaxWriteQueueBytes);
 }
 
 static void testCursor() {
@@ -742,7 +858,11 @@ int main() {
     testScale2Mapping();
     testBezelMapping();
     testMouse();
+    testUnshiftedCodepoint();
+    testKittyKeyboard();
     testPaste();
+    testPasteCap();
+    testScrollbackCompress();
     testCursor();
     testGridCursorDiff();
     testEnvironment();

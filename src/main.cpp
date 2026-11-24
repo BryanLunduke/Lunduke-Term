@@ -27,6 +27,7 @@
 // Ctrl+Shift+F search the scrollback, Ctrl+Shift+S settings, F11 fullscreen,
 // Ctrl+=/Ctrl++/Ctrl+- font zoom (per tab, not saved), Ctrl+0 zoom reset.
 #include "custom_profiles.hpp"
+#include "settings_load.hpp"
 #include "terminal_window.hpp"
 
 #include <gtkmm.h>
@@ -133,38 +134,40 @@ void parseBell(lterm::ViewOptions& o, const std::string& list) {
 void loadSettings(lterm::ViewOptions& o) {
     const std::string path = Glib::build_filename(Glib::get_user_config_dir(), "lunduke-terminal", "settings.ini");
     if (!Glib::file_test(path, Glib::FILE_TEST_EXISTS)) return;
-    Glib::KeyFile kf;
+    std::string text;
     try {
-        kf.load_from_file(path);
-        const char* g = "terminal";
-        if (kf.has_key(g, "profile")) o.profile = kf.get_string(g, "profile");
-        if (kf.has_key(g, "effects")) o.effects = kf.get_boolean(g, "effects") ? 1 : 0;
-        if (kf.has_key(g, "renderer")) o.renderer = kf.get_string(g, "renderer");
-        if (kf.has_key(g, "threads")) o.threads = kf.get_integer(g, "threads");
-        if (kf.has_key(g, "effects-fps")) o.effectsFps = kf.get_integer(g, "effects-fps");
-        if (kf.has_key(g, "max-fps")) o.maxFps = kf.get_integer(g, "max-fps");
-        if (kf.has_key(g, "effects-quality") && !parseEffectsQuality(kf.get_string(g, "effects-quality"), o.effectsQuality))
-            std::fprintf(stderr, "lunduke-terminal: effects-quality must be auto, full, reduced or static\n");
-        if (kf.has_key(g, "cpu-budget")) o.cpuBudget = kf.get_double(g, "cpu-budget") / 100.0;
-        if (kf.has_key(g, "pause-unfocused")) o.pauseWhenUnfocused = kf.get_boolean(g, "pause-unfocused");
-        if (kf.has_key(g, "font")) o.fontFamily = kf.get_string(g, "font");
-        if (kf.has_key(g, "font-px")) o.fontPx = kf.get_integer(g, "font-px");
-        if (kf.has_key(g, "scrollback-lines")) o.scrollbackLines = kf.get_int64(g, "scrollback-lines");
-        if (kf.has_key(g, "login-shell")) o.loginShell = kf.get_boolean(g, "login-shell");
-        if (kf.has_key(g, "cwd")) o.cwd = kf.get_string(g, "cwd");
-        if (kf.has_key(g, "on-exit")) o.onExit = kf.get_string(g, "on-exit");
-        if (kf.has_key(g, "bell")) parseBell(o, kf.get_string(g, "bell"));
-        if (kf.has_key(g, "cursor-shape")) o.cursorShape = kf.get_string(g, "cursor-shape");
-        if (kf.has_key(g, "cursor-blink")) o.cursorBlink = kf.get_boolean(g, "cursor-blink");
-        if (kf.has_key(g, "word-chars")) o.wordChars = kf.get_string(g, "word-chars");
-        if (kf.has_key(g, "frame")) o.tube.frame = kf.get_boolean(g, "frame") ? 1 : 0;
-        if (kf.has_key(g, "frame-size")) o.tube.frameSize = static_cast<float>(kf.get_double(g, "frame-size"));
-        if (kf.has_key(g, "frame-color")) o.tube.frameColor = kf.get_string(g, "frame-color");
-        if (kf.has_key(g, "frame-shininess")) o.tube.frameShininess = static_cast<float>(kf.get_double(g, "frame-shininess"));
-        if (kf.has_key(g, "rgb-shift")) o.tube.rgbShift = static_cast<float>(kf.get_double(g, "rgb-shift"));
+        text = Glib::file_get_contents(path);
     } catch (const Glib::Error& e) {
         std::fprintf(stderr, "lunduke-terminal: %s: %s\n", path.c_str(), e.what().c_str());
+        return;
     }
+    const lterm::SettingsValues s = lterm::parseSettingsIni(text);
+    for (const auto& w : s.warnings)
+        std::fprintf(stderr, "lunduke-terminal: %s: %s\n", path.c_str(), w.c_str());
+    if (s.hasProfile) o.profile = s.profile;
+    if (s.hasEffects) o.effects = s.effects ? 1 : 0;
+    if (s.hasRenderer) o.renderer = s.renderer;
+    if (s.hasThreads) o.threads = s.threads;
+    if (s.hasEffectsFps) o.effectsFps = s.effectsFps;
+    if (s.hasMaxFps) o.maxFps = s.maxFps;
+    if (s.hasEffectsQuality) o.effectsQuality = s.effectsQuality;
+    if (s.hasCpuBudget) o.cpuBudget = s.cpuBudget / 100.0;
+    if (s.hasPause) o.pauseWhenUnfocused = s.pauseWhenUnfocused;
+    if (s.hasFont) o.fontFamily = s.fontFamily;
+    if (s.hasFontPx) o.fontPx = s.fontPx;
+    if (s.hasScrollback) o.scrollbackLines = s.scrollbackLines;
+    if (s.hasLogin) o.loginShell = s.loginShell;
+    if (s.hasCwd) o.cwd = s.cwd;
+    if (s.hasOnExit) o.onExit = s.onExit;
+    if (s.hasBell) parseBell(o, s.bell);
+    if (s.hasCursorShape) o.cursorShape = s.cursorShape;
+    if (s.hasCursorBlink) o.cursorBlink = s.cursorBlink;
+    if (s.hasWordChars) o.wordChars = s.wordChars;
+    if (s.hasFrame) o.tube.frame = s.frame;
+    if (s.hasFrameSize) o.tube.frameSize = s.frameSize;
+    if (s.hasFrameColor) o.tube.frameColor = s.frameColor;
+    if (s.hasFrameShininess) o.tube.frameShininess = s.frameShininess;
+    if (s.hasRgbShift) o.tube.rgbShift = s.rgbShift;
 }
 
 // An option as a separate argument (`--name value`) or, for a long option, `--name=value`.
@@ -235,7 +238,10 @@ int main(int argc, char** argv) {
         std::string a = argv[i];
         if (a == "--no-effects") opts.effects = 0;
         else if (a == "--effects") opts.effects = 1;
-        else if (a == "--profile" && i + 1 < argc) opts.profile = argv[++i];
+        else if (int taken = takeOpt(a, "--profile", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.profile = optArg;
+        }
         else if (a == "--renderer" && i + 1 < argc) opts.renderer = argv[++i];
         else if (a == "--threads" && i + 1 < argc) opts.threads = std::atoi(argv[++i]);
         else if (a == "--effects-fps" && i + 1 < argc) opts.effectsFps = std::atoi(argv[++i]);

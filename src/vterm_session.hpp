@@ -36,6 +36,9 @@ std::string sanitizePaste(const std::string& text);
 constexpr size_t kMaxTitleBytes = 4096;            // OSC 0/2 window title
 constexpr size_t kMaxScrollbackLines = 100000;     // scrollback-lines setting / --scrollback
 constexpr size_t kDefaultScrollbackLines = 5000;   // when settings.ini and --scrollback give none
+// Bytes of input waiting on a PTY that is not reading. Further paste is dropped
+// until some of it is written, so a stuck reader cannot grow this without bound.
+constexpr size_t kMaxWriteQueueBytes = 1u << 20;
 // Negative -> 0, above kMaxScrollbackLines -> kMaxScrollbackLines.
 size_t clampScrollbackLines(long long requested);
 // Child side of spawn(): closes every fd >= 3 (close_range, or close() up to maxFd).
@@ -51,6 +54,10 @@ constexpr int ModNone = 0;
 constexpr int ModShift = 1;
 constexpr int ModAlt = 2;
 constexpr int ModCtrl = 4;
+
+// Matches GhosttyKeyAction. Release is only encoded when the application asked
+// for kitty keyboard event types.
+enum class KeyAction : int { Release = 0, Press = 1, Repeat = 2 };
 
 // Keys the view maps from GDK. Printable characters go through sendChar.
 enum class TermKey : int {
@@ -99,8 +106,19 @@ public:
     int cols() const override { return cols_; }
 
     // Input. Key and mouse bytes come from libghostty's encoders.
-    void sendKey(TermKey key, int mod);
-    void sendChar(uint32_t codepoint, int mod);
+    // `unshifted` is the key with Shift released (0: use `codepoint` when it is
+    // printable). Kitty mode reports that codepoint plus the Shift modifier;
+    // legacy mode still sends the shifted character.
+    void sendKey(TermKey key, int mod, KeyAction action = KeyAction::Press);
+    void sendChar(uint32_t codepoint, int mod, uint32_t unshifted = 0, KeyAction action = KeyAction::Press);
+    // A physical key the TermKey / codepoint mapping does not cover (modifiers,
+    // punctuation). `ghostKey` is a GhosttyKey value.
+    void sendPhysical(int ghostKey, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted,
+                      KeyAction action = KeyAction::Press);
+    // Kitty keyboard protocol flag "report event types" (press, repeat, release).
+    bool reportsKeyEvents() const;
+    // Kitty keyboard protocol flag "report all keys as escape codes" (modifier keys).
+    bool reportsAllKeys() const;
     void sendBytes(const char* bytes, size_t len);
     void flushWrites();
     bool wantsWrite() const { return !writeQueue_.empty(); }
@@ -129,6 +147,12 @@ public:
     // is a ceiling plus at most one page, not an exact count.
     void setScrollbackLimit(size_t lines);  // clamped to kMaxScrollbackLines
     size_t scrollbackLimit() const { return sbLimit_; }
+    // Compress scrollback that has gone idle. Incremental does one bounded step
+    // and returns true when another step is worth scheduling. Full scans once.
+    bool compressScrollback(bool full = false);
+    // Bytes fed since the last takeFedBytes(). The view uses this to malloc_trim
+    // after a large flood has gone idle.
+    size_t takeFedBytes();
     size_t scrollbackSize() const;
     size_t scrollbackBytes() const;  // resident bytes libghostty reports for both screens
     // Settings-dialog estimate of `lines` rows at `cols` columns. libghostty's real use is
@@ -177,9 +201,12 @@ private:
     void syncLines();
     void refreshCursor(bool fromApp);
     void syncMouseEncoder();
-    void encodeKey(int ghostKey, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted);
+    void encodeKey(int ghostKey, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted, KeyAction action);
     void emitMouse(int row, int col, int button, int action, int mod);
     bool locate(long line, int col, void* point) const;
+    // One grid lookup per row; later cells on that row reuse it. Invalid after feed/resize.
+    bool rowRef(long line, int col, void* ref) const;
+    void noteDirty();
     CellRead readAt(long line, int col) const;
     Color8 resolveColor(uint8_t tag, uint8_t a, uint8_t b, uint8_t c, bool foreground) const;
 
@@ -206,11 +233,21 @@ private:
     bool havePalette_ = false;
     float minFgGrey_ = 0.0f;
     size_t sbLimit_ = kDefaultScrollbackLines;
+    uint64_t compActivity_ = 0;
+    bool compSettled_ = false;
+    size_t fedBytes_ = 0;
     long topLine_ = 0;
     long anchorGlobal_ = 0;
     uint32_t anchorY_ = 0;
     bool anchorLive_ = false;
     unsigned long epoch_ = 1;
+    // Viewport rows whose cells changed since the last fillGrid. A full read is
+    // used when the scroll position is not the live screen.
+    mutable std::vector<char> viewDirty_;
+    mutable bool viewFull_ = true;
+    mutable Grid viewCache_;
+    mutable int viewCacheOff_ = -1;
+    mutable bool viewCacheAlt_ = false;
 };
 
 }  // namespace lterm

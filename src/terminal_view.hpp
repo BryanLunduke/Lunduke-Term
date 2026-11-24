@@ -13,6 +13,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace lterm {
@@ -210,6 +211,9 @@ private:
     int fontPxInUse_ = 0;
     enum class Mode { Plain, Cpu, Gl };
     bool onKey(GdkEventKey* ev);
+    bool onKeyRelease(GdkEventKey* ev);
+    // Press, repeat and (when the app asked) release. Shortcuts are handled by onKey first.
+    bool deliverKey(GdkEventKey* ev, bool release);
     // Review item 2: input methods (dead keys, Compose, ibus/fcitx for CJK). The IM shows its
     // own preedit (use_preedit off); committed text goes to the PTY.
     // gtkmm 3 has no IMContext wrapper: the GTK C API (a GtkIMMulticontext).
@@ -234,6 +238,8 @@ private:
     bool onPtyIo(Glib::IOCondition cond);
     void connectPtyWatch();
     bool readSlice(bool* more);
+    void scheduleCompress();  // idle scrollback compression, then malloc_trim after a large flood
+    sigc::connection compressIdle_;
     // Review item 14: the per-frame timing samples (ViewStats vectors) are kept only with --stats;
     // without it they grew by one double per frame for the whole session.
     void recordStat(std::vector<double>& v, double ms) {
@@ -342,6 +348,7 @@ private:
     bool inverseShown_ = false;  // margins currently painted for reverse video
     bool blinkOff_ = false;
     long imCommits_ = 0;
+    std::unordered_set<guint> heldKeys_;  // hardware keycodes currently down (repeat / release)
     sigc::connection freeHidden_;  // review item 3
     bool effectsFreed_ = false;
     void freeHiddenEffects();

@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <climits>
 #include <cerrno>
 #include <csignal>
 #include <cstdlib>
@@ -36,8 +37,14 @@ struct VtermSession::Ghost {
     GhosttyMouseEncoder mouse = nullptr;
     GhosttyMouseEvent mouseEv = nullptr;
     GhosttyRenderState render = nullptr;
+    GhosttyRenderStateRowIterator rows = nullptr;
     GhosttyTrackedGridRef anchor = nullptr;
     GhosttyColorRgb pal[256]{};
+    long pinLine = LONG_MIN;
+    unsigned long pinEpoch = 0;
+    bool pinOk = false;
+    bool pinWrap = false;
+    GhosttyGridRef pin{};
 };
 
 std::vector<std::string> childEnvironment(char** base) {
@@ -233,6 +240,7 @@ VtermSession::VtermSession(int rows, int cols) : rows_(std::max(1, rows)), cols_
         must(ghostty_mouse_encoder_new(nullptr, &g_->mouse), "ghostty_mouse_encoder_new");
         must(ghostty_mouse_event_new(nullptr, &g_->mouseEv), "ghostty_mouse_event_new");
         must(ghostty_render_state_new(nullptr, &g_->render), "ghostty_render_state_new");
+        must(ghostty_render_state_row_iterator_new(nullptr, &g_->rows), "ghostty_render_state_row_iterator_new");
         bool track = true;
         ghostty_mouse_encoder_set(g_->mouse, GHOSTTY_MOUSE_ENCODER_OPT_TRACK_LAST_CELL, &track);
         syncMouseEncoder();
@@ -240,6 +248,7 @@ VtermSession::VtermSession(int rows, int cols) : rows_(std::max(1, rows)), cols_
         refreshCursor(false);
     } catch (...) {
         if (g_->anchor) ghostty_tracked_grid_ref_free(g_->anchor);
+        ghostty_render_state_row_iterator_free(g_->rows);
         ghostty_render_state_free(g_->render);
         ghostty_mouse_event_free(g_->mouseEv);
         ghostty_mouse_encoder_free(g_->mouse);
@@ -257,6 +266,7 @@ VtermSession::~VtermSession() {
     if (fd_ >= 0) close(fd_);
     if (!g_) return;
     if (g_->anchor) ghostty_tracked_grid_ref_free(g_->anchor);
+    ghostty_render_state_row_iterator_free(g_->rows);
     ghostty_render_state_free(g_->render);
     ghostty_mouse_event_free(g_->mouseEv);
     ghostty_mouse_encoder_free(g_->mouse);
@@ -290,7 +300,10 @@ void VtermSession::syncLines() {
         GhosttyPointCoordinate c{};
         if (ghostty_tracked_grid_ref_point(g_->anchor, GHOSTTY_POINT_TAG_SCREEN, &c) == GHOSTTY_SUCCESS) {
             const long neu = anchorGlobal_ + static_cast<long>(sb) - static_cast<long>(c.y);
-            if (static_cast<long>(c.y) < static_cast<long>(anchorY_)) ++epoch_;
+            // c.y falling is scrollback trimmed above the anchor. Surviving lines keep
+            // their global numbers, so the search cache can drop that prefix instead of
+            // treating the history as new. A cleared or invalidated anchor still bumps
+            // the epoch below.
             topLine_ = neu;
         }
     } else if (anchorLive_) {
@@ -310,6 +323,7 @@ void VtermSession::refreshCursor(bool fromApp) {
     if (st == GHOSTTY_CURSOR_STYLE_UNDERLINE) shape = static_cast<int>(CursorShape::Underline);
     else if (st == GHOSTTY_CURSOR_STYLE_BAR) shape = static_cast<int>(CursorShape::Bar);
     const int b = blink ? 1 : 0;
+    noteDirty();
     if (fromApp && (shape != lastStyle_ || b != lastBlink_)) appCursor_ = true;
     lastStyle_ = shape;
     lastBlink_ = b;
@@ -492,6 +506,9 @@ bool VtermSession::readAvailable(int64_t budgetUs, bool* more) {
 
 void VtermSession::feed(const char* bytes, size_t len) {
     if (!len) return;
+    fedBytes_ += len;
+    compSettled_ = false;
+    g_->pinLine = LONG_MIN;  // grid refs do not survive a write
     ghostty_terminal_vt_write(g_->vt, reinterpret_cast<const uint8_t*>(bytes), len);
     syncLines();
     refreshCursor(true);
@@ -503,6 +520,8 @@ void VtermSession::resize(int rows, int cols) {
     rows = std::max(1, std::min(rows, 65535));
     cols = std::max(1, std::min(cols, 65535));
     ++epoch_;
+    g_->pinLine = LONG_MIN;
+    viewFull_ = true;
     ghostty_terminal_resize(g_->vt, static_cast<uint16_t>(cols), static_cast<uint16_t>(rows), 1, 1);
     uint16_t rr = 0, cc = 0;
     ghostty_terminal_get(g_->vt, GHOSTTY_TERMINAL_DATA_ROWS, &rr);
@@ -519,6 +538,28 @@ void VtermSession::resize(int rows, int cols) {
         ioctl(fd_, TIOCSWINSZ, &ws);
     }
     damaged_ = true;
+}
+
+bool VtermSession::compressScrollback(bool full) {
+    uint64_t act = 0;
+    if (ghostty_terminal_compression_activity(g_->vt, &act) != GHOSTTY_SUCCESS) return false;
+    if (!full && act == compActivity_ && compSettled_) return false;
+    if (act != compActivity_) {
+        compActivity_ = act;
+        compSettled_ = false;
+    }
+    GhosttyTerminalCompressionResult result = GHOSTTY_TERMINAL_COMPRESSION_RESULT_UNSUPPORTED;
+    const GhosttyTerminalCompressionMode mode =
+        full ? GHOSTTY_TERMINAL_COMPRESSION_MODE_FULL : GHOSTTY_TERMINAL_COMPRESSION_MODE_INCREMENTAL;
+    if (ghostty_terminal_compress(g_->vt, mode, &result) != GHOSTTY_SUCCESS) return false;
+    compSettled_ = result != GHOSTTY_TERMINAL_COMPRESSION_RESULT_PENDING;
+    return result == GHOSTTY_TERMINAL_COMPRESSION_RESULT_PENDING;
+}
+
+size_t VtermSession::takeFedBytes() {
+    const size_t n = fedBytes_;
+    fedBytes_ = 0;
+    return n;
 }
 
 void VtermSession::setScrollbackLimit(size_t lines) {
@@ -588,17 +629,25 @@ static GhosttyMods ghostMods(int mod) {
     return m;
 }
 
-void VtermSession::encodeKey(int key, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted) {
+void VtermSession::encodeKey(int key, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted, KeyAction action) {
     ghostty_key_encoder_set_from_terminal(g_->keys, g_->vt);
-    ghostty_key_event_set_action(g_->keyEv, GHOSTTY_KEY_ACTION_PRESS);
+    GhosttyKeyAction act = GHOSTTY_KEY_ACTION_PRESS;
+    if (action == KeyAction::Release) act = GHOSTTY_KEY_ACTION_RELEASE;
+    else if (action == KeyAction::Repeat) act = GHOSTTY_KEY_ACTION_REPEAT;
+    ghostty_key_event_set_action(g_->keyEv, act);
     ghostty_key_event_set_key(g_->keyEv, static_cast<GhosttyKey>(key));
     ghostty_key_event_set_mods(g_->keyEv, ghostMods(mod));
+    // Consumed mods are cleared every event. Leaving Alt or Ctrl consumed from
+    // an earlier translation made the next press of that modifier encode as a
+    // plain character.
     ghostty_key_event_set_consumed_mods(g_->keyEv, 0);
     GhosttyString text{};
     text.ptr = reinterpret_cast<const uint8_t*>(utf8 ? utf8 : "");
     text.len = utf8 ? utf8Len : 0;
     ghostty_key_event_set_utf8(g_->keyEv, text);
-    if (unshifted) ghostty_key_event_set_unshifted_codepoint(g_->keyEv, unshifted);
+    // The event object is reused. A zero here used to leave the previous key's
+    // codepoint in place, so kitty mode turned Alt+é after Ctrl+a into Alt+a.
+    ghostty_key_event_set_unshifted_codepoint(g_->keyEv, unshifted);
     uint8_t buf[128];
     size_t n = 0;
     GhosttyResult r = ghostty_key_encoder_encode(g_->keys, g_->keyEv, buf, sizeof buf, &n);
@@ -613,9 +662,30 @@ void VtermSession::encodeKey(int key, int mod, const char* utf8, size_t utf8Len,
     sendBytes(big.empty() ? reinterpret_cast<char*>(buf) : big.data(), n);
 }
 
-void VtermSession::sendKey(TermKey key, int mod) { encodeKey(ghostKey(key), mod, nullptr, 0, 0); }
+void VtermSession::sendKey(TermKey key, int mod, KeyAction action) {
+    encodeKey(ghostKey(key), mod, nullptr, 0, 0, action);
+}
 
-void VtermSession::sendChar(uint32_t cp, int mod) {
+static uint8_t kittyFlags(GhosttyTerminal vt) {
+    uint8_t flags = 0;
+    if (ghostty_terminal_get(vt, GHOSTTY_TERMINAL_DATA_KITTY_KEYBOARD_FLAGS, &flags) != GHOSTTY_SUCCESS) return 0;
+    return flags;
+}
+
+bool VtermSession::reportsKeyEvents() const {
+    return (kittyFlags(g_->vt) & GHOSTTY_KITTY_KEY_REPORT_EVENTS) != 0;
+}
+
+bool VtermSession::reportsAllKeys() const {
+    return (kittyFlags(g_->vt) & GHOSTTY_KITTY_KEY_REPORT_ALL) != 0;
+}
+
+void VtermSession::sendPhysical(int ghostKey, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted,
+                                KeyAction action) {
+    encodeKey(ghostKey, mod, utf8, utf8Len, unshifted, action);
+}
+
+void VtermSession::sendChar(uint32_t cp, int mod, uint32_t unshifted, KeyAction action) {
     int key = GHOSTTY_KEY_UNIDENTIFIED;
     if (cp >= 'a' && cp <= 'z') key = GHOSTTY_KEY_A + static_cast<int>(cp - 'a');
     else if (cp >= 'A' && cp <= 'Z') key = GHOSTTY_KEY_A + static_cast<int>(cp - 'A');
@@ -626,18 +696,23 @@ void VtermSession::sendChar(uint32_t cp, int mod) {
     else if (cp == 0x1b) key = GHOSTTY_KEY_ESCAPE;
     else if (cp == 0x7f) key = GHOSTTY_KEY_BACKSPACE;
     char utf8[4];
-    const int n = cp >= 0x20 && cp != 0x7f && !(cp >= 0x80 && cp <= 0x9f) ? utf8Of(cp, utf8) : 0;
-    encodeKey(key, mod, n ? utf8 : nullptr, static_cast<size_t>(n), cp < 0x80 ? cp : 0);
+    const bool printable = cp >= 0x20 && cp != 0x7f && !(cp >= 0x80 && cp <= 0x9f);
+    const int n = printable ? utf8Of(cp, utf8) : 0;
+    // Unshifted codepoint of this event, including non-ASCII (Alt+é is U+00E9,
+    // not "no codepoint"). Control keys have none, which clears the field.
+    // An explicit unshifted value (the key with Shift released) wins, so
+    // Shift+A is reported as "a" plus Shift rather than as the letter A.
+    const uint32_t uns = unshifted ? unshifted : (printable ? cp : 0);
+    encodeKey(key, mod, n ? utf8 : nullptr, static_cast<size_t>(n), uns, action);
 }
 
 void VtermSession::sendBytes(const char* bytes, size_t len) {
     if (!len) return;
-    if (fd_ < 0) {
-        pendingOut_.append(bytes, len);
-        return;
-    }
-    writeQueue_.append(bytes, len);
-    flushWrites();
+    std::string& q = fd_ < 0 ? pendingOut_ : writeQueue_;
+    if (q.size() >= kMaxWriteQueueBytes) return;
+    if (q.size() + len > kMaxWriteQueueBytes) len = kMaxWriteQueueBytes - q.size();
+    q.append(bytes, len);
+    if (fd_ >= 0) flushWrites();
 }
 
 void VtermSession::flushWrites() {
@@ -655,8 +730,18 @@ void VtermSession::flushWrites() {
 }
 
 void VtermSession::paste(const std::string& text) {
+    std::string& q = fd_ < 0 ? pendingOut_ : writeQueue_;
+    if (q.size() >= kMaxWriteQueueBytes) return;
     std::string body = sanitizePaste(text);
     const bool bracketed = modeOn(g_->vt, GHOSTTY_MODE_BRACKETED_PASTE);
+    // Bracketed paste adds ESC[200~ and ESC[201~. Keep the whole sequence, including
+    // the closing bracket, inside the queue cap. The tail of an oversized paste is
+    // dropped until the program reads and the queue drains.
+    const size_t overhead = bracketed ? 12 : 0;
+    const size_t room = kMaxWriteQueueBytes - q.size();
+    if (overhead >= room) return;
+    if (body.size() > room - overhead) truncateUtf8(body, room - overhead);
+    if (body.empty()) return;
     size_t need = 0;
     GhosttyResult r = ghostty_paste_encode(body.data(), body.size(), bracketed, nullptr, 0, &need);
     if (r == GHOSTTY_SUCCESS) return;
@@ -795,12 +880,56 @@ Color8 VtermSession::resolveColor(uint8_t tag, uint8_t a, uint8_t b, uint8_t c, 
     return foreground ? liftToGrey(o, minFgGrey_) : o;
 }
 
+bool VtermSession::rowRef(long line, int col, void* out) const {
+    auto* ref = static_cast<GhosttyGridRef*>(out);
+    if (g_->pinLine != line || g_->pinEpoch != epoch_) {
+        g_->pinLine = line;
+        g_->pinEpoch = epoch_;
+        g_->pinOk = false;
+        g_->pinWrap = false;
+        GhosttyPoint pt{};
+        if (locate(line, 0, &pt) && ghostty_terminal_grid_ref(g_->vt, pt, &g_->pin) == GHOSTTY_SUCCESS) {
+            g_->pinOk = true;
+            GhosttyRow row = 0;
+            if (ghostty_grid_ref_row(&g_->pin, &row) == GHOSTTY_SUCCESS)
+                ghostty_row_get(row, GHOSTTY_ROW_DATA_WRAP, &g_->pinWrap);
+        }
+    }
+    if (!g_->pinOk || col < 0 || col >= cols_) return false;
+    *ref = g_->pin;
+    ref->x = static_cast<uint16_t>(static_cast<int>(g_->pin.x) + col);
+    return true;
+}
+
+void VtermSession::noteDirty() {
+    if (static_cast<int>(viewDirty_.size()) != rows_) {
+        viewDirty_.assign(static_cast<size_t>(rows_), 1);
+        viewFull_ = true;
+    }
+    int dirty = GHOSTTY_RENDER_STATE_DIRTY_FULL;
+    if (ghostty_render_state_get(g_->render, GHOSTTY_RENDER_STATE_DATA_DIRTY, &dirty) != GHOSTTY_SUCCESS) {
+        viewFull_ = true;
+        return;
+    }
+    if (dirty == GHOSTTY_RENDER_STATE_DIRTY_FULL) {
+        viewFull_ = true;
+        return;
+    }
+    if (dirty != GHOSTTY_RENDER_STATE_DIRTY_PARTIAL) return;
+    if (ghostty_render_state_get(g_->render, GHOSTTY_RENDER_STATE_DATA_ROW_ITERATOR, g_->rows) != GHOSTTY_SUCCESS) {
+        viewFull_ = true;
+        return;
+    }
+    uint16_t y = 0;
+    while (ghostty_render_state_row_iterator_next_dirty(g_->rows, &y)) {
+        if (y < viewDirty_.size()) viewDirty_[y] = 1;
+    }
+}
+
 VtermSession::CellRead VtermSession::readAt(long line, int col) const {
     CellRead out;
-    GhosttyPoint pt{};
-    if (!locate(line, col, &pt)) return out;
     GhosttyGridRef ref{};
-    if (ghostty_terminal_grid_ref(g_->vt, pt, &ref) != GHOSTTY_SUCCESS) return out;
+    if (!rowRef(line, col, &ref)) return out;
     out.ok = true;
     GhosttyCell cell = 0;
     ghostty_grid_ref_cell(&ref, &cell);
@@ -871,34 +1000,48 @@ VtermSession::CellRead VtermSession::readAt(long line, int col) const {
 }
 
 void VtermSession::fillGrid(Grid& grid, int scrollOffset) const {
-    grid.resize(rows_, cols_);
+    const bool alt = altScreen();
     int off = 0;
-    if (!altScreen()) {
+    if (!alt) {
         const int sb = static_cast<int>(scrollbackSize());
         if (scrollOffset < 0) scrollOffset = 0;
         if (scrollOffset > sb) scrollOffset = sb;
         off = scrollOffset;
     }
+    if (viewCache_.rows != rows_ || viewCache_.cols != cols_ || viewCacheOff_ != off || viewCacheAlt_ != alt) {
+        viewCache_.resize(rows_, cols_);
+        viewFull_ = true;
+        viewCacheOff_ = off;
+        viewCacheAlt_ = alt;
+    }
+    // Live screen: only rows the render state marked. Scrolled-back history is not
+    // that viewport, so the visible rows are read in full (one lookup per row).
+    const bool partial = !viewFull_ && off == 0 && static_cast<int>(viewDirty_.size()) == rows_;
     for (int r = 0; r < rows_; ++r) {
+        if (partial && !viewDirty_[static_cast<size_t>(r)]) continue;
+        const long line = topLine_ - off + r;
         for (int c = 0; c < cols_; ++c) {
-            CellRead rd = readAt(topLine_ - off + r, c);
-            if (rd.ok) grid.at(r, c) = std::move(rd.cell);
+            CellRead rd = readAt(line, c);
+            viewCache_.at(r, c) = rd.ok ? std::move(rd.cell) : Cell{};
         }
     }
+    viewFull_ = false;
+    if (static_cast<int>(viewDirty_.size()) == rows_) std::fill(viewDirty_.begin(), viewDirty_.end(), 0);
     uint16_t cx = 0, cy = 0;
     bool vis = true;
     ghostty_terminal_get(g_->vt, GHOSTTY_TERMINAL_DATA_CURSOR_X, &cx);
     ghostty_terminal_get(g_->vt, GHOSTTY_TERMINAL_DATA_CURSOR_Y, &cy);
     ghostty_terminal_get(g_->vt, GHOSTTY_TERMINAL_DATA_CURSOR_VISIBLE, &vis);
     const int viewRow = static_cast<int>(cy) + off;
-    grid.cursorCol = std::min(static_cast<int>(cx), std::max(0, cols_ - 1));
+    viewCache_.cursorCol = std::min(static_cast<int>(cx), std::max(0, cols_ - 1));
     if (!vis || viewRow < 0 || viewRow >= rows_) {
-        grid.cursorVisible = false;
-        grid.cursorRow = std::min(static_cast<int>(cy), std::max(0, rows_ - 1));
+        viewCache_.cursorVisible = false;
+        viewCache_.cursorRow = std::min(static_cast<int>(cy), std::max(0, rows_ - 1));
     } else {
-        grid.cursorVisible = true;
-        grid.cursorRow = viewRow;
+        viewCache_.cursorVisible = true;
+        viewCache_.cursorRow = viewRow;
     }
+    grid = viewCache_;
 }
 
 std::string VtermSession::rowText(int row) const {
@@ -921,36 +1064,63 @@ std::string VtermSession::rowText(int row) const {
     return out;
 }
 
+static int wideOf(GhosttyCell cell) {
+    GhosttyCellWide wide = GHOSTTY_CELL_WIDE_NARROW;
+    ghostty_cell_get(cell, GHOSTTY_CELL_DATA_WIDE, &wide);
+    if (wide == GHOSTTY_CELL_WIDE_WIDE) return 2;
+    if (wide == GHOSTTY_CELL_WIDE_SPACER_TAIL || wide == GHOSTTY_CELL_WIDE_SPACER_HEAD) return 0;
+    return 1;
+}
+
 std::string VtermSession::cellText(long line, int col) const {
-    CellRead rd = readAt(line, col);
-    if (!rd.ok || rd.width == 0) return {};
-    return rd.cell.text;
+    uint32_t cp[16];
+    int w = 1;
+    const int n = cellChars(line, col, cp, 16, &w);
+    if (w == 0 || n <= 0) return {};
+    std::string text;
+    for (int i = 0; i < n; ++i) appendUtf8(text, cp[i]);
+    return text;
 }
 
 int VtermSession::cellWidth(long line, int col) const {
-    CellRead rd = readAt(line, col);
-    return rd.ok ? rd.width : 1;
+    GhosttyGridRef ref{};
+    if (!rowRef(line, col, &ref)) return 1;
+    GhosttyCell cell = 0;
+    if (ghostty_grid_ref_cell(&ref, &cell) != GHOSTTY_SUCCESS) return 1;
+    return wideOf(cell);
 }
 
 bool VtermSession::wrapped(long line) const {
-    GhosttyPoint pt{};
-    if (!locate(line, 0, &pt)) return false;
     GhosttyGridRef ref{};
-    if (ghostty_terminal_grid_ref(g_->vt, pt, &ref) != GHOSTTY_SUCCESS) return false;
-    GhosttyRow row = 0;
-    ghostty_grid_ref_row(&ref, &row);
-    bool wrap = false;
-    ghostty_row_get(row, GHOSTTY_ROW_DATA_WRAP, &wrap);
-    return wrap;
+    if (!rowRef(line, 0, &ref)) return false;
+    return g_->pinWrap;
 }
 
 int VtermSession::cellChars(long line, int col, uint32_t* out, int max, int* width) const {
-    CellRead rd = readAt(line, col);
-    if (width) *width = rd.ok ? rd.width : 1;
-    if (!rd.ok || rd.width == 0) return 0;
-    const int n = std::min(rd.n, max);
-    for (int i = 0; i < n; ++i) out[i] = rd.cp[i];
-    return n;
+    GhosttyGridRef ref{};
+    if (!rowRef(line, col, &ref)) {
+        if (width) *width = 1;
+        return 0;
+    }
+    GhosttyCell cell = 0;
+    if (ghostty_grid_ref_cell(&ref, &cell) != GHOSTTY_SUCCESS) {
+        if (width) *width = 1;
+        return 0;
+    }
+    const int w = wideOf(cell);
+    if (width) *width = w;
+    if (w == 0 || max <= 0) return 0;
+    size_t n = 0;
+    GhosttyResult gr = ghostty_grid_ref_graphemes(&ref, out, static_cast<size_t>(max), &n);
+    if (gr == GHOSTTY_OUT_OF_SPACE) {
+        std::vector<uint32_t> big(n);
+        gr = ghostty_grid_ref_graphemes(&ref, big.data(), big.size(), &n);
+        if (gr != GHOSTTY_SUCCESS) return 0;
+        const int k = std::min(static_cast<int>(n), max);
+        for (int i = 0; i < k; ++i) out[i] = big[static_cast<size_t>(i)];
+        return k;
+    }
+    return gr == GHOSTTY_SUCCESS ? static_cast<int>(n) : 0;
 }
 
 size_t VtermSession::scrollbackBytes() const {

@@ -58,6 +58,7 @@ effects_lib = static_library('lterm-effects',
   'src/effects.cpp', 'src/thread_pool.cpp',
   'src/grid_painter.cpp', 'src/synthetic_frame.cpp', 'src/profiles.cpp',
   'src/font_resolve.cpp', 'src/effects_governor.cpp', 'src/custom_profiles.cpp',
+  'src/settings_load.cpp',
   link_whole : cpu_effects_lib,
   dependencies : [pangocairo_dep, threads_dep, fontconfig_dep, glib_dep])
 
@@ -119,16 +120,16 @@ executable('lterm-m3-bench', 'tools/m3_bench.cpp',
 executable('lterm-m3-close-bench', 'tools/m3_close_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
-executable('lterm-m5-probe-bench', 'tools/m5_probe_bench.cpp', 'src/terminal_view.cpp',
+executable('lterm-m5-probe-bench', 'tools/m5_probe_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
 executable('lterm-m5-idle-bench', 'tools/m5_idle_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
-executable('lterm-m5-flood-bench', 'tools/m5_flood_bench.cpp', 'src/terminal_view.cpp',
+executable('lterm-m5-flood-bench', 'tools/m5_flood_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
-executable('lterm-m5-throughput-bench', 'tools/m5_throughput_bench.cpp', 'src/terminal_view.cpp',
+executable('lterm-m5-throughput-bench', 'tools/m5_throughput_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
 test('effects', executable('effects_test', 'tests/effects_test.cpp',
@@ -140,6 +141,8 @@ test('governor', executable('governor_test', 'tests/governor_test.cpp',
 test('profiles', executable('profiles_test', 'tests/profiles_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]), env : test_env)
 # M6 item 4: custom profile files (round trip, corrupt files, rename/delete, names, built-ins read-only).
+test('settings', executable('settings_test', 'tests/settings_test.cpp',
+  include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep, glib_dep]), env : test_env)
 test('custom-profiles', executable('custom_profiles_test', 'tests/custom_profiles_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep, glib_dep]), env : test_env)
 test('painter', executable('painter_test', 'tests/painter_test.cpp',
