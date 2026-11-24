@@ -204,6 +204,9 @@ private:
     void encodeKey(int ghostKey, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted, KeyAction action);
     void emitMouse(int row, int col, int button, int action, int mod);
     bool locate(long line, int col, void* point) const;
+    // One grid lookup per row; later cells on that row reuse it. Invalid after feed/resize.
+    bool rowRef(long line, int col, void* ref) const;
+    void noteDirty();
     CellRead readAt(long line, int col) const;
     Color8 resolveColor(uint8_t tag, uint8_t a, uint8_t b, uint8_t c, bool foreground) const;
 
@@ -238,6 +241,13 @@ private:
     uint32_t anchorY_ = 0;
     bool anchorLive_ = false;
     unsigned long epoch_ = 1;
+    // Viewport rows whose cells changed since the last fillGrid. A full read is
+    // used when the scroll position is not the live screen.
+    mutable std::vector<char> viewDirty_;
+    mutable bool viewFull_ = true;
+    mutable Grid viewCache_;
+    mutable int viewCacheOff_ = -1;
+    mutable bool viewCacheAlt_ = false;
 };
 
 }  // namespace lterm
