@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <malloc.h>
 #include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
@@ -1151,7 +1152,24 @@ bool TerminalView::readSlice(bool* more) {
             sel_.clear();
     }
     ensureWriteWatch();  // replies (DA, DSR) that did not fit
+    if (!*more) scheduleCompress();  // flood is over: compress idle scrollback, then return freed pages
     return alive;  // false: EOF/HUP; the child watch decides what happens to the window
+}
+
+void TerminalView::scheduleCompress() {
+    if (compressIdle_.connected()) return;
+    // Below redraw and input. Each turn is one bounded compression step.
+    compressIdle_ = Glib::signal_idle().connect(
+        [this] {
+            const bool more = session_->compressScrollback(false);
+            if (more) return true;
+            const size_t fed = session_->takeFedBytes();
+            // A large burst leaves glibc arenas holding tens of MB after the
+            // scrollback pages have been compressed. Return them once.
+            if (fed >= (1u << 20)) malloc_trim(0);
+            return false;
+        },
+        Glib::PRIORITY_DEFAULT_IDLE + 30);
 }
 
 bool TerminalView::selectionOverwritten() {

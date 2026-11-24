@@ -552,6 +552,23 @@ static void testPaste() {
     CHECK_EQ(s.takeOutput(), std::string("plain\t\xc3\xa9"));
 }
 
+static void testScrollbackCompress() {
+    VtermSession s(24, 40);
+    s.setScrollbackLimit(2000);
+    std::string line(40, 'a');
+    line += "\r\n";
+    std::string chunk;
+    for (int i = 0; i < 1500; ++i) chunk += line;
+    s.feed(chunk);
+    const size_t before = s.scrollbackBytes();
+    s.compressScrollback(true);
+    const size_t after = s.scrollbackBytes();
+    std::printf("scrollback compress: %zu -> %zu bytes\n", before, after);
+    CHECK(after > 0);
+    CHECK(after <= before);
+    CHECK(s.cellText(s.topLine() - 1, 0) == "a");
+}
+
 static void testPasteCap() {
     VtermSession s(4, 20);
     s.paste(std::string(1000, 'q'));
@@ -845,6 +862,7 @@ int main() {
     testKittyKeyboard();
     testPaste();
     testPasteCap();
+    testScrollbackCompress();
     testCursor();
     testGridCursorDiff();
     testEnvironment();

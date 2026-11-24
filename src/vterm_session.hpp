@@ -147,6 +147,12 @@ public:
     // is a ceiling plus at most one page, not an exact count.
     void setScrollbackLimit(size_t lines);  // clamped to kMaxScrollbackLines
     size_t scrollbackLimit() const { return sbLimit_; }
+    // Compress scrollback that has gone idle. Incremental does one bounded step
+    // and returns true when another step is worth scheduling. Full scans once.
+    bool compressScrollback(bool full = false);
+    // Bytes fed since the last takeFedBytes(). The view uses this to malloc_trim
+    // after a large flood has gone idle.
+    size_t takeFedBytes();
     size_t scrollbackSize() const;
     size_t scrollbackBytes() const;  // resident bytes libghostty reports for both screens
     // Settings-dialog estimate of `lines` rows at `cols` columns. libghostty's real use is
@@ -224,6 +230,9 @@ private:
     bool havePalette_ = false;
     float minFgGrey_ = 0.0f;
     size_t sbLimit_ = kDefaultScrollbackLines;
+    uint64_t compActivity_ = 0;
+    bool compSettled_ = false;
+    size_t fedBytes_ = 0;
     long topLine_ = 0;
     long anchorGlobal_ = 0;
     uint32_t anchorY_ = 0;

@@ -238,6 +238,8 @@ private:
     bool onPtyIo(Glib::IOCondition cond);
     void connectPtyWatch();
     bool readSlice(bool* more);
+    void scheduleCompress();  // idle scrollback compression, then malloc_trim after a large flood
+    sigc::connection compressIdle_;
     // Review item 14: the per-frame timing samples (ViewStats vectors) are kept only with --stats;
     // without it they grew by one double per frame for the whole session.
     void recordStat(std::vector<double>& v, double ms) {

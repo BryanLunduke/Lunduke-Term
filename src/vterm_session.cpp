@@ -495,6 +495,8 @@ bool VtermSession::readAvailable(int64_t budgetUs, bool* more) {
 
 void VtermSession::feed(const char* bytes, size_t len) {
     if (!len) return;
+    fedBytes_ += len;
+    compSettled_ = false;
     ghostty_terminal_vt_write(g_->vt, reinterpret_cast<const uint8_t*>(bytes), len);
     syncLines();
     refreshCursor(true);
@@ -522,6 +524,28 @@ void VtermSession::resize(int rows, int cols) {
         ioctl(fd_, TIOCSWINSZ, &ws);
     }
     damaged_ = true;
+}
+
+bool VtermSession::compressScrollback(bool full) {
+    uint64_t act = 0;
+    if (ghostty_terminal_compression_activity(g_->vt, &act) != GHOSTTY_SUCCESS) return false;
+    if (!full && act == compActivity_ && compSettled_) return false;
+    if (act != compActivity_) {
+        compActivity_ = act;
+        compSettled_ = false;
+    }
+    GhosttyTerminalCompressionResult result = GHOSTTY_TERMINAL_COMPRESSION_RESULT_UNSUPPORTED;
+    const GhosttyTerminalCompressionMode mode =
+        full ? GHOSTTY_TERMINAL_COMPRESSION_MODE_FULL : GHOSTTY_TERMINAL_COMPRESSION_MODE_INCREMENTAL;
+    if (ghostty_terminal_compress(g_->vt, mode, &result) != GHOSTTY_SUCCESS) return false;
+    compSettled_ = result != GHOSTTY_TERMINAL_COMPRESSION_RESULT_PENDING;
+    return result == GHOSTTY_TERMINAL_COMPRESSION_RESULT_PENDING;
+}
+
+size_t VtermSession::takeFedBytes() {
+    const size_t n = fedBytes_;
+    fedBytes_ = 0;
+    return n;
 }
 
 void VtermSession::setScrollbackLimit(size_t lines) {
