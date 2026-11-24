@@ -598,7 +598,9 @@ void VtermSession::encodeKey(int key, int mod, const char* utf8, size_t utf8Len,
     text.ptr = reinterpret_cast<const uint8_t*>(utf8 ? utf8 : "");
     text.len = utf8 ? utf8Len : 0;
     ghostty_key_event_set_utf8(g_->keyEv, text);
-    if (unshifted) ghostty_key_event_set_unshifted_codepoint(g_->keyEv, unshifted);
+    // The event object is reused. A zero here used to leave the previous key's
+    // codepoint in place, so kitty mode turned Alt+é after Ctrl+a into Alt+a.
+    ghostty_key_event_set_unshifted_codepoint(g_->keyEv, unshifted);
     uint8_t buf[128];
     size_t n = 0;
     GhosttyResult r = ghostty_key_encoder_encode(g_->keys, g_->keyEv, buf, sizeof buf, &n);
@@ -626,8 +628,11 @@ void VtermSession::sendChar(uint32_t cp, int mod) {
     else if (cp == 0x1b) key = GHOSTTY_KEY_ESCAPE;
     else if (cp == 0x7f) key = GHOSTTY_KEY_BACKSPACE;
     char utf8[4];
-    const int n = cp >= 0x20 && cp != 0x7f && !(cp >= 0x80 && cp <= 0x9f) ? utf8Of(cp, utf8) : 0;
-    encodeKey(key, mod, n ? utf8 : nullptr, static_cast<size_t>(n), cp < 0x80 ? cp : 0);
+    const bool printable = cp >= 0x20 && cp != 0x7f && !(cp >= 0x80 && cp <= 0x9f);
+    const int n = printable ? utf8Of(cp, utf8) : 0;
+    // Unshifted codepoint of this event, including non-ASCII (Alt+é is U+00E9,
+    // not "no codepoint"). Control keys have none, which clears the field.
+    encodeKey(key, mod, n ? utf8 : nullptr, static_cast<size_t>(n), printable ? cp : 0);
 }
 
 void VtermSession::sendBytes(const char* bytes, size_t len) {

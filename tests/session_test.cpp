@@ -469,6 +469,28 @@ static void testMouse() {
     CHECK_EQ(s.mouseMode(), int(MouseMode::None));
 }
 
+// The key event is reused. A later key with no ASCII unshifted codepoint must not
+// keep the previous one: kitty disambiguate mode would report Alt+é as Alt+a.
+static void testUnshiftedCodepoint() {
+    VtermSession s(4, 40);
+    s.feed("\x1b[=1u");  // kitty keyboard: disambiguate
+    s.takeOutput();
+    s.sendChar('a', ModCtrl);
+    const std::string ctrlA = s.takeOutput();
+    s.sendChar(0x00E9, ModAlt);  // é
+    const std::string altE = s.takeOutput();
+    std::printf("kitty unshifted: ctrl+a %s, alt+eacute %s\n", ctrlA.c_str(), altE.c_str());
+    CHECK(ctrlA.find("\x1b[97;5u") != std::string::npos);
+    CHECK(altE.find("\x1b[97;") == std::string::npos);  // not the leftover 'a'
+    CHECK(altE.find("233") != std::string::npos);       // U+00E9
+    CHECK(altE.find(";3u") != std::string::npos);       // Alt
+    // A following arrow must not inherit é either.
+    s.sendKey(TermKey::Up, ModNone);
+    const std::string up = s.takeOutput();
+    CHECK(up.find("233") == std::string::npos);
+    CHECK(up.find("\x1b[A") != std::string::npos || up.find("\x1bOA") != std::string::npos);
+}
+
 static void testPaste() {
     VtermSession s(4, 20);
     s.paste("echo hi\nline2\r\nx\x1b[201~y\x03");
@@ -742,6 +764,7 @@ int main() {
     testScale2Mapping();
     testBezelMapping();
     testMouse();
+    testUnshiftedCodepoint();
     testPaste();
     testCursor();
     testGridCursorDiff();
