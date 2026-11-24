@@ -6,6 +6,8 @@
 #include "selection.hpp"
 #include "vterm_session.hpp"
 
+#include <ghostty/vt.h>
+
 #include <cmath>
 
 #include <cerrno>
@@ -491,6 +493,53 @@ static void testUnshiftedCodepoint() {
     CHECK(up.find("\x1b[A") != std::string::npos || up.find("\x1bOA") != std::string::npos);
 }
 
+// Kitty keyboard protocol: Shift is the unshifted key plus the Shift modifier,
+// a fresh Alt/Ctrl chord keeps that modifier, and releases are sent only when
+// the application asks for event types.
+static void testKittyKeyboard() {
+    VtermSession legacy(4, 40);
+    legacy.sendChar('A', ModShift, 'a');
+    CHECK_EQ(legacy.takeOutput(), std::string("A"));  // legacy: the character, not a CSI
+    legacy.sendChar('A', ModCtrl | ModShift, 'a');
+    CHECK_EQ(legacy.takeOutput(), std::string("\x1b[97;6u"));  // Ctrl+Shift+A is not Ctrl+A
+    legacy.sendChar('x', ModAlt);
+    CHECK_EQ(legacy.takeOutput(), std::string("\x1bx"));
+
+    VtermSession s(4, 40);
+    s.feed("\x1b[=5u");  // disambiguate + report alternates
+    s.takeOutput();
+    CHECK(!s.reportsKeyEvents());
+    s.sendChar('A', ModShift, 'a');
+    CHECK_EQ(s.takeOutput(), std::string("\x1b[97:65;2u"));
+    // First chord after the mode switch still carries Alt / Ctrl.
+    s.sendChar('x', ModAlt);
+    CHECK_EQ(s.takeOutput(), std::string("\x1b[120;3u"));
+    s.sendChar('c', ModCtrl);
+    CHECK_EQ(s.takeOutput(), std::string("\x1b[99;5u"));
+    s.sendChar('a', ModNone, 0, KeyAction::Release);
+    CHECK_EQ(s.takeOutput(), std::string(""));  // releases off
+
+    s.feed("\x1b[=31u");  // every kitty flag
+    s.takeOutput();
+    CHECK(s.reportsKeyEvents());
+    CHECK(s.reportsAllKeys());
+    s.sendChar('a', ModNone);
+    CHECK_EQ(s.takeOutput(), std::string("\x1b[97;;97u"));  // associated text, press
+    s.sendChar('a', ModNone, 'a', KeyAction::Release);
+    const std::string up = s.takeOutput();
+    CHECK(up.find(":3") != std::string::npos);  // event type release
+    CHECK(up.find("97") != std::string::npos);
+    s.sendPhysical(GHOSTTY_KEY_CONTROL_LEFT, ModCtrl, nullptr, 0, 0);
+    const std::string ctrl = s.takeOutput();
+    std::printf("kitty ctrl press: %s\n", ctrl.c_str());
+    CHECK(!ctrl.empty());
+    CHECK(ctrl.find(";5") != std::string::npos);  // Ctrl modifier is present on the key itself
+    s.sendPhysical(GHOSTTY_KEY_ALT_LEFT, ModAlt, nullptr, 0, 0);
+    const std::string alt = s.takeOutput();
+    CHECK(!alt.empty());
+    CHECK(alt.find(";3") != std::string::npos);
+}
+
 static void testPaste() {
     VtermSession s(4, 20);
     s.paste("echo hi\nline2\r\nx\x1b[201~y\x03");
@@ -765,6 +814,7 @@ int main() {
     testBezelMapping();
     testMouse();
     testUnshiftedCodepoint();
+    testKittyKeyboard();
     testPaste();
     testCursor();
     testGridCursorDiff();

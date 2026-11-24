@@ -588,11 +588,17 @@ static GhosttyMods ghostMods(int mod) {
     return m;
 }
 
-void VtermSession::encodeKey(int key, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted) {
+void VtermSession::encodeKey(int key, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted, KeyAction action) {
     ghostty_key_encoder_set_from_terminal(g_->keys, g_->vt);
-    ghostty_key_event_set_action(g_->keyEv, GHOSTTY_KEY_ACTION_PRESS);
+    GhosttyKeyAction act = GHOSTTY_KEY_ACTION_PRESS;
+    if (action == KeyAction::Release) act = GHOSTTY_KEY_ACTION_RELEASE;
+    else if (action == KeyAction::Repeat) act = GHOSTTY_KEY_ACTION_REPEAT;
+    ghostty_key_event_set_action(g_->keyEv, act);
     ghostty_key_event_set_key(g_->keyEv, static_cast<GhosttyKey>(key));
     ghostty_key_event_set_mods(g_->keyEv, ghostMods(mod));
+    // Consumed mods are cleared every event. Leaving Alt or Ctrl consumed from
+    // an earlier translation made the next press of that modifier encode as a
+    // plain character.
     ghostty_key_event_set_consumed_mods(g_->keyEv, 0);
     GhosttyString text{};
     text.ptr = reinterpret_cast<const uint8_t*>(utf8 ? utf8 : "");
@@ -615,9 +621,30 @@ void VtermSession::encodeKey(int key, int mod, const char* utf8, size_t utf8Len,
     sendBytes(big.empty() ? reinterpret_cast<char*>(buf) : big.data(), n);
 }
 
-void VtermSession::sendKey(TermKey key, int mod) { encodeKey(ghostKey(key), mod, nullptr, 0, 0); }
+void VtermSession::sendKey(TermKey key, int mod, KeyAction action) {
+    encodeKey(ghostKey(key), mod, nullptr, 0, 0, action);
+}
 
-void VtermSession::sendChar(uint32_t cp, int mod) {
+static uint8_t kittyFlags(GhosttyTerminal vt) {
+    uint8_t flags = 0;
+    if (ghostty_terminal_get(vt, GHOSTTY_TERMINAL_DATA_KITTY_KEYBOARD_FLAGS, &flags) != GHOSTTY_SUCCESS) return 0;
+    return flags;
+}
+
+bool VtermSession::reportsKeyEvents() const {
+    return (kittyFlags(g_->vt) & GHOSTTY_KITTY_KEY_REPORT_EVENTS) != 0;
+}
+
+bool VtermSession::reportsAllKeys() const {
+    return (kittyFlags(g_->vt) & GHOSTTY_KITTY_KEY_REPORT_ALL) != 0;
+}
+
+void VtermSession::sendPhysical(int ghostKey, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted,
+                                KeyAction action) {
+    encodeKey(ghostKey, mod, utf8, utf8Len, unshifted, action);
+}
+
+void VtermSession::sendChar(uint32_t cp, int mod, uint32_t unshifted, KeyAction action) {
     int key = GHOSTTY_KEY_UNIDENTIFIED;
     if (cp >= 'a' && cp <= 'z') key = GHOSTTY_KEY_A + static_cast<int>(cp - 'a');
     else if (cp >= 'A' && cp <= 'Z') key = GHOSTTY_KEY_A + static_cast<int>(cp - 'A');
@@ -632,7 +659,10 @@ void VtermSession::sendChar(uint32_t cp, int mod) {
     const int n = printable ? utf8Of(cp, utf8) : 0;
     // Unshifted codepoint of this event, including non-ASCII (Alt+é is U+00E9,
     // not "no codepoint"). Control keys have none, which clears the field.
-    encodeKey(key, mod, n ? utf8 : nullptr, static_cast<size_t>(n), printable ? cp : 0);
+    // An explicit unshifted value (the key with Shift released) wins, so
+    // Shift+A is reported as "a" plus Shift rather than as the letter A.
+    const uint32_t uns = unshifted ? unshifted : (printable ? cp : 0);
+    encodeKey(key, mod, n ? utf8 : nullptr, static_cast<size_t>(n), uns, action);
 }
 
 void VtermSession::sendBytes(const char* bytes, size_t len) {

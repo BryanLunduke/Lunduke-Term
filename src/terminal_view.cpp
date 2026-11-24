@@ -4,6 +4,7 @@
 
 #include <epoxy/gl.h>
 #include <gdk/gdkkeysyms.h>
+#include <ghostty/vt.h>
 
 #include <algorithm>
 #include <chrono>
@@ -110,9 +111,7 @@ TerminalView::TerminalView(const ViewOptions& opts)
         w->add_events(Gdk::KEY_PRESS_MASK | Gdk::KEY_RELEASE_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK |
                       Gdk::POINTER_MOTION_MASK | Gdk::SCROLL_MASK | Gdk::SMOOTH_SCROLL_MASK);
         w->signal_key_press_event().connect(sigc::mem_fun(*this, &TerminalView::onKey), false);
-        w->signal_key_release_event().connect([this](GdkEventKey* ev) {
-            return ev->window && gtk_im_context_filter_keypress(im_, ev);
-        }, false);
+        w->signal_key_release_event().connect(sigc::mem_fun(*this, &TerminalView::onKeyRelease), false);
         w->signal_focus_in_event().connect([this](GdkEventFocus*) {
             gtk_im_context_focus_in(im_);
             return false;
@@ -1460,21 +1459,111 @@ bool TerminalView::onKey(GdkEventKey* ev) {
         // (dead acute, Ctrl+C, q sent "^C" then "´q"); drop it before the chord goes out.
         gtk_im_context_reset(im_);
     }
-    const int mod = modsOf(ev->state);
+    return deliverKey(ev, false);
+}
+
+namespace {
+int ghostFromKeyval(guint keyval) {
+    if (keyval >= GDK_KEY_a && keyval <= GDK_KEY_z) return GHOSTTY_KEY_A + static_cast<int>(keyval - GDK_KEY_a);
+    if (keyval >= GDK_KEY_A && keyval <= GDK_KEY_Z) return GHOSTTY_KEY_A + static_cast<int>(keyval - GDK_KEY_A);
+    if (keyval >= GDK_KEY_0 && keyval <= GDK_KEY_9) return GHOSTTY_KEY_DIGIT_0 + static_cast<int>(keyval - GDK_KEY_0);
+    switch (keyval) {
+    case GDK_KEY_space: return GHOSTTY_KEY_SPACE;
+    case GDK_KEY_minus: case GDK_KEY_underscore: return GHOSTTY_KEY_MINUS;
+    case GDK_KEY_equal: case GDK_KEY_plus: return GHOSTTY_KEY_EQUAL;
+    case GDK_KEY_bracketleft: case GDK_KEY_braceleft: return GHOSTTY_KEY_BRACKET_LEFT;
+    case GDK_KEY_bracketright: case GDK_KEY_braceright: return GHOSTTY_KEY_BRACKET_RIGHT;
+    case GDK_KEY_backslash: case GDK_KEY_bar: return GHOSTTY_KEY_BACKSLASH;
+    case GDK_KEY_semicolon: case GDK_KEY_colon: return GHOSTTY_KEY_SEMICOLON;
+    case GDK_KEY_apostrophe: case GDK_KEY_quotedbl: return GHOSTTY_KEY_QUOTE;
+    case GDK_KEY_comma: case GDK_KEY_less: return GHOSTTY_KEY_COMMA;
+    case GDK_KEY_period: case GDK_KEY_greater: return GHOSTTY_KEY_PERIOD;
+    case GDK_KEY_slash: case GDK_KEY_question: return GHOSTTY_KEY_SLASH;
+    case GDK_KEY_grave: case GDK_KEY_asciitilde: return GHOSTTY_KEY_BACKQUOTE;
+    case GDK_KEY_Shift_L: return GHOSTTY_KEY_SHIFT_LEFT;
+    case GDK_KEY_Shift_R: return GHOSTTY_KEY_SHIFT_RIGHT;
+    case GDK_KEY_Control_L: return GHOSTTY_KEY_CONTROL_LEFT;
+    case GDK_KEY_Control_R: return GHOSTTY_KEY_CONTROL_RIGHT;
+    case GDK_KEY_Alt_L: return GHOSTTY_KEY_ALT_LEFT;
+    case GDK_KEY_Alt_R: case GDK_KEY_ISO_Level3_Shift: return GHOSTTY_KEY_ALT_RIGHT;
+    default: return -1;
+    }
+}
+
+uint32_t unshiftedOf(GdkEventKey* ev) {
+    if (ev->window && ev->hardware_keycode) {
+        GdkKeymap* map = gdk_keymap_get_for_display(gdk_window_get_display(ev->window));
+        guint base = 0;
+        const auto keep = static_cast<GdkModifierType>(ev->state & (GDK_MOD2_MASK | GDK_LOCK_MASK));
+        if (gdk_keymap_translate_keyboard_state(map, ev->hardware_keycode, keep, ev->group, &base, nullptr, nullptr,
+                                                nullptr)) {
+            const guint32 u = gdk_keyval_to_unicode(base);
+            if (u) return u;
+        }
+    }
+    const guint32 u = gdk_keyval_to_unicode(ev->keyval);
+    if (u >= 'A' && u <= 'Z') return u - 'A' + 'a';
+    return u;
+}
+}  // namespace
+
+bool TerminalView::deliverKey(GdkEventKey* ev, bool release) {
+    int mod = modsOf(ev->state);
+    const guint kv = ev->keyval;
+    const bool shiftKey = kv == GDK_KEY_Shift_L || kv == GDK_KEY_Shift_R;
+    const bool ctrlKey = kv == GDK_KEY_Control_L || kv == GDK_KEY_Control_R;
+    const bool altKey = kv == GDK_KEY_Alt_L || kv == GDK_KEY_Alt_R || kv == GDK_KEY_ISO_Level3_Shift;
+    // state is the modifiers from before this event. The Alt or Ctrl key's own
+    // press does not include itself yet, so a fresh modifier press was encoded
+    // with that modifier missing. The release still has it; drop it so the
+    // event describes the key going up.
+    if (shiftKey) mod = release ? (mod & ~ModShift) : (mod | ModShift);
+    if (ctrlKey) mod = release ? (mod & ~ModCtrl) : (mod | ModCtrl);
+    if (altKey) mod = release ? (mod & ~ModAlt) : (mod | ModAlt);
+
+    KeyAction action = KeyAction::Press;
+    if (release) {
+        heldKeys_.erase(ev->hardware_keycode);
+        action = KeyAction::Release;
+    } else if (ev->hardware_keycode && !heldKeys_.insert(ev->hardware_keycode).second) {
+        action = KeyAction::Repeat;
+    }
+
+    const uint32_t unshifted = unshiftedOf(ev);
+    const guint32 uc = gdk_keyval_to_unicode(kv);
     TermKey key;
-    if (mapKey(ev->keyval, key)) {
-        session_->sendKey(key, mod);
-        sendKeyInput();
+    if (mapKey(kv, key)) {
+        session_->sendKey(key, mod, action);
+        if (!release) sendKeyInput();
         return true;
     }
-    const guint32 uc = gdk_keyval_to_unicode(ev->keyval);
-    if (uc) {
-        // Shift is already reflected in the character itself.
-        session_->sendChar(uc, mod & ~ModShift);
-        sendKeyInput();
+    if (const int gk = ghostFromKeyval(kv); gk >= 0 && uc == 0) {
+        // Modifier keys encode only when the app asked for every key. Otherwise
+        // leave the event for GTK accelerators; the modifier is still in the
+        // state of the next key press.
+        if (!release && !session_->reportsAllKeys()) return false;
+        session_->sendPhysical(gk, mod, nullptr, 0, 0, action);
+        if (!release) sendKeyInput();
+        return true;
+    }
+    if (uc || unshifted) {
+        const uint32_t cp = uc ? uc : unshifted;
+        session_->sendChar(cp, mod, unshifted, action);
+        if (!release) sendKeyInput();
         return true;
     }
     return false;
+}
+
+bool TerminalView::onKeyRelease(GdkEventKey* ev) {
+    heldKeys_.erase(ev->hardware_keycode);
+    if (holding_ || exited_) return true;
+    const bool keypad = ev->keyval >= GDK_KEY_KP_Space && ev->keyval <= GDK_KEY_KP_9;
+    if (ev->window && !(ev->state & (GDK_CONTROL_MASK | GDK_MOD1_MASK)) && !keypad) {
+        if (gtk_im_context_filter_keypress(im_, ev)) return true;
+    }
+    if (!session_->reportsKeyEvents()) return false;
+    return deliverKey(ev, true);
 }
 
 void TerminalView::onImCommit(const char* text) {

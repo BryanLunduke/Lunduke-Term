@@ -52,6 +52,10 @@ constexpr int ModShift = 1;
 constexpr int ModAlt = 2;
 constexpr int ModCtrl = 4;
 
+// Matches GhosttyKeyAction. Release is only encoded when the application asked
+// for kitty keyboard event types.
+enum class KeyAction : int { Release = 0, Press = 1, Repeat = 2 };
+
 // Keys the view maps from GDK. Printable characters go through sendChar.
 enum class TermKey : int {
     Enter, Tab, Backspace, Escape,
@@ -99,8 +103,19 @@ public:
     int cols() const override { return cols_; }
 
     // Input. Key and mouse bytes come from libghostty's encoders.
-    void sendKey(TermKey key, int mod);
-    void sendChar(uint32_t codepoint, int mod);
+    // `unshifted` is the key with Shift released (0: use `codepoint` when it is
+    // printable). Kitty mode reports that codepoint plus the Shift modifier;
+    // legacy mode still sends the shifted character.
+    void sendKey(TermKey key, int mod, KeyAction action = KeyAction::Press);
+    void sendChar(uint32_t codepoint, int mod, uint32_t unshifted = 0, KeyAction action = KeyAction::Press);
+    // A physical key the TermKey / codepoint mapping does not cover (modifiers,
+    // punctuation). `ghostKey` is a GhosttyKey value.
+    void sendPhysical(int ghostKey, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted,
+                      KeyAction action = KeyAction::Press);
+    // Kitty keyboard protocol flag "report event types" (press, repeat, release).
+    bool reportsKeyEvents() const;
+    // Kitty keyboard protocol flag "report all keys as escape codes" (modifier keys).
+    bool reportsAllKeys() const;
     void sendBytes(const char* bytes, size_t len);
     void flushWrites();
     bool wantsWrite() const { return !writeQueue_.empty(); }
@@ -177,7 +192,7 @@ private:
     void syncLines();
     void refreshCursor(bool fromApp);
     void syncMouseEncoder();
-    void encodeKey(int ghostKey, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted);
+    void encodeKey(int ghostKey, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted, KeyAction action);
     void emitMouse(int row, int col, int button, int action, int mod);
     bool locate(long line, int col, void* point) const;
     CellRead readAt(long line, int col) const;
