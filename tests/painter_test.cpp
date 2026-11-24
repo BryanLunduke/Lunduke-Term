@@ -289,5 +289,47 @@ int main() {
     cairo_surface_destroy(ref);
     cairo_surface_destroy(fast);
     cairo_surface_destroy(full);
+
+    // A 4:3 cell stretches the glyph. The stretch is baked into the cache; two paints match,
+    // and the cell is not blank.
+    {
+        GridPainter wide("DejaVu Sans Mono", 16, 1, 10, 25);
+        Grid sg;
+        sg.resize(2, 8);
+        const char* msg = "Amber";
+        for (int c = 0; msg[c]; ++c) {
+            sg.at(0, c).text = std::string(1, msg[c]);
+            sg.at(0, c).fg = Color8{255, 129, 0};
+        }
+        const int sw = 8 * wide.cellWidth(), sh = 2 * wide.cellHeight();
+        cairo_surface_t* a = cairo_image_surface_create(CAIRO_FORMAT_RGB24, sw, sh);
+        cairo_surface_t* b = cairo_image_surface_create(CAIRO_FORMAT_RGB24, sw, sh);
+        cairo_t* ca = cairo_create(a);
+        cairo_t* cb = cairo_create(b);
+        wide.paintRows(ca, sg, 0, 0, Color8{255, 129, 0}, Color8{0, 0, 0}, nullptr, sw);
+        wide.paintRows(cb, sg, 0, 0, Color8{255, 129, 0}, Color8{0, 0, 0}, nullptr, sw);
+        cairo_destroy(ca);
+        cairo_destroy(cb);
+        int smx;
+        double smean;
+        stats(pixels(a), pixels(b), &smx, &smean);
+        int ink = 0;
+        cairo_surface_flush(a);
+        const uint8_t* d = cairo_image_surface_get_data(a);
+        const int st = cairo_image_surface_get_stride(a);
+        for (int y = 0; y < wide.cellHeight(); ++y)
+            for (int x = 0; x < sw; ++x) {
+                const uint8_t* p = d + y * st + x * 4;
+                ink += std::max(p[0], std::max(p[1], p[2])) > 20;
+            }
+        std::printf("stretched 4:3 paint: max diff %d, ink %d, cell %dx%d\n", smx, ink, wide.cellWidth(),
+                    wide.cellHeight());
+        if (smx != 0 || ink < 10) {
+            std::fprintf(stderr, "FAIL: stretched glyph cache\n");
+            ++fails;
+        }
+        cairo_surface_destroy(a);
+        cairo_surface_destroy(b);
+    }
     return fails ? 1 : 0;
 }

@@ -69,6 +69,8 @@ private:
     int cellW_ = 8, cellH_ = 16, ascent_ = 12;
     int natW_ = 8, natH_ = 16;  // the font's cell, before a CRT or fit-to-screen box
     int scale_ = 1;
+    int blitOriginX_ = 0;  // where a cached mask's left edge sits relative to the cell
+    bool prescale_ = false;
 };
 
 // Converts a Cairo ARGB32 surface (premultiplied, opaque here) to tightly packed RGBA8.
