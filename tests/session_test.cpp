@@ -552,6 +552,34 @@ static void testPaste() {
     CHECK_EQ(s.takeOutput(), std::string("plain\t\xc3\xa9"));
 }
 
+static void testPasteCap() {
+    VtermSession s(4, 20);
+    s.paste(std::string(1000, 'q'));
+    s.paste("Z");
+    CHECK_EQ(s.takeOutput(), std::string(1000, 'q') + "Z");
+
+    VtermSession big(4, 20);
+    big.paste(std::string(kMaxWriteQueueBytes + 250000, 'a'));
+    big.paste("XYZ");  // the queue is full: this paste must not grow it
+    const std::string out = big.takeOutput();
+    CHECK(out.size() <= kMaxWriteQueueBytes);
+    CHECK(out.size() >= kMaxWriteQueueBytes - 4);
+    CHECK(out.find("XYZ") == std::string::npos);
+    CHECK(out.find_first_not_of('a') == std::string::npos);
+
+    VtermSession br(4, 20);
+    br.feed("\x1b[?2004h");
+    br.takeOutput();
+    br.paste(std::string(kMaxWriteQueueBytes, 'b'));
+    const std::string wrapped = br.takeOutput();
+    CHECK(wrapped.size() <= kMaxWriteQueueBytes);
+    CHECK(wrapped.compare(0, 6, "\x1b[200~") == 0);
+    CHECK(wrapped.size() >= 12);
+    CHECK(wrapped.compare(wrapped.size() - 6, 6, "\x1b[201~") == 0);
+    std::printf("paste cap: plain %zu bytes, bracketed %zu bytes (cap %zu)\n", out.size(), wrapped.size(),
+                kMaxWriteQueueBytes);
+}
+
 static void testCursor() {
     VtermSession s(4, 20);
     CHECK_EQ(s.cursorShape(), 0);  // not set by the app: the user's setting applies
@@ -816,6 +844,7 @@ int main() {
     testUnshiftedCodepoint();
     testKittyKeyboard();
     testPaste();
+    testPasteCap();
     testCursor();
     testGridCursorDiff();
     testEnvironment();

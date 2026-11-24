@@ -36,6 +36,9 @@ std::string sanitizePaste(const std::string& text);
 constexpr size_t kMaxTitleBytes = 4096;            // OSC 0/2 window title
 constexpr size_t kMaxScrollbackLines = 100000;     // scrollback-lines setting / --scrollback
 constexpr size_t kDefaultScrollbackLines = 5000;   // when settings.ini and --scrollback give none
+// Bytes of input waiting on a PTY that is not reading. Further paste is dropped
+// until some of it is written, so a stuck reader cannot grow this without bound.
+constexpr size_t kMaxWriteQueueBytes = 1u << 20;
 // Negative -> 0, above kMaxScrollbackLines -> kMaxScrollbackLines.
 size_t clampScrollbackLines(long long requested);
 // Child side of spawn(): closes every fd >= 3 (close_range, or close() up to maxFd).

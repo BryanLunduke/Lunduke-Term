@@ -670,12 +670,11 @@ void VtermSession::sendChar(uint32_t cp, int mod, uint32_t unshifted, KeyAction 
 
 void VtermSession::sendBytes(const char* bytes, size_t len) {
     if (!len) return;
-    if (fd_ < 0) {
-        pendingOut_.append(bytes, len);
-        return;
-    }
-    writeQueue_.append(bytes, len);
-    flushWrites();
+    std::string& q = fd_ < 0 ? pendingOut_ : writeQueue_;
+    if (q.size() >= kMaxWriteQueueBytes) return;
+    if (q.size() + len > kMaxWriteQueueBytes) len = kMaxWriteQueueBytes - q.size();
+    q.append(bytes, len);
+    if (fd_ >= 0) flushWrites();
 }
 
 void VtermSession::flushWrites() {
@@ -693,8 +692,18 @@ void VtermSession::flushWrites() {
 }
 
 void VtermSession::paste(const std::string& text) {
+    std::string& q = fd_ < 0 ? pendingOut_ : writeQueue_;
+    if (q.size() >= kMaxWriteQueueBytes) return;
     std::string body = sanitizePaste(text);
     const bool bracketed = modeOn(g_->vt, GHOSTTY_MODE_BRACKETED_PASTE);
+    // Bracketed paste adds ESC[200~ and ESC[201~. Keep the whole sequence, including
+    // the closing bracket, inside the queue cap. The tail of an oversized paste is
+    // dropped until the program reads and the queue drains.
+    const size_t overhead = bracketed ? 12 : 0;
+    const size_t room = kMaxWriteQueueBytes - q.size();
+    if (overhead >= room) return;
+    if (body.size() > room - overhead) truncateUtf8(body, room - overhead);
+    if (body.empty()) return;
     size_t need = 0;
     GhosttyResult r = ghostty_paste_encode(body.data(), body.size(), bracketed, nullptr, 0, &need);
     if (r == GHOSTTY_SUCCESS) return;
