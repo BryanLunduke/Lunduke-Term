@@ -290,7 +290,10 @@ void VtermSession::syncLines() {
         GhosttyPointCoordinate c{};
         if (ghostty_tracked_grid_ref_point(g_->anchor, GHOSTTY_POINT_TAG_SCREEN, &c) == GHOSTTY_SUCCESS) {
             const long neu = anchorGlobal_ + static_cast<long>(sb) - static_cast<long>(c.y);
-            if (static_cast<long>(c.y) < static_cast<long>(anchorY_)) ++epoch_;
+            // c.y falling is scrollback trimmed above the anchor. Surviving lines keep
+            // their global numbers, so the search cache can drop that prefix instead of
+            // treating the history as new. A cleared or invalidated anchor still bumps
+            // the epoch below.
             topLine_ = neu;
         }
     } else if (anchorLive_) {
