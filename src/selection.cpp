@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cctype>
+#include <cstdlib>
 #include <cstring>
 
 namespace lterm {
@@ -214,6 +215,92 @@ WindowSize windowSizeForGrid(int cols, int rows, int cellW, int cellH, int scale
     out.width = tightInner(std::max(1, cols), cw, marginMinPx, marginFrac) + 2 * fi;
     out.height = tightInner(std::max(1, rows), ch, marginMinPx, marginFrac) + 2 * fi;
     return out;
+}
+
+namespace {
+// Signed distance from 4:3. Positive means the window is wider than a CRT.
+long aspectMiss(const WindowSize& w) { return 3L * w.width - 4L * w.height; }
+}  // namespace
+
+CellBox fitCellBox(int natCellW, int natCellH, int scale, int cols, int rows, int marginMinPx, float marginFrac,
+                   int frameInset, bool crtAspect, int maxLogicalW, int maxLogicalH) {
+    const int s = std::max(1, scale);
+    const int c = std::max(1, cols), r = std::max(1, rows);
+    int cw = std::max(1, natCellW / s);
+    int ch = std::max(1, natCellH / s);
+    auto windowAt = [&](int lw, int lh) {
+        return windowSizeForGrid(c, r, std::max(1, lw) * s, std::max(1, lh) * s, s, marginMinPx, marginFrac,
+                                 frameInset);
+    };
+    auto closer = [&](int a, int b, bool widthAxis) {
+        const long ea = std::labs(aspectMiss(widthAxis ? windowAt(a, ch) : windowAt(cw, a)));
+        const long eb = std::labs(aspectMiss(widthAxis ? windowAt(b, ch) : windowAt(cw, b)));
+        return ea <= eb ? a : b;
+    };
+    if (crtAspect) {
+        const long miss = aspectMiss(windowAt(cw, ch));
+        if (miss > 0) {
+            // Too wide for 4:3: stretch the cell taller until the glass matches a CRT.
+            int lo = ch, hi = std::max(ch + 1, ch * 4);
+            while (aspectMiss(windowAt(cw, hi)) > 0 && hi < ch * 16) hi *= 2;
+            while (lo < hi) {
+                const int mid = (lo + hi) / 2;
+                if (aspectMiss(windowAt(cw, mid)) > 0) lo = mid + 1;
+                else hi = mid;
+            }
+            ch = lo > ch ? closer(lo, lo - 1, false) : lo;
+        } else if (miss < 0) {
+            int lo = cw, hi = std::max(cw + 1, cw * 4);
+            while (aspectMiss(windowAt(hi, ch)) < 0 && hi < cw * 16) hi *= 2;
+            while (lo < hi) {
+                const int mid = (lo + hi) / 2;
+                if (aspectMiss(windowAt(mid, ch)) < 0) lo = mid + 1;
+                else hi = mid;
+            }
+            cw = lo > cw ? closer(lo, lo - 1, true) : lo;
+        }
+    }
+    if (maxLogicalW > 0 && maxLogicalH > 0) {
+        const WindowSize full = windowAt(cw, ch);
+        if (full.width > maxLogicalW || full.height > maxLogicalH) {
+            int lo = 1, hi = 1000, best = 1;
+            while (lo <= hi) {
+                const int mid = (lo + hi) / 2;
+                const int tw = std::max(1, (cw * mid) / 1000);
+                const int th = std::max(1, (ch * mid) / 1000);
+                const WindowSize t = windowAt(tw, th);
+                if (t.width <= maxLogicalW && t.height <= maxLogicalH) {
+                    best = mid;
+                    lo = mid + 1;
+                } else {
+                    hi = mid - 1;
+                }
+            }
+            cw = std::max(1, (cw * best) / 1000);
+            ch = std::max(1, (ch * best) / 1000);
+            // Integer rounding can leave the window a pixel over the work area, or a little
+            // off 4:3. Nudge while staying inside the work area.
+            for (int n = 0; n < 64; ++n) {
+                WindowSize t = windowAt(cw, ch);
+                if (t.width > maxLogicalW || t.height > maxLogicalH) {
+                    if (cw > 1 && (t.width > maxLogicalW || ch == 1)) --cw;
+                    if (ch > 1 && (t.height > maxLogicalH || cw == 1)) --ch;
+                    continue;
+                }
+                if (!crtAspect) break;
+                const long e = aspectMiss(t);
+                const long tol = std::max(2L, std::max<long>(t.width, t.height) / 80);
+                if (std::labs(e) <= tol) break;
+                if (e > 0 && ch + 1 < 4096 && windowAt(cw, ch + 1).height <= maxLogicalH) ++ch;
+                else if (e < 0 && cw + 1 < 4096 && windowAt(cw + 1, ch).width <= maxLogicalW) ++cw;
+                else break;
+            }
+        }
+    }
+    CellBox box;
+    box.cellW = std::max(1, cw) * s;
+    box.cellH = std::max(1, ch) * s;
+    return box;
 }
 
 }  // namespace lterm

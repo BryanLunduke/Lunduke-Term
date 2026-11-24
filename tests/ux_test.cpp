@@ -892,7 +892,10 @@ int main(int argc, char** argv) {
     testPlainRenders("cpu");
     testSettingsFontPx();
     {
-        // First launch, no --size: the window's default size is an 80x24 grid of the profile font.
+        // The bell does not flash or beep unless a setting asks for it.
+        CHECK(!ViewOptions{}.bellVisual);
+        CHECK(!ViewOptions{}.bellAudible);
+        // First launch, no --size: a 4:3 window whose grid is still 80x24.
         ViewOptions o;
         o.profile = "amber";
         o.renderer = "cpu";
@@ -911,17 +914,15 @@ int main(int argc, char** argv) {
             CHECK(v->session().cols() == kDefaultCols);
             CHECK(v->session().rows() == kDefaultRows);
         }
-        // --frame adds the bezel and the window grows so the grid stays 80x24.
+        // --frame adds the bezel. The window stays 4:3 and still holds 80x24, so it grows,
+        // but not by exactly twice the frame on each axis: the cell stretch is refit.
         ViewOptions framed = o;
         framed.tube.frame = 1;
         const WindowSize withFrame = defaultWindowSize(framed);
         CHECK(withFrame.width > want.width && withFrame.height > want.height);
-        const Profile* amber = findProfile("amber");
-        if (amber && amber->fx.frameSize > 0) {
-            const int grow = 2 * static_cast<int>(std::lround(amber->fx.frameSize));
-            CHECK(withFrame.width >= want.width + grow - 2);
-            CHECK(withFrame.height >= want.height + grow - 2);
-        }
+        const double aspect = static_cast<double>(withFrame.width) / std::max(1, withFrame.height);
+        CHECK(std::fabs(aspect - 4.0 / 3.0) < 0.04);
+        std::printf("framed window: %dx%d aspect %.3f\n", withFrame.width, withFrame.height, aspect);
     }
     testFullscreenKey();
     testFontZoom();

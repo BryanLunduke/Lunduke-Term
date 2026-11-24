@@ -42,7 +42,8 @@ static bool sameProfile(const Profile& a, const Profile& b) {
     return a.effects == b.effects && a.fg == b.fg && a.bg == b.bg && a.cursor == b.cursor && a.palette == b.palette &&
            a.minFgGrey == b.minFgGrey && a.hasEffectsPalette == b.hasEffectsPalette &&
            a.effectsPalette == b.effectsPalette && a.effectsMinFgGrey == b.effectsMinFgGrey && fontsEq &&
-           a.fontFamily == b.fontFamily && a.fontPx == b.fontPx && a.marginFrac == b.marginFrac &&
+           a.fontFamily == b.fontFamily && a.fontPx == b.fontPx && a.termCols == b.termCols && a.termRows == b.termRows &&
+           a.crtAspect == b.crtAspect && a.marginFrac == b.marginFrac &&
            a.marginMinPx == b.marginMinPx && a.bezelOption == b.bezelOption && same(x.fontColor, y.fontColor) &&
            same(x.backgroundColor, y.backgroundColor) && x.bloom == y.bloom && x.burnIn == y.burnIn &&
            x.chromaColor == y.chromaColor && x.brightness == y.brightness && x.ambientLight == y.ambientLight &&

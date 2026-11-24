@@ -41,7 +41,9 @@ struct ViewOptions {
     bool loginShell = false;
     std::string cwd;
     std::string onExit = "hold-on-error";  // close | hold | hold-on-error
-    bool bellVisual = true, bellUrgent = true, bellAudible = false;
+    // Screen flash and beep are off unless settings or --bell ask for them. urgent is the
+    // window-manager hint only (no flash while the window is focused).
+    bool bellVisual = false, bellUrgent = true, bellAudible = false;
     std::string cursorShape = "block";  // block | underline | bar (DECSCUSR overrides)
     bool cursorBlink = false;           // DECSCUSR / ?12 override
     // Review item 5: blinking stops (cursor solid) this long after the last key, output or

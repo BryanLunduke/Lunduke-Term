@@ -36,6 +36,11 @@ struct Profile {
     std::vector<FontChoice> fonts;
     std::string fontFamily;   // the same list joined with ", " (for display / Pango)
     int fontPx = 16;          // size for choices with px == 0
+    // The character grid a new window shows. 0 means the standard 80x24. pixel-40col is 40x25.
+    int termCols = 80, termRows = 24;
+    // Retro tubes open in a 4:3 window (a CRT monitor) with this grid fitted inside it.
+    // Plain and modern stay a tight window around the same grid.
+    bool crtAspect = true;
     // Fraction of the window kept free around the text (the barrel warp hides the corners).
     float marginFrac = 0.0f;
     int marginMinPx = 4;

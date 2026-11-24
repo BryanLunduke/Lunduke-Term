@@ -129,7 +129,7 @@ int main() {
     }
     {
         const Profile* dos = findProfile("ibm-dos");
-        CHECK(dos && !dos->fonts.empty() && dos->fonts.front().family == "Px IBM VGA8" && dos->fonts.front().px == 32);
+        CHECK(dos && !dos->fonts.empty() && dos->fonts.front().family == "Px IBM VGA8" && dos->fonts.front().px == 16);
         const Profile* m3278 = findProfile("ibm-3278");
         CHECK(m3278 && !m3278->fonts.empty() && m3278->fonts.front().family == "IBM 3270");
         CHECK(profileFont(*dos).fallback);

@@ -114,4 +114,15 @@ struct WindowSize {
 WindowSize windowSizeForGrid(int cols, int rows, int cellW, int cellH, int scale, int marginMinPx, float marginFrac,
                              int frameInset = 0);
 
+// Device-pixel cell box for a new window. `natCellW/H` are the font's own cell at `scale`.
+// When `crtAspect` is set, one axis is stretched so windowSizeForGrid is 4:3 (the glass of a
+// CRT) while the grid stays `cols` x `rows`. Glyphs are drawn into that box. A positive
+// maxLogicalW/H then shrinks both axes together until the window fits the work area. 0 means
+// no limit. The box is never smaller than 1 device pixel.
+struct CellBox {
+    int cellW = 1, cellH = 1;
+};
+CellBox fitCellBox(int natCellW, int natCellH, int scale, int cols, int rows, int marginMinPx, float marginFrac,
+                   int frameInset, bool crtAspect, int maxLogicalW = 0, int maxLogicalH = 0);
+
 }  // namespace lterm

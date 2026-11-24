@@ -254,7 +254,7 @@ static void testWindowForGrid() {
                                                p->marginFrac, 0);
         CHECK_EQ(g.cols, kDefaultCols);
         CHECK_EQ(g.rows, kDefaultRows);
-        std::printf("default window: %s %d px, cell %dx%d, logical %dx%d (80x24)\n", f.family.c_str(), f.px,
+        std::printf("tight grid: %s %d px, cell %dx%d, logical %dx%d (80x24)\n", f.family.c_str(), f.px,
                     gp.cellWidth(), gp.cellHeight(), s.width, s.height);
         // DejaVu Sans Mono 16 px is 10x19 on this box (same cell as Monospace 12). xfce4-terminal's
         // default 80x24 client window measured 818x485; the extra pixels here are amber's 4% margin.
@@ -264,6 +264,63 @@ static void testWindowForGrid() {
             CHECK_EQ(s.width, amber.width);
             CHECK_EQ(s.height, amber.height);
         }
+    }
+}
+
+// Retro profiles: the default window is 4:3 and the profile's grid still fills it. Plain and
+// modern stay tight. A small work area shrinks the cells instead of the column count.
+static void testCrtWindow() {
+    auto check = [](const char* id, int cols, int rows, bool crt, int maxW, int maxH) {
+        const Profile* p = findProfile(id);
+        CHECK(p);
+        if (!p) return;
+        const FontPick f = profileFont(*p);
+        GridPainter gp(f.family, f.px, 1);
+        const CellBox box = fitCellBox(gp.cellWidth(), gp.cellHeight(), 1, cols, rows, p->marginMinPx, p->marginFrac,
+                                       0, crt, maxW, maxH);
+        const WindowSize s = windowSizeForGrid(cols, rows, box.cellW, box.cellH, 1, p->marginMinPx, p->marginFrac, 0);
+        const GridLayout g = computeGridLayout(s.width, s.height, 1, box.cellW, box.cellH, p->marginMinPx, p->marginFrac, 0);
+        CHECK_EQ(g.cols, cols);
+        CHECK_EQ(g.rows, rows);
+        if (maxW > 0) CHECK(s.width <= maxW);
+        if (maxH > 0) CHECK(s.height <= maxH);
+        const double aspect = static_cast<double>(s.width) / std::max(1, s.height);
+        if (crt) {
+            CHECK(std::fabs(aspect - 4.0 / 3.0) < 0.03);
+            CHECK(box.cellH >= gp.cellHeight() || (maxW > 0 && s.width < maxW));
+        }
+        std::printf("%s window %dx%d aspect %.3f cells %dx%d -> %dx%d (limit %dx%d)\n", id, s.width, s.height, aspect,
+                    box.cellW, box.cellH, g.cols, g.rows, maxW, maxH);
+    };
+    check("amber", 80, 24, true, 0, 0);
+    check("ibm-dos", 80, 24, true, 0, 0);
+    check("pixel-40col", 40, 25, true, 0, 0);
+    check("plain", 80, 24, false, 0, 0);
+    check("modern", 80, 24, false, 0, 0);
+    check("amber", 80, 24, true, 800, 600);
+    check("amber", 80, 24, true, 1280, 800);
+    check("ibm-dos", 80, 24, true, 800, 600);
+    check("pixel-40col", 40, 25, true, 800, 600);
+    // HiDPI: the logical window at scale 2 matches scale 1.
+    if (const Profile* p = findProfile("amber")) {
+        const FontPick f = profileFont(*p);
+        GridPainter g1(f.family, f.px, 1), g2(f.family, f.px, 2);
+        const CellBox b1 = fitCellBox(g1.cellWidth(), g1.cellHeight(), 1, 80, 24, p->marginMinPx, p->marginFrac, 0, true);
+        const CellBox b2 = fitCellBox(g2.cellWidth(), g2.cellHeight(), 2, 80, 24, p->marginMinPx, p->marginFrac, 0, true);
+        const WindowSize s1 = windowSizeForGrid(80, 24, b1.cellW, b1.cellH, 1, p->marginMinPx, p->marginFrac, 0);
+        const WindowSize s2 = windowSizeForGrid(80, 24, b2.cellW, b2.cellH, 2, p->marginMinPx, p->marginFrac, 0);
+        CHECK_EQ(s1.width, s2.width);
+        CHECK_EQ(s1.height, s2.height);
+        CHECK_EQ(b2.cellW, b1.cellW * 2);
+        CHECK_EQ(b2.cellH, b1.cellH * 2);
+    }
+    // Plain is not forced onto 4:3.
+    if (const Profile* p = findProfile("plain")) {
+        const FontPick f = profileFont(*p);
+        GridPainter gp(f.family, f.px, 1);
+        const CellBox box = fitCellBox(gp.cellWidth(), gp.cellHeight(), 1, 80, 24, p->marginMinPx, p->marginFrac, 0, false);
+        CHECK_EQ(box.cellW, gp.cellWidth());
+        CHECK_EQ(box.cellH, gp.cellHeight());
     }
 }
 
@@ -681,6 +738,7 @@ int main() {
     testSelection();
     testPointToCell();
     testWindowForGrid();
+    testCrtWindow();
     testScale2Mapping();
     testBezelMapping();
     testMouse();

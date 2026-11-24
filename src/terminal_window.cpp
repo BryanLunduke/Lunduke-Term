@@ -91,6 +91,84 @@ bool resetDeletedDefaultProfile(const std::string& path, const std::string& dele
     }
 }
 
+namespace {
+void monitorWorkArea(int& w, int& h) {
+    w = h = 0;
+    const auto display = Gdk::Display::get_default();
+    if (!display) return;
+    auto mon = display->get_primary_monitor();
+    if (!mon && display->get_n_monitors() > 0) mon = display->get_monitor(0);
+    if (!mon) return;
+    Gdk::Rectangle r;
+    mon->get_workarea(r);
+    w = std::max(0, r.get_width());
+    h = std::max(0, r.get_height());
+}
+
+// The work area in application pixels changes when a test flips the GDK scale, and a refit
+// would then change the cell size and the grid. Remember the first real measurement. A
+// launch at HiDPI already sees application pixels, which is the unit set_default_size uses.
+void stableWorkArea(int& w, int& h) {
+    static int cachedW = -1, cachedH = -1;
+    if (cachedW < 0) {
+        int mw = 0, mh = 0;
+        monitorWorkArea(mw, mh);
+        if (mw > 0 && mh > 0) {
+            cachedW = mw;
+            cachedH = mh;
+        }
+        w = mw;
+        h = mh;
+        return;
+    }
+    w = cachedW;
+    h = cachedH;
+}
+}  // namespace
+
+LaunchGrid launchGrid(const Profile& profile, const std::string& family, int fontPx, bool effectsOn, int scale) {
+    const int s = std::max(1, scale);
+    int px = fontPx;
+    if (px < 1) px = profile.fontPx > 0 ? profile.fontPx : 16;
+    const std::string face = family.empty() ? std::string("Monospace") : family;
+    GridPainter painter(face, px, s);
+    int maxW = 0, maxH = 0;
+    stableWorkArea(maxW, maxH);
+    LaunchGrid out;
+    out.cols = profile.termCols > 0 ? profile.termCols : kDefaultCols;
+    out.rows = profile.termRows > 0 ? profile.termRows : kDefaultRows;
+    out.scale = s;
+    // layoutGrid takes the inset from frameGeometry on the finished window, which caps it at a
+    // quarter of the shorter side. Start from the profile's frame size and repeat until the
+    // inset the window will actually use is the one it was sized for. The cell box is stretched
+    // (retro profiles) so this window is 4:3 and still holds exactly out.cols x out.rows, then
+    // shrunk so the window fits the work area.
+    int inset = 0;
+    if (effectsOn && profile.fx.frame && profile.fx.frameSize > 0)
+        inset = static_cast<int>(std::ceil(profile.fx.frameSize));
+    for (int n = 0; n < 4; ++n) {
+        const CellBox box = fitCellBox(painter.cellWidth(), painter.cellHeight(), s, out.cols, out.rows,
+                                       profile.marginMinPx, profile.marginFrac, inset, profile.crtAspect, maxW, maxH);
+        out.cellW = box.cellW;
+        out.cellH = box.cellH;
+        out.window = windowSizeForGrid(out.cols, out.rows, box.cellW, box.cellH, s, profile.marginMinPx,
+                                       profile.marginFrac, inset);
+        int next = 0;
+        if (effectsOn && profile.fx.frame && profile.fx.frameSize > 0) {
+            EffectParams fx = profile.fx;
+            fx.pixelScale = 1.0f;
+            next = static_cast<int>(std::ceil(frameGeometry(fx, out.window.width, out.window.height).inset));
+        }
+        if (next == inset) break;
+        inset = next;
+    }
+    if (out.window.width < 1) out.window.width = 640;
+    if (out.window.height < 1) out.window.height = 480;
+    if (maxW > 0 && out.window.width > maxW) out.window.width = maxW;
+    if (maxH > 0 && out.window.height > maxH) out.window.height = maxH;
+    return out;
+}
+
 WindowSize defaultWindowSize(const ViewOptions& opts) {
     const Profile* found = findProfile(opts.profile);
     if (!found) found = findProfile(kDefaultProfile);
@@ -99,35 +177,9 @@ WindowSize defaultWindowSize(const ViewOptions& opts) {
     const bool effectsOn = opts.effects < 0 ? profile.effects : opts.effects != 0;
     const FontPick pick = resolveViewFont(profile, opts.fontFamily);
     int px = opts.fontPx > 0 ? opts.fontPx : pick.px;
-    if (px < 1) px = profile.fontPx > 0 ? profile.fontPx : 16;
-    const std::string family = pick.family.empty() ? std::string("Monospace") : pick.family;
-    // Scale 1: set_default_size is in logical pixels, and a later GDK scale keeps the same
-    // rows and columns (computeGridLayout).
-    GridPainter painter(family, px, 1);
-    const int cellW = std::max(1, painter.cellWidth());
-    const int cellH = std::max(1, painter.cellHeight());
-    // layoutGrid takes the inset from frameGeometry on the finished window, which caps it at a
-    // quarter of the shorter side. Start from the profile's frame size and repeat until the
-    // inset the window will actually use is the one it was sized for.
-    int inset = 0;
-    if (effectsOn && profile.fx.frame && profile.fx.frameSize > 0)
-        inset = static_cast<int>(std::ceil(profile.fx.frameSize));
-    WindowSize s{};
-    for (int n = 0; n < 4; ++n) {
-        s = windowSizeForGrid(kDefaultCols, kDefaultRows, cellW, cellH, 1, profile.marginMinPx,
-                              profile.marginFrac, inset);
-        int next = 0;
-        if (effectsOn && profile.fx.frame && profile.fx.frameSize > 0) {
-            EffectParams fx = profile.fx;
-            fx.pixelScale = 1.0f;
-            next = static_cast<int>(std::ceil(frameGeometry(fx, s.width, s.height).inset));
-        }
-        if (next == inset) break;
-        inset = next;
-    }
-    if (s.width < 1) s.width = 640;
-    if (s.height < 1) s.height = 384;
-    return s;
+    // Scale 1: set_default_size is in logical pixels. The view asks for the same grid at its
+    // own GDK scale, so the rows and columns do not change on a HiDPI monitor.
+    return launchGrid(profile, pick.family, px, effectsOn, 1).window;
 }
 
 // ---------------------------------------------------------------------------------------------

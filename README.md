@@ -100,8 +100,8 @@ Without them, the profiles fall back to DejaVu Sans Mono. See `docs/FONTS.md`.
 
 Options: `--profile ID`, `--effects`/`--no-effects`, `--renderer auto|gl|cpu`, `--threads N`
 (C++ fallback), `--effects-fps N` (default 20), `--max-fps N` (default 60), `--no-pause-unfocused`,
-`--font FAMILY`, `--font-px N`, `--size WxH` (default: an 80×24 grid of the profile's font, plus that profile's margins and bezel; `--size` or a size the window manager restored is kept), `--quit-after MS` (close the window after MS **milliseconds**), `--stats`, `--scrollback N` (default 5000 lines; a `scrollback-lines` already saved in settings.ini is used as is),
-`--login`, `--cwd DIR`, `--on-exit close|hold|hold-on-error`, `--hold`, `--bell visual,urgent,audible|none`,
+`--font FAMILY`, `--font-px N`, `--size WxH` (default: the profile's grid, 80×24 or 40×25 for Pixel 40-column, inside a 4:3 window for retro profiles; plain and modern stay a tight 80×24; the window is shrunk to the work area. `--size` or a size the window manager restored is kept), `--quit-after MS` (close the window after MS **milliseconds**), `--stats`, `--scrollback N` (default 5000 lines; a `scrollback-lines` already saved in settings.ini is used as is),
+`--login`, `--cwd DIR`, `--on-exit close|hold|hold-on-error`, `--hold`, `--bell visual,urgent,audible|none` (default `urgent`: no screen flash and no beep),
 `--cursor-shape block|underline|bar`, `--cursor-blink`/`--no-cursor-blink`,
 `--effects-quality auto|full|reduced|static`, `--cpu-budget PCT` (software rendering only, percent of one core, default 15, 0 = off), `--frame`/`--no-frame`
 (bezel; amber/green/green-scanlines/vintage/paper-white only, ignored with a warning elsewhere), `--frame-size PX`

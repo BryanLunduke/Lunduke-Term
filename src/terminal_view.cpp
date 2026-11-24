@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "terminal_view.hpp"
+#include "terminal_window.hpp"
 
 #include <epoxy/gl.h>
 #include <gdk/gdkkeysyms.h>
@@ -429,7 +430,10 @@ void TerminalView::applyProfile() {
     const int base = opts_.fontPx > 0 ? opts_.fontPx : pick.px;
     const int px = zoomedFontPx(base, zoomPx_);
     fontPxInUse_ = px;
-    painter_.reset(new GridPainter(pick.family, px, scale_));  // px stays logical
+    // The same cell box defaultWindowSize used, so a 4:3 window (or a tight one) holds the
+    // profile's grid. px stays logical; the box is in device pixels at this scale.
+    const LaunchGrid launch = launchGrid(profile_, pick.family, px, effectsOn_, scale_);
+    painter_.reset(new GridPainter(pick.family, px, scale_, launch.cellW, launch.cellH));
     applyColors();
     cpu_.reset();
     glParamsStale_ = true;
@@ -453,8 +457,8 @@ void TerminalView::setProfile(const std::string& id) {
     profile_ = *p;
     applyTubeOverrides(profile_, opts_.tube);
     zoomPx_ = 0;  // perf step 1: a new profile starts at its own size
-    applyProfile();
     if (opts_.effects < 0) effectsOn_ = profile_.effects;
+    applyProfile();
     applyColors();
     chooseMode();
     if (w_ > 0) layoutGrid();  // the bezel (if any) takes room

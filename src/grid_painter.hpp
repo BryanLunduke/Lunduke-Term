@@ -17,7 +17,9 @@ public:
     // pixelSize is in logical pixels. scale is the GTK scale factor (HiDPI): the cell metrics
     // are measured at pixelSize and multiplied by scale, the glyphs are rasterised at
     // pixelSize * scale, so a scale-2 grid is exactly the scale-1 grid at twice the resolution.
-    GridPainter(const std::string& fontFamily, int pixelSize, int scale = 1);
+    // cellBoxW/H: device-pixel cell to draw into. 0 keeps the font's own cell. A different box
+    // scales the glyph (a 4:3 CRT stretches the raster; a small screen shrinks it).
+    GridPainter(const std::string& fontFamily, int pixelSize, int scale = 1, int cellBoxW = 0, int cellBoxH = 0);
     ~GridPainter();
     GridPainter(const GridPainter&) = delete;
     GridPainter& operator=(const GridPainter&) = delete;
@@ -65,6 +67,7 @@ private:
     PangoFontDescription* bold_ = nullptr;
     PangoContext* ctx_ = nullptr;
     int cellW_ = 8, cellH_ = 16, ascent_ = 12;
+    int natW_ = 8, natH_ = 16;  // the font's cell, before a CRT or fit-to-screen box
     int scale_ = 1;
 };
 
