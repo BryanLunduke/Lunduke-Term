@@ -229,6 +229,7 @@ TerminalView::~TerminalView() {
     blink_.disconnect();
     io_.disconnect();
     ptyIdle_.disconnect();
+    compressIdle_.disconnect();
     tick_.disconnect();
     freeHidden_.disconnect();
     frameTimer_.disconnect();
