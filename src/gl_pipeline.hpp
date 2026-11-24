@@ -86,9 +86,9 @@ private:
              progFrameComp_ = 0;
     unsigned texNoise_ = 0;
     // Size-dependent objects (recreated by resize()).
-    unsigned texSrc_ = 0, texDown_ = 0, texBloomB_ = 0, texBurn_[2] = {0, 0}, texStatic_ = 0,
+    unsigned texSrc_ = 0, texDownPlain_ = 0, texDown_ = 0, texBloomB_ = 0, texBurn_[2] = {0, 0}, texStatic_ = 0,
              texOut_ = 0;
-    unsigned fboDown_ = 0, fboBloomB_ = 0, fboBurn_[2] = {0, 0}, fboStatic_ = 0, fboOut_ = 0;
+    unsigned fboDownPlain_ = 0, fboDown_ = 0, fboBloomB_ = 0, fboBurn_[2] = {0, 0}, fboStatic_ = 0, fboOut_ = 0;
     // Bezel (p_.frame): static base + reflection lookup (rendered on resize), composite per content.
     unsigned texFrameBase_ = 0, texFrameRefl_ = 0, texFrame_ = 0;
     unsigned fboFrameBase_ = 0, fboFrameRefl_ = 0, fboFrame_ = 0;
@@ -101,6 +101,7 @@ private:
     int w_ = 0, h_ = 0, hw_ = 0, hh_ = 0, bw_ = 0, bh_ = 0;
     float burnLast_ = 0, burnPrev_ = 0;
     bool haveBurn_ = false;
+    bool haveSource_ = false;
     std::vector<float> weights_;
     // Uniform locations per program (-1: not active in that program, ignored by glUniform*).
     struct UniformLocations {

@@ -247,6 +247,32 @@ int main() {
         std::printf("rgb shift fringes: left %d,%d,%d right %d,%d,%d\n", lft[0], lft[1], lft[2], rgt[0], rgt[1], rgt[2]);
         CHECK(lft[0] > lft[2] && rgt[2] > rgt[0]);
     }
+    // A one-row content change recomputes only the band the warp and bloom can see.
+    // It must match a pipeline that reran the whole frame.
+    {
+        EffectParams p;
+        p.staticNoise = p.jitter = p.flickering = p.horizontalSync = p.glowingLine = 0;
+        const int W = 320, H = 200;
+        auto frame = renderSyntheticFrame(W, H, 0, "DejaVu Sans Mono", 12);
+        CpuEffects full(p, 2), band(p, 2);
+        full.resize(W, H);
+        band.resize(W, H);
+        full.setSource(frame.data(), W * 4, 0.0f);
+        band.setSource(frame.data(), W * 4, 0.0f);
+        auto changed = frame;
+        const int row = 80;
+        for (int x = 0; x < W; ++x)
+            for (int c = 0; c < 3; ++c) changed[static_cast<size_t>(row * W + x) * 4 + c] = 255;
+        full.updateSource(changed.data(), W * 4, PixelOrder::RGBA, 30.0f, 0, H);
+        band.updateSource(changed.data(), W * 4, PixelOrder::RGBA, 30.0f, row, row + 1);
+        std::vector<uint8_t> a(W * H * 4), b(a.size());
+        full.render(40.0f, a.data());
+        band.render(40.0f, b.data());
+        int mx = 0;
+        for (size_t i = 0; i < a.size(); ++i) mx = std::max(mx, std::abs(int(a[i]) - int(b[i])));
+        std::printf("partial bloom/static vs full frame: max diff %d (band %.1f ms bloom)\n", mx, band.lastBloomMs);
+        CHECK(mx == 0);
+    }
     std::printf(failures ? "effects_test: %d FAILED\n" : "effects_test: OK\n", failures);
     return failures ? 1 : 0;
 }

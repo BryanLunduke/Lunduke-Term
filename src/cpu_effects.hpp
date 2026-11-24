@@ -36,6 +36,7 @@ private:
     // (after the burn-in has read it) the bloom; bloomB_ is the blur's horizontal pass.
     std::vector<float> down_;
     std::vector<float> bloomB_;
+    std::vector<float> bloom_;  // bloom result; down_ stays the plain downsample so a later frame can update a band
     std::vector<float> burn_;             // RGBA float (rgb + prev mask), full or half res
     int bw_ = 0, bh_ = 0;                 // burn-in buffer size
     // Static pass output, RGB float (perf step 3: was RGBA, 16 B per pixel, now 12; nothing reads the
@@ -62,6 +63,7 @@ private:
     void buildFrame();
     float burnLast_ = 0, burnPrev_ = 0;
     bool haveBurn_ = false;
+    bool haveSource_ = false;  // false until the first full content pass (resize clears it)
 };
 
 }  // namespace lterm
