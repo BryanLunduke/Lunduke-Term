@@ -119,16 +119,16 @@ executable('lterm-m3-bench', 'tools/m3_bench.cpp',
 executable('lterm-m3-close-bench', 'tools/m3_close_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
-executable('lterm-m5-probe-bench', 'tools/m5_probe_bench.cpp', 'src/terminal_view.cpp',
+executable('lterm-m5-probe-bench', 'tools/m5_probe_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
 executable('lterm-m5-idle-bench', 'tools/m5_idle_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
-executable('lterm-m5-flood-bench', 'tools/m5_flood_bench.cpp', 'src/terminal_view.cpp',
+executable('lterm-m5-flood-bench', 'tools/m5_flood_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
-executable('lterm-m5-throughput-bench', 'tools/m5_throughput_bench.cpp', 'src/terminal_view.cpp',
+executable('lterm-m5-throughput-bench', 'tools/m5_throughput_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
   dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
 test('effects', executable('effects_test', 'tests/effects_test.cpp',
