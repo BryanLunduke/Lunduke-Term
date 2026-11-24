@@ -7,56 +7,22 @@ project('lunduke-terminal', 'cpp',
 
 gtkmm_dep = dependency('gtkmm-3.0', version : '>=3.24')
 pangocairo_dep = dependency('pangocairo')
-# Tests label their timing output with the build kind (tests/sanitizer.hpp). Before any target
-# (the bundled libvterm below): meson allows project arguments only there.
+# Tests label their timing output with the build kind (tests/sanitizer.hpp). Before any target:
+# meson allows project arguments only there.
 if get_option('b_sanitize') != 'none'
   add_project_arguments('-DLTERM_SANITIZED_BUILD=1', language : 'cpp')
 endif
 # --version and TERM_PROGRAM_VERSION. Before any target: meson only allows project arguments there.
 add_project_arguments('-DLTERM_VERSION="@0@"'.format(meson.project_version()), language : 'cpp')
 
-# libvterm: bundled by default (third_party/README.md): the pristine 0.3.3 source plus the patches
-# in third_party/libvterm-patches, applied at build time to a copy in the build directory.
-# -Dlibvterm=system uses the installed libvterm instead (no patches).
-lv_dir = 'third_party/libvterm'
-lv_sources = files(lv_dir / 'src/encoding.c', lv_dir / 'src/keyboard.c', lv_dir / 'src/mouse.c',
-  lv_dir / 'src/parser.c', lv_dir / 'src/pen.c', lv_dir / 'src/state.c', lv_dir / 'src/unicode.c',
-  lv_dir / 'src/vterm.c')
-lv_inc = include_directories(lv_dir / 'include', lv_dir / 'src')
-lv_series = files('third_party/libvterm-patches/series')
-lv_patches = files(  # in series order
-  'third_party/libvterm-patches/0001-screen-rep-wide-glyph-at-right-margin.patch',
-  'third_party/libvterm-patches/0002-screen-ring-rotation-for-full-screen-scroll.patch')
-lv_c_opts = ['c_std=c99', 'warning_level=1']  # upstream builds with -std=c99 -Wall
-if get_option('libvterm') == 'system'
-  vterm_dep = dependency('vterm', version : '>=0.3')
-else
-  add_languages('c', native : false, required : true)
-  lv_screen_c = custom_target('libvterm-screen.c',
-    input : [lv_dir / 'src/screen.c'], output : 'libvterm-screen.c',
-    command : [find_program('python3'), files('tools/libvterm_patch.py'), find_program('patch'),
-               '@INPUT0@', '@OUTPUT@', lv_series, lv_patches],
-    depend_files : [lv_series, lv_patches, files('tools/libvterm_patch.py')])
-  lv_lib = static_library('vterm-bundled', lv_sources, lv_screen_c,
-    include_directories : lv_inc, override_options : lv_c_opts, pic : true)
-  vterm_dep = declare_dependency(link_with : lv_lib, include_directories : include_directories(lv_dir / 'include'))
-  # Tests only: the pristine screen.c, to check the patched library against stock.
-  lv_screen_stock_c = custom_target('libvterm-screen-stock.c',
-    input : [lv_dir / 'src/screen.c'], output : 'libvterm-screen-stock.c',
-    command : [find_program('python3'), files('tools/libvterm_patch.py'), find_program('patch'),
-               '@INPUT0@', '@OUTPUT@', lv_series],
-    depend_files : [lv_series, files('tools/libvterm_patch.py')])
-  lv_stock_lib = static_library('vterm-stock', lv_sources, lv_screen_stock_c,
-    include_directories : lv_inc, override_options : lv_c_opts, build_by_default : false)
-  # Tests only: stock plus 0001 (the REP fix), for the differential test's mode b.
-  lv_screen_repfix_c = custom_target('libvterm-screen-repfix.c',
-    input : [lv_dir / 'src/screen.c'], output : 'libvterm-screen-repfix.c',
-    command : [find_program('python3'), files('tools/libvterm_patch.py'), find_program('patch'),
-               '@INPUT0@', '@OUTPUT@', lv_series, lv_patches[0]],
-    depend_files : [lv_series, lv_patches[0], files('tools/libvterm_patch.py')])
-  lv_repfix_lib = static_library('vterm-repfix', lv_sources, lv_screen_repfix_c,
-    include_directories : lv_inc, override_options : lv_c_opts, build_by_default : false)
-endif
+# libghostty-vt, linked statically (third_party/ghostty-vt.pins). The script checks SHA256,
+# caches the tarballs under third_party/cache, and is a no-op once this build dir has the pin.
+gv_prefix = meson.current_build_dir() / 'libghostty-prefix'
+run_command(find_program('bash'), files('tools/build-libghostty-vt.sh'),
+  meson.current_source_dir(), gv_prefix, check: true)
+gv_dep = declare_dependency(
+  compile_args : ['-I' + gv_prefix / 'include'],
+  link_args : [gv_prefix / 'lib' / 'libghostty-vt.a', '-lm'])
 epoxy_dep = dependency('epoxy')
 egl_dep = dependency('egl')
 threads_dep = dependency('threads')
@@ -99,12 +65,12 @@ gl_lib = static_library('lterm-gl', 'src/gl_effects.cpp', 'src/gl_pipeline.cpp',
   link_with : effects_lib, dependencies : [epoxy_dep, egl_dep])
 
 vterm_lib = static_library('lterm-vterm', 'src/vterm_session.cpp', 'src/selection.cpp', 'src/search.cpp',
-  link_with : effects_lib, dependencies : [vterm_dep, util_dep, pangocairo_dep])
+  link_with : effects_lib, dependencies : [gv_dep, util_dep, pangocairo_dep])
 
 lterm_exe = executable('lunduke-terminal',
   'src/main.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   link_with : [effects_lib, gl_lib, vterm_lib],
-  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep],
+  dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep],
   install : true)
 
 # Desktop integration (installed by `meson install`; see docs/PACKAGING.md).
@@ -149,22 +115,22 @@ executable('lterm-m1-bench', 'tools/m1_bench.cpp',
 executable('lterm-m3-bench', 'tools/m3_bench.cpp',
   include_directories : inc,
   link_with : [vterm_lib, effects_lib],
-  dependencies : [vterm_dep, pangocairo_dep])
+  dependencies : [gv_dep, pangocairo_dep])
 executable('lterm-m3-close-bench', 'tools/m3_close_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
-  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
+  dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
 executable('lterm-m5-probe-bench', 'tools/m5_probe_bench.cpp', 'src/terminal_view.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
-  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
+  dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
 executable('lterm-m5-idle-bench', 'tools/m5_idle_bench.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
-  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
+  dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
 executable('lterm-m5-flood-bench', 'tools/m5_flood_bench.cpp', 'src/terminal_view.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
-  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
+  dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
 executable('lterm-m5-throughput-bench', 'tools/m5_throughput_bench.cpp', 'src/terminal_view.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
-  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
+  dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
 test('effects', executable('effects_test', 'tests/effects_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep]), env : test_env)
 test('cpu-hash', executable('cpu_hash_test', 'tests/cpu_hash_test.cpp',
@@ -181,50 +147,46 @@ test('painter', executable('painter_test', 'tests/painter_test.cpp',
 test('fonts', executable('fonts_test', 'tests/fonts_test.cpp',
   include_directories : inc, link_with : effects_lib, dependencies : [pangocairo_dep, threads_dep, fontconfig_dep]), env : test_env)
 test('vterm', executable('vterm_test', 'tests/vterm_test.cpp',
-  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]), env : test_env)
+  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [gv_dep, pangocairo_dep]), env : test_env)
 test('gl-match', executable('gl_match_test', 'tests/gl_match_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib, gl_lib],
-  dependencies : [vterm_dep, pangocairo_dep, epoxy_dep, threads_dep]),
+  dependencies : [gv_dep, pangocairo_dep, epoxy_dep, threads_dep]),
   args : [files('tests/data/unicode-sample.txt')],
   env : test_env, timeout : 120)
 test('session', executable('session_test', 'tests/session_test.cpp',
-  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
+  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [gv_dep, pangocairo_dep]),
   timeout : 60, env : test_env)
 test('fixes', executable('fixes_test', 'tests/fixes_test.cpp',
-  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
+  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [gv_dep, pangocairo_dep]),
   timeout : 60, env : test_env)
 test('fuzz-regress', executable('fuzz_regress_test', 'tests/fuzz_regress_test.cpp',
-  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
+  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [gv_dep, pangocairo_dep]),
   timeout : 60, env : test_env)
-# third_party/libvterm-patches/0001: REP of a wide glyph at the right margin (fuzz crash 46ca723d).
-# The system libvterm has the bug (that is the patch), so only with the bundled one.
-if get_option('libvterm') == 'bundled'
-  test('libvterm-rep', executable('libvterm_rep_test', 'tests/libvterm_rep_test.cpp',
-    include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
-    timeout : 60, env : test_env)
-endif
+test('engine', executable('engine_test', 'tests/engine_test.cpp',
+  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [gv_dep, pangocairo_dep]),
+  timeout : 60, env : test_env)
 test('unicode', executable('unicode_test', 'tests/unicode_test.cpp',
-  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
+  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [gv_dep, pangocairo_dep]),
   timeout : 60, env : test_env)
 test('search', executable('search_test', 'tests/search_test.cpp',
-  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [vterm_dep, pangocairo_dep]),
+  include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [gv_dep, pangocairo_dep]),
   timeout : 60, env : test_env)
 # GTK-level fixes; AddressSanitizer makes a use-after-free fail loudly. Skips without $DISPLAY.
 view_test_exe = executable('view_test', 'tests/view_test.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
-  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep, dependency('x11')],
+  dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep, dependency('x11')],
   cpp_args : ['-fsanitize=address', '-fno-omit-frame-pointer'], link_args : ['-fsanitize=address'])
 test('view', view_test_exe, env : view_env,
   timeout : 150, is_parallel : false)
 # M5 review fixes (output flood, input method, hidden tabs, ...). Skips without $DISPLAY.
 review_test_exe = executable('review_test', 'tests/review_test.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
-  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
+  dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
 test('review', review_test_exe, env : view_env, timeout : 120, is_parallel : false)
 # M6 PR A: context menu, plain rendering, settings font size, custom profiles. Skips without $DISPLAY.
 ux_test_exe = executable('ux_test', 'tests/ux_test.cpp', 'src/terminal_view.cpp', 'src/terminal_window.cpp', 'src/profile_editor.cpp',
   include_directories : inc, link_with : [effects_lib, gl_lib, vterm_lib],
-  dependencies : [gtkmm_dep, pangocairo_dep, vterm_dep, epoxy_dep, threads_dep])
+  dependencies : [gtkmm_dep, pangocairo_dep, gv_dep, epoxy_dep, threads_dep])
 test('ux', ux_test_exe, env : view_env, timeout : 120, is_parallel : false)
 # Default scrollback 5000; a saved scrollback-lines is kept. Runs the binary; skips without $DISPLAY.
 test('scrollback-default', find_program('sh'), args : [files('tests/scrollback_default_test.sh'), lterm_exe,
@@ -233,45 +195,6 @@ test('scrollback-default', find_program('sh'), args : [files('tests/scrollback_d
 # Perf step 1: --help, --version and an unknown option (exit 0, 0, 2). Needs no $DISPLAY.
 test('cli', find_program('sh'), args : [files('tests/cli_test.sh'), lterm_exe, meson.project_version()],
   env : test_env, timeout : 60)
-# The vendored libvterm is byte-identical to the upstream 0.3.3 tarball (third_party/README.md).
-test('libvterm-pristine', find_program('sha256sum'),
-  args : ['--quiet', '--strict', '-c', meson.current_source_dir() / 'third_party' / 'libvterm-SHA256SUMS'],
-  workdir : meson.current_source_dir() / 'third_party' / 'libvterm')
-if get_option('libvterm') == 'bundled'
-  # libvterm's own t/ suite (upstream `make test`), on the patched library and on stock.
-  lv_t_suite = files('tools/libvterm_t_suite.sh')
-  # Same as test_env, plus a suppression for a stock libvterm leak only the t/ harness reaches.
-  lv_t_env = environment()
-  lv_t_env.set('ASAN_OPTIONS', 'detect_leaks=1:abort_on_error=1')
-  lv_t_env.set('LSAN_OPTIONS', 'suppressions=' + (meson.current_source_dir() / 'tests' / 'lsan-libvterm-t.supp') + ':print_suppressions=0')
-  lv_t_env.set('UBSAN_OPTIONS', 'print_stacktrace=1:halt_on_error=1')
-  foreach v : [['patched', lv_lib], ['stock', lv_stock_lib]]
-    test('libvterm-t-' + v[0], lv_t_suite,
-      args : [executable('libvterm_harness_' + v[0], lv_dir / 't/harness.c', include_directories : lv_inc,
-                         link_with : v[1], override_options : lv_c_opts),
-              meson.current_source_dir() / lv_dir],
-      timeout : 120, env : lv_t_env)
-  endforeach
-  # Differential test: tests/libvterm_diff.c logs every screen callback and dumps the whole
-  # screen for random escape-sequence streams; the patched build must print byte for byte what
-  # stock prints. Mode a: stock vs patched. Mode b: stock+0001 vs patched, with REP of wide
-  # glyphs and 1-column screens, which crash stock. Long runs: docs/bench/perf2/.
-  lv_diff_exe = {}
-  foreach v : [['stock', lv_stock_lib], ['repfix', lv_repfix_lib], ['patched', lv_lib]]
-    lv_diff_exe += {v[0] : executable('libvterm_diff_' + v[0], 'tests/libvterm_diff.c',
-      include_directories : include_directories(lv_dir / 'include'), link_with : v[1],
-      override_options : lv_c_opts)}
-  endforeach
-  test('libvterm-diff', find_program('python3'),
-    args : [files('tools/libvterm_diff_run.py'), lv_diff_exe['stock'], lv_diff_exe['patched'],
-            'a', '1', '100', '2000', '--timeout', '300'],
-    timeout : 900, env : test_env)
-  test('libvterm-diff-repfix', find_program('python3'),
-    args : [files('tools/libvterm_diff_run.py'), lv_diff_exe['repfix'], lv_diff_exe['patched'],
-            'b', '1', '100', '2000', '--timeout', '300'],
-    timeout : 900, env : test_env)
-  # The same check on real output: the repo's sources and `seq 1 50000` at four window sizes.
-  test('libvterm-feed-diff', files('tools/libvterm_feed_diff.sh'),
-    args : [lv_diff_exe['stock'], lv_diff_exe['patched'], meson.current_source_dir(), '50000'],
-    timeout : 600, env : test_env)
-endif
+# The pins file names the libghostty-vt and Zig tarballs the build verifies.
+test('ghostty-pins', find_program('grep'),
+  args : ['-q', 'LIBGHOSTTY_VERSION=1.0.1', meson.current_source_dir() / 'third_party' / 'ghostty-vt.pins'])

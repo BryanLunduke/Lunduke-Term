@@ -78,7 +78,7 @@ struct ViewMemory {
     size_t statSamples = 0;   // ViewStats vectors (doubles)
 };
 
-// The terminal widget. Pipeline: libvterm -> Grid -> glyph-cached Pango/Cairo source image
+// The terminal widget. Pipeline: libghostty-vt -> Grid -> glyph-cached Pango/Cairo source image
 // (changed rows only) -> either a plain blit (DrawingArea), the GLSL effects on a GtkGLArea
 // (main path), or the multithreaded C++ effects (fallback, same output).
 class TerminalView : public Gtk::Box {

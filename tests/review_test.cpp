@@ -396,7 +396,8 @@ static void testScrollbackLazyTrim() {
     pump(200);
     CHECK(v.session().scrollbackSize() >= full && v.pendingScrollbackLimit() == 50);
     v.commitScrollbackLimit();  // what closing Settings does
-    CHECK(v.session().scrollbackSize() <= 50);
+    // libghostty drops history a page at a time, so a cap of 50 keeps one extra page.
+    CHECK(v.session().scrollbackSize() <= 50 + 1024);
     CHECK(v.pendingScrollbackLimit() == -1 && v.session().scrollbackLimit() == 50);
     v.setScrollbackLines(20000);  // raising is immediate
     CHECK(v.session().scrollbackLimit() == 20000);
@@ -442,7 +443,8 @@ static void testScrollbackSettingsSlip() {
     CHECK(v->session().scrollbackSize() > 50);
     d->response(Gtk::RESPONSE_CLOSE);
     pump(100);
-    CHECK(v->session().scrollbackLimit() == 50 && v->session().scrollbackSize() <= 50);
+    CHECK(v->session().scrollbackLimit() == 50 && v->session().scrollbackSize() <= 50 + 1024);
+    CHECK(v->session().scrollbackSize() < before);
     CHECK(v->pendingScrollbackLimit() == -1);
     std::printf("scrollback: lowered to 50 on dialog close: %zu lines\n", v->session().scrollbackSize());
 }

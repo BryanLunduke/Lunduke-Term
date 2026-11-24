@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// libvterm + PTY session: owns the VTerm, the scrollback, the child process and the PTY master.
+// VT session: libghostty-vt plus the PTY. One terminal per widget (a future tab removal
+// only deletes the widget). Scrollback, reflow, and key/mouse encoding live in libghostty.
 #pragma once
 
 #include "grid.hpp"
 #include "selection.hpp"
 
-#include <vterm.h>
-
 #include <array>
 #include <cstdint>
-#include <deque>
 #include <functional>
 #include <string>
 #include <sys/types.h>
@@ -36,8 +34,8 @@ std::string sanitizePaste(const std::string& text);
 
 // Limits against hostile or runaway input.
 constexpr size_t kMaxTitleBytes = 4096;            // OSC 0/2 window title
-constexpr size_t kMaxScrollbackLines = 100000;     // scrollback-lines setting / --scrollback (M5 stopgap: was 1,000,000)
-constexpr size_t kDefaultScrollbackLines = 5000;   // when settings.ini and --scrollback give none (M6: was 10,000)
+constexpr size_t kMaxScrollbackLines = 100000;     // scrollback-lines setting / --scrollback
+constexpr size_t kDefaultScrollbackLines = 5000;   // when settings.ini and --scrollback give none
 // Negative -> 0, above kMaxScrollbackLines -> kMaxScrollbackLines.
 size_t clampScrollbackLines(long long requested);
 // Child side of spawn(): closes every fd >= 3 (close_range, or close() up to maxFd).
@@ -45,16 +43,30 @@ void closeFrom3(int maxFd);
 // Truncates to at most max bytes without splitting a UTF-8 sequence.
 void truncateUtf8(std::string& s, size_t max);
 
-// Cell width (1 or 2) libvterm gives a code point; see vterm_session.cpp.
-int libvtermWidth(uint32_t cp);
-// True when libvterm 0.3.3 prints the code point with width 0 (a combining mark or other
-// zero-width character on its own). Probed and cached like libvtermWidth.
-bool libvtermZeroWidth(uint32_t cp);
+// Display width (0, 1, or 2) of one code point, from libghostty's width table.
+int codepointWidth(uint32_t cp);
 
-// Scrollback side array: records of VTERM_MAX_CHARS_PER_CELL uint32s (column, chars[1..5]),
-// stored in increasing column order. Binary search; returns the record index of `col`, or
-// `records` when the column has none. Declared here for the tests.
-size_t sbExtraFind(const uint32_t* extra, size_t records, uint32_t col);
+// Modifier bits OR-ed into sendKey / sendChar / mouse. Same positions the view has always used.
+constexpr int ModNone = 0;
+constexpr int ModShift = 1;
+constexpr int ModAlt = 2;
+constexpr int ModCtrl = 4;
+
+// Keys the view maps from GDK. Printable characters go through sendChar.
+enum class TermKey : int {
+    Enter, Tab, Backspace, Escape,
+    Up, Down, Left, Right,
+    Insert, Delete, Home, End, PageUp, PageDown,
+    Kp0, Kp1, Kp2, Kp3, Kp4, Kp5, Kp6, Kp7, Kp8, Kp9,
+    KpMultiply, KpAdd, KpSubtract, KpDecimal, KpDivide, KpEnter, KpEqual,
+    F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12,
+};
+
+// What the application asked the mouse to do. Click covers X10 (?9) and normal tracking (?1000).
+enum class MouseMode : int { None = 0, Click = 1, Drag = 2, Move = 3 };
+
+// DECSCUSR. Unset: the app has not changed the cursor; the user's setting applies.
+enum class CursorShape : int { Unset = 0, Block = 1, Underline = 2, Bar = 3 };
 
 class VtermSession : public LineSource {
 public:
@@ -74,7 +86,7 @@ public:
     pid_t hangup(int waitMs = 50);
     void markExited() { pid_ = -1; }
 
-    // Reads whatever is available on the PTY and feeds libvterm. Returns false on EOF/HUP.
+    // Reads whatever is available on the PTY and feeds libghostty. Returns false on EOF/HUP.
     // With budgetUs > 0 it stops after that much time even if more is waiting (an output flood)
     // and sets *more; the caller lets the main loop run (redraw, keys) before reading on.
     bool readAvailable(int64_t budgetUs = 0, bool* more = nullptr);
@@ -82,23 +94,20 @@ public:
     void feed(const char* bytes, size_t len);
     void feed(const std::string& s) { feed(s.data(), s.size()); }
 
-    void resize(int rows, int cols);  // vterm_set_size (+ reflow) + TIOCSWINSZ
+    void resize(int rows, int cols);  // ghostty resize (reflow) + TIOCSWINSZ
     int rows() const { return rows_; }
-    // Resizes done without reflow to dodge libvterm's abort() (see reflowWouldAbort()).
-    int reflowFallbacks() const { return reflowFallbacks_; }
     int cols() const override { return cols_; }
 
-    // Input.
-    void sendKey(VTermKey key, VTermModifier mod);
-    void sendChar(uint32_t codepoint, VTermModifier mod);
+    // Input. Key and mouse bytes come from libghostty's encoders.
+    void sendKey(TermKey key, int mod);
+    void sendChar(uint32_t codepoint, int mod);
     void sendBytes(const char* bytes, size_t len);
     void flushWrites();
     bool wantsWrite() const { return !writeQueue_.empty(); }
     void paste(const std::string& text);  // sanitised, bracketed when the app enabled mode 2004
-    // Mouse in screen cell coordinates (0-based); libvterm encodes for the active mode
-    // (X10 / normal / button-event / any-event, X10 / UTF-8 / SGR 1006 / urxvt encodings).
-    void mouseMove(int row, int col, VTermModifier mod);
-    void mouseButton(int row, int col, int button, bool pressed, VTermModifier mod);
+    // Mouse in screen cell coordinates (0-based).
+    void mouseMove(int row, int col, int mod);
+    void mouseButton(int row, int col, int button, bool pressed, int mod);
     void focus(bool in);
     // Without a PTY (tests) everything the terminal would send is collected here.
     std::string takeOutput() {
@@ -111,164 +120,97 @@ public:
     // above the screen and hides as many bottom rows).
     void fillGrid(Grid& g, int scrollOffset = 0) const;
     void setColors(Color8 fg, Color8 bg, const std::array<Color8, 16>& palette, float minFgGrey);
+    // User cursor, used until the application sends DECSCUSR or mode 12.
+    void setDefaultCursor(CursorShape shape, bool blink);
     std::string rowText(int row) const;
 
-    // Scrollback. Lines have global numbers that never change while they exist: screen row r is
-    // line topLine() + r; history goes down to firstLine().
+    // Scrollback. Lines have global numbers. Screen row r is line topLine() + r while the
+    // primary screen is showing. libghostty prunes history a page at a time, so the line cap
+    // is a ceiling plus at most one page, not an exact count.
     void setScrollbackLimit(size_t lines);  // clamped to kMaxScrollbackLines
     size_t scrollbackLimit() const { return sbLimit_; }
-    size_t scrollbackSize() const { return sb_.size(); }
-    size_t scrollbackBytes() const;  // M4 item 4: cell storage of the history (capacity, not size)
-    // Review item 4: what `lines` full lines of `cols` cells take in the scrollback (the same
-    // sum as scrollbackBytes(); blank line ends are trimmed, so real use is usually lower).
+    size_t scrollbackSize() const;
+    size_t scrollbackBytes() const;  // resident bytes libghostty reports for both screens
+    // Settings-dialog estimate of `lines` rows at `cols` columns. libghostty's real use is
+    // measured by scrollbackBytes() and by the RSS benchmark.
     static size_t scrollbackBytesFull(size_t lines, int cols);
-    long topLine() const { return pushed_; }
-    long firstLine() const override { return pushed_ - static_cast<long>(sb_.size()); }
-    long endLine() const override { return pushed_ + rows_; }
+    long topLine() const { return topLine_; }
+    long firstLine() const override;
+    long endLine() const override { return topLine_ + rows_; }
     std::string cellText(long line, int col) const override;
     int cellWidth(long line, int col) const override;
     bool wrapped(long line) const override;
-    long stableEnd() const override { return pushed_; }  // the scrollback
+    long stableEnd() const override { return topLine_; }
     unsigned long contentEpoch() const override { return epoch_; }
     int cellChars(long line, int col, uint32_t* out, int max, int* width) const override;
 
-    // Terminal properties set by the application.
-    int cursorShape() const { return cursorShape_; }  // VTERM_PROP_CURSORSHAPE_*, 0 = not set
+    int cursorShape() const { return static_cast<int>(cursorShape_); }
     int cursorBlink() const { return cursorBlink_; }  // -1 not set by the app, 0/1
-    // VTERM_PROP_MOUSE_*; X10 (?9, tracked by us since libvterm ignores it) reports as CLICK.
-    int mouseMode() const { return mouseMode_ == VTERM_PROP_MOUSE_NONE && x10_ ? VTERM_PROP_MOUSE_CLICK : mouseMode_; }
-    bool altScreen() const { return altScreen_; }
-    bool reverseVideo() const { return reverse_; }
+    int mouseMode() const;
+    bool altScreen() const;
+    bool reverseVideo() const;
 
     bool takeDamage() {
         bool d = damaged_;
         damaged_ = false;
         return d;
     }
-    // For the fuzzer's differential check (tools/fuzz): feed()'s escape-guard state (see
-    // csiState_) and the VTerm whose parser it mirrors.
-    int guardState() const { return csiState_; }
-    int guardIntermediates() const { return csiState_ == 3 ? escInters_ : 0; }
-    bool guardHoldsEsc() const { return stringEscHeld_; }
-    VTerm* vtermForCheck() const { return vt_; }
     const std::string& title() const { return title_; }
     std::function<void()> onTitle;
     std::function<void()> onBell;
+    // libghostty callbacks (C function pointers cannot be private members).
+    void onBellFired();
+    void onTitleFired();
+    void onWriteFired(const uint8_t* data, size_t len);
 
 private:
-    // M6 item 6: a scrollback cell is 16 bytes instead of VTermScreenCell's 40. chars[0], the
-    // attributes and the width are packed; the rare cells with combining characters keep
-    // chars[1..] in SbLine::extra (column + 5 code points each).
-    struct SbCell {
-        uint32_t ch = 0;
-        uint32_t bits = 0;  // attrs (18 bits), width (8 bits), "has extra chars" (1 bit)
-        VTermColor fg{}, bg{};
+    struct Ghost;  // libghostty handles, kept out of this header
+    struct CellRead {
+        Cell cell;
+        uint32_t cp[16]{};
+        int n = 0;
+        int width = 1;
+        bool ok = false;
     };
-    struct SbLine {
-        std::vector<SbCell> cells;    // trailing blank cells trimmed
-        std::vector<uint32_t> extra;  // per combining cell, in column order: column, chars[1..5]
-        bool wrapped = false;         // continues on the next line
-    };
-    static void packCell(const VTermScreenCell& c, int col, SbLine& line);
-    static void unpackCell(const SbLine& line, int col, VTermScreenCell& out);
-    Color8 mapColor(VTermColor c, bool foreground) const;
-    void toCell(const VTermScreenCell& vc, Cell& cell) const;
-    void normalizeCell(int col, VTermScreenCell& c) const;
-    bool getCell(long line, int col, VTermScreenCell& out) const;
-    void scanModes(const char* bytes, size_t len);
-    static int cbDamage(VTermRect, void* user);
-    static int cbMoveCursor(VTermPos pos, VTermPos, int visible, void* user);
-    static int cbSetTermProp(VTermProp prop, VTermValue* val, void* user);
-    static int cbBell(void* user);
-    static int cbCsiFallback(const char* leader, const long args[], int argcount, const char* intermed, char command,
-                             void* user);
-    static int cbPushLine(int cols, const VTermScreenCell* cells, void* user);
-    static int cbPopLine(int cols, VTermScreenCell* cells, void* user);
-    static int cbSbClear(void* user);
-    static void cbOutput(const char* s, size_t len, void* user);
-    void feedRaw(const char* bytes, size_t len);
-    void holdStringEsc(const char* bytes, size_t i, size_t& done);
-    void snapshotWraps();  // see wrapSnap_
-    void clearTopContinuation();  // libvterm 0.3.3 reflow reads row -1 otherwise (see resize())
-    bool reflowWouldAbort(int newRows, int newCols) const;  // libvterm 0.3.3 abort(), see resize()
+    void ensureGhost();
+    void pinAnchor();
+    void syncLines();
+    void refreshCursor(bool fromApp);
+    void syncMouseEncoder();
+    void encodeKey(int ghostKey, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted);
+    void emitMouse(int row, int col, int button, int action, int mod);
+    bool locate(long line, int col, void* point) const;
+    CellRead readAt(long line, int col) const;
+    Color8 resolveColor(uint8_t tag, uint8_t a, uint8_t b, uint8_t c, bool foreground) const;
 
-    VTerm* vt_ = nullptr;
-    VTermScreen* screen_ = nullptr;
-    VTermState* state_ = nullptr;
+    Ghost* g_ = nullptr;
     int rows_, cols_;
     int fd_ = -1;
     pid_t pid_ = -1;
     bool damaged_ = true;
-    bool ready_ = false;  // ignore the property values libvterm reports during its reset
-    VTermPos cursor_{0, 0};
-    bool cursorVisible_ = true;
-    int cursorShape_ = 0, cursorBlink_ = -1, mouseMode_ = 0;
-    bool altScreen_ = false, reverse_ = false;
-    bool x10_ = false;
-    int scanState_ = 0;
-    int csiState_ = 0;    // feed(): 0 ground, 1 after ESC, 2 inside CSI, 3 ESC + intermediates, 4 control string,
-                          // 5 ESC in a string, 6 DCS command, 7 OSC number (mirrors libvterm's parser)
-    long csiStart_ = -1;  // index of the ESC of the open CSI in the current chunk
-    // libvterm's DECSC/DECRC (ESC 7/8, CSI ?1048/?1049) do not save the character set state
-    // (G0/G1 designations, SO/SI), which a VT100 does; feed() tracks it and restores it.
-    struct Charsets {
-        char g0 = 'B', g1 = 'B';
-        bool shifted = false;  // SO: G1 invoked into GL
-    };
-    Charsets cs_, savedCs_;
-    int escTarget_ = -1;      // feed() state 3: 0 = G0, 1 = G1 being designated (ESC ( / ESC )), else -1
-    int escInters_ = 0;       // feed() state 3: intermediate bytes so far
-    // feed() state 5: the ESC is not given to libvterm yet (F15, see holdStringEsc()). It is,
-    // right before the next byte that ends the escape; C0 controls before that go on without it.
-    bool stringEscHeld_ = false;
-    std::string csiParams_;   // parameters of the open CSI (bounded)
-    // libvterm 0.3.3 stores CSI arguments in a fixed long[16] without a bounds check: a 17th
-    // argument overwrites the parser's callbacks pointer (crash, or worse, from any program's
-    // output). feed() counts the separators and drops the parameter bytes after the 15th.
-    int csiSeps_ = 0;
-    int reflowFallbacks_ = 0;
-    // Its argument accumulator (long * 10 + digit) also overflows (undefined behaviour), and a
-    // value >= 2^31 collides with its CSI_ARG_FLAG_MORE bit: feed() keeps at most 9 significant
-    // digits per argument (the rest are dropped, so the value stays huge and gets clamped).
-    int csiDigits_ = 0;
-    bool csiArgs_ = false;   // a digit or separator was seen (leader bytes are over)
-    bool csiInter_ = false;  // an intermediate byte was seen
-    // Last code point printed as text (0: none yet / unknown) and the UTF-8 decoder for it.
-    // libvterm 0.3.3 REP (CSI Ps b) loops forever when the last printed glyph had width 0 (a
-    // lone combining mark, or nothing printed yet), so feed() drops REP then (fuzz finding F7).
-    uint32_t lastCp_ = 0;
-    uint32_t u8acc_ = 0;
-    int u8need_ = 0;
-    void restoreCharsets();
-    // libvterm 0.3.3 does not clamp the saved cursor (DECSC, ?1048h, ?1049h) on resize, so a
-    // DECRC after shrinking puts the cursor outside the screen and the next character reads
-    // past lineinfo[] (fuzz finding F9). Called after every cursor restore.
-    void clampCursorAfterRestore();
-    // Moves the cursor to (row, col), also in origin mode (see clampCursorAfterRestore).
-    void placeCursor(int row, int col);
-    // A DECSTBM / DECSLRM with parameters was seen. libvterm 0.3.3 only clamps the bottom/right
-    // margin on resize, so shrinking below the region's top/left leaves top > bottom and the next
-    // LF memmove()s a negative size (fuzz finding F10); resize() resets the margins then.
-    bool regionSet_ = false;
-    std::string penSgr() const;
-    // Continuation flags of the screen rows, taken just before an operation that may push
-    // several lines to the scrollback at once (CSI S, CSI M, resize). libvterm shifts its line
-    // info before the pushes, which loses the flags of all but the last pushed row.
-    std::vector<char> wrapSnap_;
-    bool wrapSnapActive_ = false;
-    int wrapSnapPushes_ = 0;
-    std::string scanParams_;
-    std::string title_, titleBuf_;
+    int cursorShape_ = static_cast<int>(CursorShape::Unset);
+    int cursorBlink_ = -1;
+    int defaultShape_ = static_cast<int>(CursorShape::Block);
+    int defaultBlink_ = 0;
+    bool appCursor_ = false;
+    int lastStyle_ = static_cast<int>(CursorShape::Block);
+    int lastBlink_ = 0;
+    bool mouseDirty_ = true;
+    bool buttonDown_ = false;
+    int heldButton_ = 0;
+    std::string title_;
+    std::string versionStr_;
     std::string pendingOut_, writeQueue_;
-    std::string* capture_ = nullptr;
     Color8 fg_{208, 208, 208}, bg_{0, 0, 0};
     std::array<Color8, 16> palette_{};
     bool havePalette_ = false;
     float minFgGrey_ = 0.0f;
-    std::deque<SbLine> sb_;
     size_t sbLimit_ = kDefaultScrollbackLines;
-    long pushed_ = 0;  // lines ever pushed to the scrollback (minus popped)
-    unsigned long epoch_ = 0;  // bumped when scrollback lines are popped/cleared or on resize
+    long topLine_ = 0;
+    long anchorGlobal_ = 0;
+    uint32_t anchorY_ = 0;
+    bool anchorLive_ = false;
+    unsigned long epoch_ = 1;
 };
 
 }  // namespace lterm

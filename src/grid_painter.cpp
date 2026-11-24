@@ -69,6 +69,61 @@ static void setColor(cairo_t* cr, Color8 c) {
     cairo_set_source_rgb(cr, c.r / 255.0, c.g / 255.0, c.b / 255.0);
 }
 
+static Color8 dimmed(Color8 c) {
+    return Color8{static_cast<uint8_t>(c.r * 3 / 5), static_cast<uint8_t>(c.g * 3 / 5), static_cast<uint8_t>(c.b * 3 / 5)};
+}
+
+// Lines the glyph mask does not carry: faint is a tint, the rest are stroked so a colored
+// underline (SGR 58) can differ from the text.
+static void drawDecorations(cairo_t* cr, const Cell& cell, int x, int y, int w, int h, int scale, Color8 textColor) {
+    const bool ul = cell.underline != Underline::None;
+    if (!ul && !cell.strikethrough && !cell.overline) return;
+    const int t = std::max(scale, std::max(1, h / 14));
+    auto bar = [&](int yy, int hh, Color8 c) {
+        setColor(cr, c);
+        cairo_rectangle(cr, x, yy, w, std::max(1, hh));
+        cairo_fill(cr);
+    };
+    if (cell.overline) bar(y, t, textColor);
+    if (cell.strikethrough) bar(y + h / 2 - t / 2, t, textColor);
+    if (!ul) return;
+    const Color8 c = cell.underlineColored ? cell.underlineColor : textColor;
+    const int base = y + h - 2 * t;
+    if (cell.underline == Underline::Double) {
+        bar(base - t - std::max(1, t / 2), t, c);
+        bar(base, t, c);
+        return;
+    }
+    if (cell.underline == Underline::Curly) {
+        setColor(cr, c);
+        cairo_set_line_width(cr, std::max(1.0, t * 0.8));
+        cairo_new_path(cr);
+        const int amp = std::max(1, t);
+        const int period = std::max(4 * scale, 4);
+        cairo_move_to(cr, x, base + amp);
+        for (int i = 0; i <= w; i += std::max(1, period / 4)) {
+            const double phase = (i % period) / static_cast<double>(period);
+            const double yy = base + amp * (phase < 0.5 ? 1.0 - 4 * phase : 4 * phase - 3.0);
+            cairo_line_to(cr, x + i, yy);
+        }
+        cairo_stroke(cr);
+        return;
+    }
+    if (cell.underline == Underline::Dotted || cell.underline == Underline::Dashed) {
+        setColor(cr, c);
+        cairo_set_line_width(cr, t);
+        const double dash[2] = {cell.underline == Underline::Dotted ? static_cast<double>(t) : static_cast<double>(3 * t),
+                                static_cast<double>(2 * t)};
+        cairo_set_dash(cr, dash, 2, 0);
+        cairo_move_to(cr, x, base + t / 2.0);
+        cairo_line_to(cr, x + w, base + t / 2.0);
+        cairo_stroke(cr);
+        cairo_set_dash(cr, nullptr, 0, 0);
+        return;
+    }
+    bar(base, t, c);
+}
+
 void GridPainter::paint(cairo_t* cr, const Grid& g, int ox, int oy, Color8 cursorColor) const {
     PangoLayout* layout = pango_layout_new(ctx_);
     for (int r = 0; r < g.rows; ++r) {
@@ -95,29 +150,31 @@ void GridPainter::paint(cairo_t* cr, const Grid& g, int ox, int oy, Color8 curso
                 cairo_rectangle(cr, ox + c * cellW_, y, cellW_ * (cell.width == 2 ? 2 : 1), cellH_);
                 cairo_fill(cr);
             }
-            if (cell.width == 0 || cell.text.empty() || cell.text == " ") continue;
-            pango_layout_set_font_description(layout, cell.bold ? bold_ : font_);
-            PangoAttrList* attrs = nullptr;
-            if (cell.underline || cell.italic) {
-                attrs = pango_attr_list_new();
-                if (cell.underline) pango_attr_list_insert(attrs, pango_attr_underline_new(PANGO_UNDERLINE_SINGLE));
-                if (cell.italic) pango_attr_list_insert(attrs, pango_attr_style_new(PANGO_STYLE_ITALIC));
+            const Color8 tint = cell.faint ? dimmed(isCursor ? cell.bg : cell.fg) : (isCursor ? cell.bg : cell.fg);
+            const int gw = cellW_ * (cell.width == 2 ? 2 : 1);
+            if (!(cell.conceal || cell.width == 0 || cell.text.empty() || cell.text == " ")) {
+                pango_layout_set_font_description(layout, cell.bold ? bold_ : font_);
+                PangoAttrList* attrs = nullptr;
+                if (cell.italic) {
+                    attrs = pango_attr_list_new();
+                    pango_attr_list_insert(attrs, pango_attr_style_new(PANGO_STYLE_ITALIC));
+                }
+                pango_layout_set_attributes(layout, attrs);
+                if (attrs) pango_attr_list_unref(attrs);
+                pango_layout_set_text(layout, cell.text.c_str(), -1);
+                setColor(cr, tint);
+                const int base = pango_layout_get_baseline(layout) / PANGO_SCALE;
+                cairo_move_to(cr, ox + c * cellW_, y + ascent_ - base);
+                pango_cairo_show_layout(cr, layout);
             }
-            pango_layout_set_attributes(layout, attrs);
-            if (attrs) pango_attr_list_unref(attrs);
-            pango_layout_set_text(layout, cell.text.c_str(), -1);
-            setColor(cr, isCursor ? cell.bg : cell.fg);
-            const int base = pango_layout_get_baseline(layout) / PANGO_SCALE;
-            cairo_move_to(cr, ox + c * cellW_, y + ascent_ - base);
-            pango_cairo_show_layout(cr, layout);
+            if (cell.width != 0) drawDecorations(cr, cell, ox + c * cellW_, y, gw, cellH_, scale_, tint);
         }
     }
     g_object_unref(layout);
 }
 
 cairo_surface_t* GridPainter::glyph(const Cell& cell) {
-    GlyphKey key{cell.text,
-                 static_cast<uint8_t>((cell.bold ? 1 : 0) | (cell.italic ? 2 : 0) | (cell.underline ? 4 : 0)),
+    GlyphKey key{cell.text, static_cast<uint8_t>((cell.bold ? 1 : 0) | (cell.italic ? 2 : 0)),
                  static_cast<uint8_t>(cell.width == 2 ? 2 : 1)};
     auto it = cache_.find(key);
     if (it != cache_.end()) return it->second;
@@ -131,10 +188,9 @@ cairo_surface_t* GridPainter::glyph(const Cell& cell) {
     PangoLayout* layout = glyphLayout_;
     pango_layout_set_font_description(layout, cell.bold ? bold_ : font_);
     PangoAttrList* attrs = nullptr;
-    if (cell.underline || cell.italic) {
+    if (cell.italic) {
         attrs = pango_attr_list_new();
-        if (cell.underline) pango_attr_list_insert(attrs, pango_attr_underline_new(PANGO_UNDERLINE_SINGLE));
-        if (cell.italic) pango_attr_list_insert(attrs, pango_attr_style_new(PANGO_STYLE_ITALIC));
+        pango_attr_list_insert(attrs, pango_attr_style_new(PANGO_STYLE_ITALIC));
     }
     pango_layout_set_attributes(layout, attrs);
     if (attrs) pango_attr_list_unref(attrs);
@@ -207,16 +263,19 @@ void GridPainter::paintRows(cairo_t* cr, const Grid& g, int ox, int oy, Color8 c
                 cairo_rectangle(cr, ox + c * cellW_, y, cellW_ * (cell.width == 2 ? 2 : 1), cellH_);
                 cairo_fill(cr);
             }
-            if (!(cell.width == 0 || cell.text.empty() || (cell.text == " " && !cell.underline))) {
+            const Color8 tint = cell.faint ? dimmed(solid ? cell.bg : cell.fg) : (solid ? cell.bg : cell.fg);
+            const int gw = cellW_ * (cell.width == 2 ? 2 : 1);
+            if (!(cell.conceal || cell.width == 0 || cell.text.empty() || cell.text == " ")) {
                 cairo_surface_t* m = glyph(cell);
                 if (cairo_image_surface_get_format(m) == CAIRO_FORMAT_ARGB32) {  // colour glyph
                     cairo_set_source_surface(cr, m, ox + c * cellW_ - padX_, y);
                     cairo_paint(cr);
                 } else {
-                    setColor(cr, solid ? cell.bg : cell.fg);
+                    setColor(cr, tint);
                     cairo_mask_surface(cr, m, ox + c * cellW_ - padX_, y);
                 }
             }
+            if (cell.width != 0) drawDecorations(cr, cell, ox + c * cellW_, y, gw, cellH_, scale_, tint);
             if (isCursor && !solid) {
                 const int w = cellW_ * (cell.width == 2 ? 2 : 1);
                 const int x = ox + c * cellW_;

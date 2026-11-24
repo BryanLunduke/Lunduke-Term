@@ -33,7 +33,8 @@ public:
     void paint(cairo_t* cr, const Grid& g, int originX, int originY, Color8 cursorColor) const;
 
     // M1 renderer: glyphs are rasterised once into A8 masks (key: text, bold, italic,
-    // underline, width) and composited with cairo_mask_surface. Only rows with rows[r] != 0 are
+    // width). Underlines, strike and overline are stroked afterwards so SGR 58 can color
+    // them. Only rows with rows[r] != 0 are
     // repainted (rows == nullptr: all). Each painted row band is first cleared to `clear`
     // across the whole surface width so margins stay clean.
     void paintRows(cairo_t* cr, const Grid& g, int originX, int originY, Color8 cursorColor, Color8 clear,
@@ -45,7 +46,7 @@ public:
 private:
     struct GlyphKey {
         std::string text;
-        uint8_t flags;  // 1 bold, 2 italic, 4 underline
+        uint8_t flags;  // 1 bold, 2 italic
         uint8_t width;
         bool operator==(const GlyphKey& o) const { return flags == o.flags && width == o.width && text == o.text; }
     };

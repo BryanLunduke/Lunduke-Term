@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
             last = t;
             if (mode == "yes" && ctrlcSent < 0 && t - t0 >= 2000) {
                 ctrlcSent = t;
-                view->session().sendChar('c', VTERM_MOD_CTRL);
+                view->session().sendChar('c', ModCtrl);
                 view->session().flushWrites();
             }
             if (t - t0 >= seconds * 1000.0 || (exited && t - exitAt > 200)) {

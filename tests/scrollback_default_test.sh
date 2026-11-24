@@ -54,9 +54,10 @@ check() {  # name config-dir expected
     st="$tmp/status.$4"
     got=$(run "$2" "$st")
     settle=$(cat "$st" 2>/dev/null || echo "no settle status (the shell in the terminal did not run)")
-    echo "$1: sb-lines=$got (want $3; $settle)"
+    echo "$1: sb-lines=$got (want $3, page slack 800; $settle)"
     case $settle in timeout*) echo "FAIL: $1: $settle (bound ${settle_ms} ms)"; fail=1 ;; esac
-    [ "$got" = "$3" ] || fail=1
+    # libghostty retains history in pages, so the live count sits near the cap.
+    [ -n "$got" ] && [ "$got" -ge $(($3 - 800)) ] && [ "$got" -le $(($3 + 800)) ] || fail=1
 }
 
 mkdir -p "$tmp/none/lunduke-terminal" "$tmp/old/lunduke-terminal" "$tmp/other/lunduke-terminal"
