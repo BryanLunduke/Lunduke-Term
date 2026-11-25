@@ -665,6 +665,80 @@ static void testPasteStream() {
 }
 
 // A profile colour change repaints cells that are already on screen.
+static void testOscColors() {
+    VtermSession s(4, 40);
+    std::array<Color8, 16> pal{};
+    pal[1] = Color8{205, 0, 0};
+    s.setColors(Color8{200, 200, 200}, Color8{0, 0, 0}, pal, 0);
+    s.setCursorColor(Color8{200, 200, 200});
+    s.feed("\x1b[31mX");
+    Grid g;
+    s.fillGrid(g);
+    CHECK(g.at(0, 0).fg.r == 205 && g.at(0, 0).fg.b == 0);
+    s.feed("\x1b]4;1;#0000ff\x1b\\");
+    s.fillGrid(g);
+    CHECK(g.at(0, 0).fg.r == 0 && g.at(0, 0).fg.b == 255);
+    s.feed("\x1b[0m\x1b]10;#00ff00\x1b\\Z");
+    s.fillGrid(g);
+    CHECK(g.at(0, 1).text == "Z");
+    CHECK(g.at(0, 1).fg.g == 255 && g.at(0, 1).fg.r == 0);
+    s.feed("\x1b]11;#010203\x1b\\");
+    s.fillGrid(g);
+    CHECK(g.at(0, 1).bg.r == 1 && g.at(0, 1).bg.g == 2 && g.at(0, 1).bg.b == 3);
+    s.feed("\x1b]12;#abcdef\x1b\\");
+    s.fillGrid(g);
+    CHECK(s.cursorColor().r == 0xab && s.cursorColor().g == 0xcd && s.cursorColor().b == 0xef);
+    s.takeOutput();
+    s.feed("\x1b]10;?\x1b\\");
+    const std::string q10 = s.takeOutput();
+    CHECK(q10.find("\x1b]10;") != std::string::npos);
+    CHECK(q10.find("rgb:") != std::string::npos);
+    s.feed("\x1b]11;?\x1b\\");
+    const std::string q11 = s.takeOutput();
+    CHECK(q11.find("\x1b]11;") != std::string::npos);
+    s.feed("\x1b]4;1;?\x1b\\");
+    const std::string q4 = s.takeOutput();
+    CHECK(q4.find("\x1b]4;1;") != std::string::npos);
+    s.feed("\x1b]104;1\x1b\\\x1b[31mQ");
+    s.fillGrid(g);
+    CHECK(g.at(0, 2).text == "Q");
+    CHECK(g.at(0, 2).fg.r == 205 && g.at(0, 2).fg.b == 0);
+    s.feed("\x1b[0m\x1b]110\x1b\\W");
+    s.fillGrid(g);
+    CHECK(g.at(0, 3).text == "W");
+    CHECK(g.at(0, 3).fg.r == 200 && g.at(0, 3).fg.g == 200);
+    s.feed("\x1b]111\x1b\\");
+    s.fillGrid(g);
+    CHECK(g.at(0, 3).bg.r == 0 && g.at(0, 3).bg.g == 0 && g.at(0, 3).bg.b == 0);
+    s.feed("\x1b]112\x1b\\");
+    s.fillGrid(g);
+    CHECK(s.cursorColor().r == 200 && s.cursorColor().g == 200 && s.cursorColor().b == 200);
+    std::printf("osc colors: palette, fg/bg/cursor, queries, resets\n");
+}
+
+static void testSyncOutput() {
+    VtermSession s(4, 20);
+    int began = 0, ended = 0;
+    s.onSyncHold = [&](bool held) {
+        if (held) ++began;
+        else ++ended;
+    };
+    CHECK(!s.syncHeld());
+    s.feed("\x1b[?2026h");
+    CHECK(s.syncHeld());
+    CHECK(began == 1);
+    s.feed("HELLO");
+    CHECK(s.syncHeld());  // the text is in the model; presentation is the view's job
+    s.feed("\x1b[?2026h");  // already held: no second begin
+    CHECK(began == 1);
+    s.feed("\x1b[?2026l");
+    CHECK(!s.syncHeld());
+    CHECK(ended == 1);
+    Grid g;
+    s.fillGrid(g);
+    CHECK(g.at(0, 0).text == "H" && g.at(0, 4).text == "O");
+}
+
 static void testColorRefresh() {
     VtermSession s(4, 20);
     std::array<Color8, 16> pal{};
@@ -945,6 +1019,8 @@ int main() {
     testPaste();
     testPasteStream();
     testColorRefresh();
+    testSyncOutput();
+    testOscColors();
     testScrollbackCompress();
     testCursor();
     testGridCursorDiff();

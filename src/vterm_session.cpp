@@ -176,6 +176,9 @@ extern "C" void ltermOnTitle(GhosttyTerminal, void* user) {
 extern "C" void ltermOnWrite(GhosttyTerminal, void* user, const uint8_t* data, size_t len) {
     static_cast<VtermSession*>(user)->onWriteFired(data, len);
 }
+extern "C" void ltermOnRenderHold(GhosttyTerminal, void* user, bool held) {
+    static_cast<VtermSession*>(user)->onRenderHold(held);
+}
 extern "C" GhosttyString ltermOnVersion(GhosttyTerminal, void*) {
     static const std::string v = std::string("lunduke-terminal ") + LTERM_VERSION;
     GhosttyString s;
@@ -202,6 +205,12 @@ void VtermSession::onWriteFired(const uint8_t* data, size_t len) {
     sendBytes(reinterpret_cast<const char*>(data), len);
 }
 
+void VtermSession::onRenderHold(bool held) {
+    if (held == syncHeld_) return;
+    syncHeld_ = held;
+    if (onSyncHold) onSyncHold(held);
+}
+
 VtermSession::VtermSession(int rows, int cols) : rows_(std::max(1, rows)), cols_(std::max(1, cols)) {
     if (rows_ > 65535) rows_ = 65535;
     if (cols_ > 65535) cols_ = 65535;
@@ -213,6 +222,7 @@ VtermSession::VtermSession(int rows, int cols) : rows_(std::max(1, rows)), cols_
         ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_BELL, reinterpret_cast<const void*>(ltermOnBell));
         ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_TITLE_CHANGED, reinterpret_cast<const void*>(ltermOnTitle));
         ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_WRITE_PTY, reinterpret_cast<const void*>(ltermOnWrite));
+        ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_RENDER_HOLD, reinterpret_cast<const void*>(ltermOnRenderHold));
         ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_XTVERSION, reinterpret_cast<const void*>(ltermOnVersion));
         const char* tn = "xterm-256color";
         GhosttyString termName{reinterpret_cast<const uint8_t*>(tn), std::strlen(tn)};
@@ -957,7 +967,46 @@ void VtermSession::setColors(Color8 fg, Color8 bg, const std::array<Color8, 16>&
     // Resolved colours live in the viewport cache. A profile change has to
     // repaint the cells already on screen, not only the next output.
     viewFull_ = true;
+    colorsChanged_ = true;
     damaged_ = true;
+}
+
+void VtermSession::setCursorColor(Color8 c) {
+    cursor_ = c;
+    GhosttyColorRgb g{c.r, c.g, c.b};
+    ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_COLOR_CURSOR, &g);
+    colorsChanged_ = true;
+    damaged_ = true;
+}
+
+bool VtermSession::takeColorsChanged() {
+    const bool c = colorsChanged_;
+    colorsChanged_ = false;
+    return c;
+}
+
+void VtermSession::pullAppColors() const {
+    auto rgb = [](const GhosttyColorRgb& c) { return Color8{c.r, c.g, c.b}; };
+    auto take = [&](GhosttyTerminalData key, Color8& slot) {
+        GhosttyColorRgb c{};
+        if (ghostty_terminal_get(g_->vt, key, &c) != GHOSTTY_SUCCESS) return;
+        const Color8 n = rgb(c);
+        if (n == slot) return;
+        slot = n;
+        viewFull_ = true;
+        colorsChanged_ = true;
+    };
+    take(GHOSTTY_TERMINAL_DATA_COLOR_FOREGROUND, fg_);
+    take(GHOSTTY_TERMINAL_DATA_COLOR_BACKGROUND, bg_);
+    take(GHOSTTY_TERMINAL_DATA_COLOR_CURSOR, cursor_);
+    GhosttyColorRgb pal[256];
+    if (ghostty_terminal_get(g_->vt, GHOSTTY_TERMINAL_DATA_COLOR_PALETTE, pal) != GHOSTTY_SUCCESS) return;
+    for (int i = 0; i < 256; ++i) {
+        if (g_->pal[i].r == pal[i].r && g_->pal[i].g == pal[i].g && g_->pal[i].b == pal[i].b) continue;
+        g_->pal[i] = pal[i];
+        viewFull_ = true;
+        colorsChanged_ = true;
+    }
 }
 
 bool VtermSession::altScreen() const {
@@ -1015,8 +1064,10 @@ bool VtermSession::locate(long line, int col, void* out) const {
 Color8 VtermSession::resolveColor(uint8_t tag, uint8_t a, uint8_t b, uint8_t c, bool foreground) const {
     if (tag == GHOSTTY_STYLE_COLOR_NONE) return foreground ? fg_ : bg_;
     if (tag == GHOSTTY_STYLE_COLOR_PALETTE) {
-        if (havePalette_ && a < 16) return palette_[a];
+        // g_->pal is the profile palette plus any OSC 4 override. Indices
+        // 0-15 are not lifted; the profile's min-grey applies to the cube.
         Color8 o{g_->pal[a].r, g_->pal[a].g, g_->pal[a].b};
+        if (havePalette_ && a < 16) return o;
         return foreground ? liftToGrey(o, minFgGrey_) : o;
     }
     Color8 o{a, b, c};
@@ -1143,6 +1194,7 @@ VtermSession::CellRead VtermSession::readAt(long line, int col) const {
 }
 
 void VtermSession::fillGrid(Grid& grid, int scrollOffset) const {
+    pullAppColors();
     const bool alt = altScreen();
     int off = 0;
     if (!alt) {

@@ -94,6 +94,7 @@ TerminalView::TerminalView(const ViewOptions& opts)
     session_.reset(new VtermSession(kDefaultRows, kDefaultCols));
     session_->onTitle = [this] { signalTitle.emit(session_->title()); };
     session_->onBell = [this] { onBell(); };
+    session_->onSyncHold = [this](bool held) { onSyncHold(held); };
     const size_t sb = clampScrollbackLines(opts_.scrollbackLines);
     if (opts_.scrollbackLines > static_cast<long long>(kMaxScrollbackLines))
         std::fprintf(stderr, "lunduke-terminal: scrollback-lines %lld is too large, using %zu\n", opts_.scrollbackLines, sb);
@@ -452,6 +453,7 @@ void TerminalView::applyColors() {
     const bool fxPal = effectsOn_ && profile_.hasEffectsPalette;
     session_->setColors(profile_.fg, profile_.bg, fxPal ? profile_.effectsPalette : profile_.palette,
                         fxPal ? profile_.effectsMinFgGrey : profile_.minFgGrey);
+    session_->setCursorColor(profile_.cursor);
     session_->setDefaultCursor(opts_.cursorShape == "underline" ? CursorShape::Underline
                                 : opts_.cursorShape == "bar"    ? CursorShape::Bar
                                                                  : CursorShape::Block,
@@ -744,6 +746,7 @@ bool TerminalView::updateContent() {
     if (!src_ || (!contentDirty_ && !fullRepaint_)) return false;
     const auto t0 = std::chrono::steady_clock::now();
     session_->fillGrid(next_, scrollOffset_);
+    if (session_->takeColorsChanged()) fullRepaint_ = true;
     // Selection, cursor style, reverse video / visual bell are applied to the composed grid, so the
     // changed-rows repaint picks them up like any other cell change.
     if (sel_.active()) {
@@ -784,7 +787,9 @@ bool TerminalView::updateContent() {
         inverseShown_ = inverse;
         fullRepaint_ = true;
     }
-    const Color8 clearColor = inverse ? profile_.fg : profile_.bg;
+    // OSC 10/11 override the profile's default fg/bg. The profile stays what a
+    // reset (OSC 110/111) returns to.
+    const Color8 clearColor = inverse ? session_->foregroundColor() : session_->backgroundColor();
     const int shape = session_->cursorShape();
     if (shape == static_cast<int>(CursorShape::Underline)) next_.cursorShape = Grid::CursorShape::Underline;
     else if (shape == static_cast<int>(CursorShape::Bar)) next_.cursorShape = Grid::CursorShape::Bar;
@@ -811,7 +816,8 @@ bool TerminalView::updateContent() {
         cairo_set_source_rgb(c, clearColor.r / 255.0, clearColor.g / 255.0, clearColor.b / 255.0);
         cairo_paint(c);
     }
-    painter_->paintRows(c, next_, marginX_, marginY_, inverse ? profile_.bg : profile_.cursor, clearColor, full ? nullptr : &rows, w_);
+    const Color8 cursor = inverse ? session_->backgroundColor() : session_->cursorColor();
+    painter_->paintRows(c, next_, marginX_, marginY_, cursor, clearColor, full ? nullptr : &rows, w_);
     cairo_destroy(c);
     std::swap(cur_, next_);
     fullRepaint_ = false;
@@ -840,7 +846,29 @@ bool TerminalView::updateContent() {
     return true;
 }
 
+void TerminalView::onSyncHold(bool held) {
+    syncTimer_.disconnect();
+    if (!held) {
+        syncHold_ = false;
+        contentDirty_ = true;
+        requestFrame();
+        return;
+    }
+    syncHold_ = true;
+    // A program that forgets to end the synchronized update must not freeze
+    // the screen. One second is long enough for a normal redraw (neovim, tmux).
+    syncTimer_ = Glib::signal_timeout().connect(
+        [this] {
+            syncHold_ = false;
+            contentDirty_ = true;
+            requestFrame();
+            return false;
+        },
+        1000);
+}
+
 void TerminalView::requestFrame() {
+    if (syncHold_) return;  // one present when the synchronized update ends
     if (frameTimer_.connected()) return;
     // Review item 7: a hidden tab (or minimised window) only parses; contentDirty_ stays set and
     // setWindowVisible(true) paints the changed rows once.
@@ -864,6 +892,7 @@ void TerminalView::requestFrame() {
 }
 
 void TerminalView::onFrameTimer() {
+    if (syncHold_) return;  // the timer was queued before the hold; present on release
     if (!visible_) return;  // hidden since the request: paint on show (contentDirty_ stays set)
     if (mode_ == Mode::Plain) lastFrameMs_ = nowMs();
     const bool changed = updateContent();

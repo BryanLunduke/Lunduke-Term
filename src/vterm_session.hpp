@@ -148,6 +148,14 @@ public:
     // above the screen and hides as many bottom rows).
     void fillGrid(Grid& g, int scrollOffset = 0) const;
     void setColors(Color8 fg, Color8 bg, const std::array<Color8, 16>& palette, float minFgGrey);
+    // Profile cursor colour, used until OSC 12 (reset with OSC 112).
+    void setCursorColor(Color8 c);
+    Color8 foregroundColor() const { return fg_; }
+    Color8 backgroundColor() const { return bg_; }
+    Color8 cursorColor() const { return cursor_; }
+    // True once since the last call if OSC or setColors changed a colour the
+    // view has to repaint, including the margins and the cursor.
+    bool takeColorsChanged();
     // User cursor, used until the application sends DECSCUSR or mode 12.
     void setDefaultCursor(CursorShape shape, bool blink);
     std::string rowText(int row) const;
@@ -192,10 +200,15 @@ public:
     const std::string& title() const { return title_; }
     std::function<void()> onTitle;
     std::function<void()> onBell;
+    // DEC 2026 synchronized output. `held` is true while the application has a
+    // synchronized update open. The view should not present until it is false.
+    std::function<void(bool held)> onSyncHold;
+    bool syncHeld() const { return syncHeld_; }
     // libghostty callbacks (C function pointers cannot be private members).
     void onBellFired();
     void onTitleFired();
     void onWriteFired(const uint8_t* data, size_t len);
+    void onRenderHold(bool held);
 
 private:
     struct Ghost;  // libghostty handles, kept out of this header
@@ -226,6 +239,9 @@ private:
     void noteDirty();
     CellRead readAt(long line, int col) const;
     Color8 resolveColor(uint8_t tag, uint8_t a, uint8_t b, uint8_t c, bool foreground) const;
+    // Copy OSC 4/10/11/12 (and their resets) out of libghostty. The profile
+    // colours set by setColors stay the defaults those resets return to.
+    void pullAppColors() const;
 
     Ghost* g_ = nullptr;
     int rows_, cols_;
@@ -252,7 +268,11 @@ private:
     size_t pasteOff_ = 0;
     bool pasteNeedPrefix_ = false;
     bool pasteNeedSuffix_ = false;
-    Color8 fg_{208, 208, 208}, bg_{0, 0, 0};
+    bool syncHeld_ = false;
+    // Effective colours (profile, then any OSC override). Mutable: fillGrid is
+    // const and refreshes them from libghostty.
+    mutable Color8 fg_{208, 208, 208}, bg_{0, 0, 0}, cursor_{208, 208, 208};
+    mutable bool colorsChanged_ = false;
     std::array<Color8, 16> palette_{};
     bool havePalette_ = false;
     float minFgGrey_ = 0.0f;
