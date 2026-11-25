@@ -7,6 +7,7 @@
 #include <ghostty/vt.h>
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -1341,8 +1342,29 @@ void TerminalView::pasteClipboard(bool primary) {
         ->request_text([this, alive](const Glib::ustring& t) {
             if (alive.expired()) return;  // the view was destroyed while the request was pending
             if (t.empty() || holding_ || exited_) return;
+            const std::string text = t.raw();
+            if (pasteNeedsConfirm(text, session_->bracketedPaste(), opts_.confirmPaste)) {
+                Gtk::Window* top = dynamic_cast<Gtk::Window*>(get_toplevel());
+                const bool sudo = pasteNeedsConfirm(text, true, true);
+                Gtk::MessageDialog dlg(*top, sudo ? "This paste contains sudo." : "This paste is more than one line.",
+                                       false, Gtk::MESSAGE_WARNING, Gtk::BUTTONS_NONE, true);
+                std::string preview = text.size() > 500 ? text.substr(0, 500) + "…" : text;
+                dlg.set_secondary_text(preview);
+                dlg.add_button("_Cancel", Gtk::RESPONSE_CANCEL);
+                dlg.add_button("_Paste", Gtk::RESPONSE_OK);
+                dlg.set_default_response(Gtk::RESPONSE_CANCEL);
+                Gtk::CheckButton again("Don't ask again");
+                dlg.get_content_area()->pack_start(again, false, false);
+                again.show();
+                const int response = dlg.run();
+                if (response != Gtk::RESPONSE_OK) return;
+                if (again.get_active()) {
+                    opts_.confirmPaste = false;
+                    signalPasteConfirmOff.emit();
+                }
+            }
             snapToBottom();
-            session_->paste(t.raw());
+            session_->paste(text);
             ensureWriteWatch();
         });
 }

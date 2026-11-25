@@ -280,6 +280,14 @@ SettingsValues parseSettingsIni(const std::string& text) {
         } else warn("scrollbar", err);
         err = nullptr;
     }
+    if (g_key_file_has_key(kf, kGroup, "confirm-paste", nullptr)) {
+        const gboolean v = g_key_file_get_boolean(kf, kGroup, "confirm-paste", &err);
+        if (!err) {
+            o.hasConfirmPaste = true;
+            o.confirmPaste = v;
+        } else warn("confirm-paste", err);
+        err = nullptr;
+    }
     // A key this build does not read is kept on disk (Save does not strip unknown
     // keys) but it is not applied, so say so instead of ignoring it.
     if (gchar** keys = g_key_file_get_keys(kf, kGroup, nullptr, nullptr)) {
@@ -287,7 +295,7 @@ SettingsValues parseSettingsIni(const std::string& text) {
             "profile", "effects", "renderer", "threads", "effects-fps", "max-fps", "effects-quality",
             "cpu-budget", "pause-unfocused", "font", "font-px", "scrollback-lines", "login-shell", "cwd",
             "on-exit", "bell", "cursor-shape", "cursor-blink", "word-chars", "frame", "frame-size",
-            "frame-color", "frame-shininess", "rgb-shift", "scrollbar"};
+            "frame-color", "frame-shininess", "rgb-shift", "scrollbar", "confirm-paste"};
         for (gchar** k = keys; *k; ++k) {
             bool ok = false;
             for (const char* n : known)

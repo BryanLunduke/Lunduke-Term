@@ -5,6 +5,7 @@
 #include <ghostty/vt.h>
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <climits>
 #include <cerrno>
@@ -91,6 +92,27 @@ static size_t utf8Seq(const std::string& s, size_t i, uint32_t& cp) {
     }
     if (cp < min || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) return 0;
     return n;
+}
+
+bool pasteNeedsConfirm(const std::string& text, bool bracketedPaste, bool ask) {
+    if (!ask || text.empty()) return false;
+    auto command = [&](const char* word) {
+        const size_t n = std::strlen(word);
+        for (size_t i = 0; i + n <= text.size(); ++i) {
+            if (text.compare(i, n, word) != 0) continue;
+            if (i > 0 && std::isalnum(static_cast<unsigned char>(text[i - 1]))) continue;
+            if (i + n < text.size() && std::isalnum(static_cast<unsigned char>(text[i + n]))) continue;
+            size_t k = i;
+            while (k > 0 && (text[k - 1] == ' ' || text[k - 1] == '\t')) --k;
+            if (k == 0 || text[k - 1] == '\n' || text[k - 1] == '\r' || text[k - 1] == ';' || text[k - 1] == '|' ||
+                text[k - 1] == '&')
+                return true;
+        }
+        return false;
+    };
+    if (command("sudo")) return true;
+    const bool multiline = text.find('\n') != std::string::npos || text.find('\r') != std::string::npos;
+    return multiline && !bracketedPaste;
 }
 
 std::string sanitizePaste(const std::string& text) {
@@ -800,6 +822,8 @@ static uint8_t kittyFlags(GhosttyTerminal vt) {
     if (ghostty_terminal_get(vt, GHOSTTY_TERMINAL_DATA_KITTY_KEYBOARD_FLAGS, &flags) != GHOSTTY_SUCCESS) return 0;
     return flags;
 }
+
+bool VtermSession::bracketedPaste() const { return modeOn(g_->vt, GHOSTTY_MODE_BRACKETED_PASTE); }
 
 bool VtermSession::reportsKeyEvents() const {
     return (kittyFlags(g_->vt) & GHOSTTY_KITTY_KEY_REPORT_EVENTS) != 0;

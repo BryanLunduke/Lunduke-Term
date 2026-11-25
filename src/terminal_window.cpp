@@ -59,6 +59,7 @@ bool saveSettings(const ViewOptions& o, const std::string& path, std::string* er
         else kf.set_boolean(g, "frame", o.tube.frame > 0);
         if (o.scrollbar < 0) drop("scrollbar");
         else kf.set_string(g, "scrollbar", o.scrollbar > 0 ? "on" : "off");
+        kf.set_boolean(g, "confirm-paste", o.confirmPaste);
         const std::string dir = Glib::path_get_dirname(path);
         if (g_mkdir_with_parents(dir.c_str(), 0700) != 0) {
             if (error) *error = "cannot create " + dir;
@@ -444,6 +445,12 @@ TerminalView* TerminalWindow::newTab(bool first) {
         if (v == currentView()) updateSearchStatus();
     });
     v->signalSettingsRequested.connect([this] { showSettings(); });
+    v->signalPasteConfirmOff.connect([this] {
+        opts_.confirmPaste = false;
+        for (auto& t : tabs_) t->view->setConfirmPaste(false);
+        std::string err, warn;
+        saveSettings(opts_, settingsFile, &err, &warn);
+    });
 
     tabs_.push_back(std::move(tab));
     const int page = nb_.append_page(*v, tabs_.back()->label);
@@ -708,6 +715,7 @@ void TerminalWindow::applySettings(const ViewOptions& o) {
         if (cur.effectsQuality != o.effectsQuality) v.setEffectsQuality(o.effectsQuality);
         if (cur.scrollbackLines != o.scrollbackLines) v.setScrollbackLines(o.scrollbackLines);
         if (cur.scrollbar != o.scrollbar) v.setScrollbar(o.scrollbar);
+        if (cur.confirmPaste != o.confirmPaste) v.setConfirmPaste(o.confirmPaste);
     }
     const auto command = opts_.command;
     opts_.profile = o.profile;
@@ -717,6 +725,7 @@ void TerminalWindow::applySettings(const ViewOptions& o) {
     opts_.scrollbackLines = o.scrollbackLines;
     opts_.tube.frame = o.tube.frame;
     opts_.scrollbar = o.scrollbar;
+    opts_.confirmPaste = o.confirmPaste;
     opts_.command = command;
 }
 
@@ -803,6 +812,10 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     grid->attach(scrollbackNote, 1, row++, 1, 1);
     addRow("Bezel (frame)", frame);
     addRow("Scrollbar", scrollbar);
+    confirmPaste.set_tooltip_text(
+        "Ask before a multi-line paste, and before any paste that runs sudo. "
+        "A multi-line paste is not asked while the application has bracketed paste on; sudo still is.");
+    grid->attach(confirmPaste, 0, row++, 2, 1);
     status.set_halign(Gtk::ALIGN_START);
     status.set_line_wrap(true);
     status.set_max_width_chars(60);
@@ -818,6 +831,7 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
         c->signal_changed().connect(sigc::mem_fun(*this, &SettingsDialog::changed));
     fontPx.signal_value_changed().connect(sigc::mem_fun(*this, &SettingsDialog::changed));
     scrollback.signal_value_changed().connect(sigc::mem_fun(*this, &SettingsDialog::changed));
+    confirmPaste.signal_toggled().connect(sigc::mem_fun(*this, &SettingsDialog::changed));
     save.signal_clicked().connect([this] {
         std::string err, warn;
         if (!saveSettings(options(), win_.settingsFile, &err, &warn)) status.set_text("Not saved: " + err);
@@ -841,6 +855,7 @@ void SettingsDialog::load(const ViewOptions& o) {
     updateScrollbackNote();
     frame.set_active_id(std::to_string(o.tube.frame < 0 ? -1 : (o.tube.frame > 0 ? 1 : 0)));
     scrollbar.set_active_id(std::to_string(o.scrollbar < 0 ? -1 : (o.scrollbar > 0 ? 1 : 0)));
+    confirmPaste.set_active(o.confirmPaste);
     status.set_text("");
     updateFrameSensitivity();
     loading_ = false;
@@ -856,6 +871,7 @@ ViewOptions SettingsDialog::options() const {
     o.scrollbackLines = static_cast<long long>(scrollback.get_value());
     o.tube.frame = std::stoi(frame.get_active_id().empty() ? std::string("-1") : std::string(frame.get_active_id()));
     o.scrollbar = std::stoi(scrollbar.get_active_id().empty() ? std::string("-1") : std::string(scrollbar.get_active_id()));
+    o.confirmPaste = confirmPaste.get_active();
     return o;
 }
 

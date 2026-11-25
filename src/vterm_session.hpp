@@ -32,6 +32,12 @@ std::vector<std::string> childEnvironment(char** base);
 // honour) and bytes that are not valid UTF-8, as xterm does in UTF-8 mode.
 std::string sanitizePaste(const std::string& text);
 
+// Whether a paste should ask the user first. Multi-line text asks unless the
+// application has bracketed paste on (it asked to receive the paste as data).
+// A paste that contains a sudo command always asks, including inside brackets.
+// `ask` is the confirm-paste setting; false skips the question.
+bool pasteNeedsConfirm(const std::string& text, bool bracketedPaste, bool ask);
+
 // Limits against hostile or runaway input.
 constexpr size_t kMaxTitleBytes = 4096;            // OSC 0/2 window title
 constexpr size_t kMaxScrollbackLines = 100000;     // scrollback-lines setting / --scrollback
@@ -211,6 +217,7 @@ public:
     // synchronized update open. The view should not present until it is false.
     std::function<void(bool held)> onSyncHold;
     bool syncHeld() const { return syncHeld_; }
+    bool bracketedPaste() const;
     // OSC 52 write. The text is what was set (empty means cleared). Reads are ignored.
     std::function<void(const std::string& text)> onOsc52;
     const std::string& osc52Text() const { return osc52_; }

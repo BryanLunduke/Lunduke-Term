@@ -76,6 +76,8 @@ const char kUsage[] =
     "  --scrollback N            scrollback lines (default 5000)\n"
     "  --scrollbar auto|on|off   scrollback bar (default auto: on for plain and\n"
     "                            modern, off for CRT profiles so the tube is unchanged)\n"
+    "                            confirm-paste in settings asks before a multi-line paste\n"
+    "                            and before sudo (multi-line is skipped in bracketed paste)\n"
     "  --cursor-shape block|underline|bar, --cursor-blink, --no-cursor-blink\n"
     "  --bell LIST               comma list of visual, urgent, audible or none\n"
     "                            (default: urgent. No screen flash and no beep.)\n"
@@ -171,6 +173,7 @@ void loadSettings(lterm::ViewOptions& o) {
     if (s.hasFrameShininess) o.tube.frameShininess = s.frameShininess;
     if (s.hasRgbShift) o.tube.rgbShift = s.rgbShift;
     if (s.hasScrollbar) o.scrollbar = s.scrollbar;
+    if (s.hasConfirmPaste) o.confirmPaste = s.confirmPaste;
 }
 
 // An option as a separate argument (`--name value`) or, for a long option, `--name=value`.

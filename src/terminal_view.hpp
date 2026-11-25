@@ -54,6 +54,9 @@ struct ViewOptions {
     // path's float buffers); showing it rebuilds them. -1: never.
     int effectsFreeHiddenMs = 3000;
     std::string wordChars = Selection::defaultWordChars();
+    // Ask before a multi-line paste, and before any paste that runs sudo.
+    // Multi-line is not asked while bracketed paste is on. sudo still is.
+    bool confirmPaste = true;
     // -1: on unless the profile is a 4:3 CRT (a bar beside the tube changes the
     // screen). 0 off, 1 on.
     int scrollbar = -1;
@@ -166,6 +169,9 @@ public:
     // M6 item 1: right-click menu (Copy, Paste, Settings). Shift+right-click opens it while an
     // application reports the mouse. "Settings" asks the window to show its dialog.
     sigc::signal<void> signalSettingsRequested;
+    // The user checked "don't ask again" on the paste dialog.
+    sigc::signal<void> signalPasteConfirmOff;
+    void setConfirmPaste(bool ask) { opts_.confirmPaste = ask; }
     Gtk::Menu& contextMenu() { return menu_; }  // tests
     Gtk::MenuItem& contextCopy() { return menuCopy_; }
     Gtk::MenuItem& contextPaste() { return menuPaste_; }

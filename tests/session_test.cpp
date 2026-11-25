@@ -665,6 +665,18 @@ static void testPasteStream() {
 }
 
 // A profile colour change repaints cells that are already on screen.
+static void testPasteConfirm() {
+    CHECK(!pasteNeedsConfirm("echo hi", false, true));
+    CHECK(pasteNeedsConfirm("echo hi\nls", false, true));
+    CHECK(!pasteNeedsConfirm("echo hi\nls", true, true));  // bracketed paste: the app asked for the lines
+    CHECK(pasteNeedsConfirm("sudo reboot", false, true));
+    CHECK(pasteNeedsConfirm("sudo reboot", true, true));  // sudo still asks inside brackets
+    CHECK(pasteNeedsConfirm("echo hi; sudo -n true", true, true));
+    CHECK(!pasteNeedsConfirm("pseudocode\n", true, true));
+    CHECK(!pasteNeedsConfirm("sudo reboot", false, false));  // don't ask again
+    std::printf("paste confirm: multi-line, bracketed skip, sudo kept\n");
+}
+
 static void testLinks() {
     VtermSession s(4, 60);
     s.feed("see https://example.com/a. next\r\n");
@@ -1056,6 +1068,7 @@ int main() {
     testOscColors();
     testOsc52();
     testLinks();
+    testPasteConfirm();
     testScrollbackCompress();
     testCursor();
     testGridCursorDiff();
