@@ -73,6 +73,19 @@ for opt in --renderer --on-exit --cursor-shape --effects-quality; do
     has "$tmp/bad2.err" "$opt must be"
 done
 
+# Long options accept --name=value, and a missing argument is not "unknown option".
+"$bin" --renderer=cpu --effects-quality=static --font=DejaVu --size=80X24 --list-profiles \
+    > "$tmp/eq.out" 2> "$tmp/eq.err"
+expect "--name=value then --list-profiles" 0 $?
+has "$tmp/eq.out" "plain"
+if grep -q "unknown option" "$tmp/eq.err"; then echo "--name=value was unknown"; fail=1; fi
+"$bin" --renderer > "$tmp/rend.out" 2> "$tmp/rend.err"
+expect "--renderer missing argument" 2 $?
+has "$tmp/rend.err" "requires an argument"
+"$bin" --size hello > "$tmp/sz.out" 2> "$tmp/sz.err"
+expect "--size hello" 2 $?
+has "$tmp/sz.err" "WxH"
+
 # Launcher flags are accepted and do not open a window when --list-profiles follows them.
 "$bin" --cwd / --workdir / --working-directory / \
     --cwd=/ --workdir=/ --working-directory=/ \

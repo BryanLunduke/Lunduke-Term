@@ -664,6 +664,21 @@ static void testPasteStream() {
     std::printf("paste stream pty: child received %zu bytes\n", got.size());
 }
 
+// A profile colour change repaints cells that are already on screen.
+static void testColorRefresh() {
+    VtermSession s(4, 20);
+    std::array<Color8, 16> pal{};
+    s.setColors(Color8{200, 180, 40}, Color8{0, 0, 0}, pal, 0);
+    s.feed("A");
+    Grid g;
+    s.fillGrid(g);
+    CHECK(g.at(0, 0).text == "A");
+    CHECK(g.at(0, 0).fg.r == 200);
+    s.setColors(Color8{10, 20, 30}, Color8{1, 2, 3}, pal, 0);
+    s.fillGrid(g);
+    CHECK(g.at(0, 0).fg.r == 10 && g.at(0, 0).fg.g == 20 && g.at(0, 0).bg.b == 3);
+}
+
 static void testCursor() {
     VtermSession s(4, 20);
     CHECK_EQ(s.cursorShape(), 0);  // not set by the app: the user's setting applies
@@ -929,6 +944,7 @@ int main() {
     testKittyKeyboard();
     testPaste();
     testPasteStream();
+    testColorRefresh();
     testScrollbackCompress();
     testCursor();
     testGridCursorDiff();

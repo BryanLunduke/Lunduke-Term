@@ -31,7 +31,8 @@ int main() {
         "font-px = 18\n"
         "effects = true\n"
         "effects-quality = static\n"
-        "bell = urgent\n";
+        "bell = urgent\n"
+        "not-a-real-key = 1\n";
     const SettingsValues s = parseSettingsIni(text);
     CHECK(warned(s, "skipped settings line"));
     CHECK(warned(s, "threads"));
@@ -41,6 +42,7 @@ int main() {
     CHECK(s.hasEffectsQuality && s.effectsQuality == EffectsQuality::Static);
     CHECK(s.hasBell && s.bell == "urgent");
     CHECK(!s.hasThreads);
+    CHECK(warned(s, "unknown setting not-a-real-key"));
     std::printf("settings: %zu warning(s), profile %s, font-px %d\n", s.warnings.size(), s.profile.c_str(),
                 s.fontPx);
     if (failures) {

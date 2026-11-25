@@ -954,6 +954,9 @@ void VtermSession::setColors(Color8 fg, Color8 bg, const std::array<Color8, 16>&
     GhosttyColorRgb f{fg.r, fg.g, fg.b}, b{bg.r, bg.g, bg.b};
     ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_COLOR_FOREGROUND, &f);
     ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_COLOR_BACKGROUND, &b);
+    // Resolved colours live in the viewport cache. A profile change has to
+    // repaint the cells already on screen, not only the next output.
+    viewFull_ = true;
     damaged_ = true;
 }
 
