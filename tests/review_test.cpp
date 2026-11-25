@@ -515,6 +515,29 @@ static void testInputMethod() {
     std::printf("input method: dead_acute e, Compose o c, x -> c3 a9 c2 a9 78 (%ld commits)\n", v.imCommits());
 }
 
+// Kitty "report all keys as escape codes". Shift+a is committed by the input
+// method; the encoder must still see Shift (ESC[97;2u, not ESC[65u).
+static void testKittyImShift() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-c",
+                 "printf '\\033[=8u'; stty raw -echo; dd bs=1 count=8 2>/dev/null | od -An -tx1; exec sleep 30"};
+    Win w(o);
+    TerminalView& v = *w.view;
+    CHECK(v.start());
+    w.view->grabTerminalFocus();
+    CHECK(waitFor([&] { return v.session().reportsAllKeys(); }, ltermWaitMs(3000, 8000)));
+    GdkEventKey e = keyEv(GDK_KEY_A, GDK_SHIFT_MASK);
+    e.window = w.win.get_window()->gobj();
+    v.testKey(&e);
+    CHECK(v.imCommits() >= 1);  // the letter went through the IM commit path
+    const bool ok = waitFor([&] { return screenText(v.shownGrid()).find("1b 5b 39 37 3b 32 75") != std::string::npos; },
+                            ltermWaitMs(3000, 10000));
+    CHECK(ok);
+    if (!ok) std::fprintf(stderr, "kitty IM screen: %s\n", screenText(v.shownGrid()).substr(0, 200).c_str());
+    std::printf("kitty IM Shift+a: %s (%ld commits)\n", ok ? "1b 5b 39 37 3b 32 75" : "missing", v.imCommits());
+}
+
 // Ctrl chords go through onKey (the IM is skipped), which is the path a real
 // key press takes. Ctrl+Shift+A is ^A, Ctrl+@ is NUL, Ctrl+[ is ESC.
 static void testLegacyCtrlKeys() {
@@ -677,6 +700,7 @@ int main(int argc, char** argv) {
     testScrollbackSettingsSlip();
     testScrollbackMax();
     testInputMethod();
+    testKittyImShift();
     testLegacyCtrlKeys();
     testDeadKeyChord();
     testHiddenFrees("gl");

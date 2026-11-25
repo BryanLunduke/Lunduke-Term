@@ -219,7 +219,14 @@ private:
     // gtkmm 3 has no IMContext wrapper: the GTK C API (a GtkIMMulticontext).
     GtkIMContext* im_ = nullptr;
     void onImCommit(const char* text);
+    void noteImPreedit(bool active);
     void updateImCursor();
+    // The key the input method is handling. A direct commit (Shift+a) must be
+    // encoded from this event so kitty mode sees Shift; a real composition
+    // (dead key, CJK) sets imComposing_ and is sent as text.
+    GdkEventKey imKey_{};
+    bool imKeyValid_ = false;
+    bool imComposing_ = false;
     bool onButtonPress(GdkEventButton* ev);
     bool onButtonRelease(GdkEventButton* ev);
     bool onMotion(GdkEventMotion* ev);

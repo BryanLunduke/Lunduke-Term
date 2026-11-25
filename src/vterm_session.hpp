@@ -123,6 +123,9 @@ public:
     bool reportsKeyEvents() const;
     // Kitty keyboard protocol flag "report all keys as escape codes" (modifier keys).
     bool reportsAllKeys() const;
+    // Any kitty keyboard flag. The input method must keep Shift (and the other
+    // modifiers) when this is on; a plain commit would drop them.
+    bool kittyKeyboard() const;
     void sendBytes(const char* bytes, size_t len);
     void flushWrites();
     // True while keystrokes, a paste, or both are still waiting on the pty.

@@ -760,6 +760,8 @@ bool VtermSession::reportsAllKeys() const {
     return (kittyFlags(g_->vt) & GHOSTTY_KITTY_KEY_REPORT_ALL) != 0;
 }
 
+bool VtermSession::kittyKeyboard() const { return kittyFlags(g_->vt) != 0; }
+
 void VtermSession::sendPhysical(int ghostKey, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted,
                                 KeyAction action) {
     encodeKey(ghostKey, mod, utf8, utf8Len, unshifted, action);

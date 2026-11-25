@@ -106,6 +106,12 @@ TerminalView::TerminalView(const ViewOptions& opts)
     g_signal_connect(im_, "commit", G_CALLBACK(+[](GtkIMContext*, const char* text, gpointer self) {
         static_cast<TerminalView*>(self)->onImCommit(text);
     }), this);
+    g_signal_connect(im_, "preedit-changed", G_CALLBACK(+[](GtkIMContext* im, gpointer self) {
+        gchar* s = nullptr;
+        gtk_im_context_get_preedit_string(im, &s, nullptr, nullptr);
+        static_cast<TerminalView*>(self)->noteImPreedit(s && *s);
+        g_free(s);
+    }), this);
     for (Gtk::Widget* w : {static_cast<Gtk::Widget*>(&area_), static_cast<Gtk::Widget*>(&gl_)}) {
         w->set_can_focus(true);
         w->set_no_show_all(true);  // chooseMode() shows exactly one of the two
@@ -1472,11 +1478,19 @@ bool TerminalView::onKey(GdkEventKey* ev) {
     const bool keypad = ev->keyval >= GDK_KEY_KP_Space && ev->keyval <= GDK_KEY_KP_9;
     if (ev->window && !(ev->state & (GDK_CONTROL_MASK | GDK_MOD1_MASK)) && !keypad) {
         updateImCursor();
+        // A second key before the previous one committed is a composition
+        // (dead acute, then e). The commit must not be reported as that key.
+        if (imKeyValid_) imComposing_ = true;
+        imKey_ = *ev;
+        imKeyValid_ = true;
         if (gtk_im_context_filter_keypress(im_, ev)) return true;
+        imKeyValid_ = false;
     } else if (ev->window && !ev->is_modifier) {
         // PR #6 review N3: a pending dead key or compose sequence must not survive a chord
         // (dead acute, Ctrl+C, q sent "^C" then "´q"); drop it before the chord goes out.
         gtk_im_context_reset(im_);
+        imKeyValid_ = false;
+        imComposing_ = false;
     }
     return deliverKey(ev, false);
 }
@@ -1585,9 +1599,33 @@ bool TerminalView::onKeyRelease(GdkEventKey* ev) {
     return deliverKey(ev, true);
 }
 
+void TerminalView::noteImPreedit(bool active) {
+    if (active) imComposing_ = true;
+}
+
 void TerminalView::onImCommit(const char* text) {
     if (holding_ || exited_ || !text || !*text || !g_utf8_validate(text, -1, nullptr)) return;
     ++imCommits_;
+    // Kitty mode encodes Shift+a as the unshifted key plus the Shift modifier
+    // (ESC[97;2u). The input method commits the shifted character and would
+    // otherwise drop Shift, so a direct one-character commit is re-encoded
+    // from the key event. A composition (dead key, CJK) does not match the
+    // key's own character and is still sent as text.
+    const bool direct = imKeyValid_ && !imComposing_ && session_->kittyKeyboard() && g_utf8_strlen(text, -1) == 1;
+    if (direct) {
+        const uint32_t cp = g_utf8_get_char(text);
+        const uint32_t keyCp = gdk_keyval_to_unicode(imKey_.keyval);
+        if (cp && cp == keyCp) {
+            const uint32_t uns = unshiftedOf(&imKey_);
+            session_->sendChar(cp, modsOf(imKey_.state), uns ? uns : cp);
+            imKeyValid_ = false;
+            imComposing_ = false;
+            sendKeyInput();
+            return;
+        }
+    }
+    imKeyValid_ = false;
+    imComposing_ = false;
     for (const char* p = text; *p; p = g_utf8_next_char(p)) session_->sendChar(g_utf8_get_char(p), ModNone);
     sendKeyInput();
 }
