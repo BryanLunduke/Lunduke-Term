@@ -129,7 +129,10 @@ if [ -n "$DISPLAY_SAVED" ]; then
         want=$2
         shift 2
         rm -f "$tmp/marker"
-        XDG_CONFIG_HOME="$tmp/nocfg" HOME="$tmp/home" \
+        # HOME is redirected, so point X at the real authority file. Otherwise the
+        # launch looks for $HOME/.Xauthority in the empty temporary home.
+        XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}" \
+            XDG_CONFIG_HOME="$tmp/nocfg" HOME="$tmp/home" \
             timeout -k 5 40 "$bin" --profile plain --renderer cpu --on-exit close --quit-after 20000 \
             "$@" > "$tmp/launch.out" 2> "$tmp/launch.err"
         rc=$?

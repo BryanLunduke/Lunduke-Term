@@ -638,7 +638,6 @@ static void testPasteStream() {
     pty.paste(streamed);
     pty.sendBytes("Z", 1);
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(15);
-    std::string screen;
     while (std::chrono::steady_clock::now() < deadline) {
         pty.flushWrites();
         pollfd p{pty.masterFd(), POLLIN, 0};

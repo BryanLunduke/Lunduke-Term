@@ -156,6 +156,10 @@ test('gl-match', executable('gl_match_test', 'tests/gl_match_test.cpp',
   dependencies : [gv_dep, pangocairo_dep, epoxy_dep, threads_dep]),
   args : [files('tests/data/unicode-sample.txt')],
   env : test_env, timeout : 120)
+executable('lterm-round2-bench', 'tools/round2_bench.cpp',
+  include_directories : inc,
+  link_with : [vterm_lib, effects_lib],
+  dependencies : [gv_dep, pangocairo_dep])
 test('session', executable('session_test', 'tests/session_test.cpp',
   include_directories : inc, link_with : [vterm_lib, effects_lib], dependencies : [gv_dep, pangocairo_dep]),
   timeout : 60, env : test_env)

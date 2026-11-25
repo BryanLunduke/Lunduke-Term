@@ -553,22 +553,32 @@ static void testSyncOutputView() {
 static void testKittyImShift() {
     ViewOptions o;
     o.profile = "plain";
+    // python waits up to 2 s for the key, then prints the bytes it got, so a
+    // sequence that is not exactly 8 bytes is still visible.
     o.command = {"/bin/sh", "-c",
-                 "printf '\\033[=8u'; stty raw -echo; dd bs=1 count=8 2>/dev/null | od -An -tx1; exec sleep 30"};
+                 "printf '\\033[=8u'; stty raw -echo; exec python3 -c '"
+                 "import os,select,sys\n"
+                 "sys.stdout.write(\"READY\"); sys.stdout.flush()\n"
+                 "r,_,_=select.select([sys.stdin],[],[],2)\n"
+                 "data=os.read(sys.stdin.fileno(),64) if r else b\"\"\n"
+                 "sys.stdout.write(\" HEX \"+data.hex()+\" END\")\n"
+                 "sys.stdout.flush()\n"
+                 "'"};
     Win w(o);
     TerminalView& v = *w.view;
     CHECK(v.start());
     w.view->grabTerminalFocus();
-    CHECK(waitFor([&] { return v.session().reportsAllKeys(); }, ltermWaitMs(3000, 8000)));
+    CHECK(waitFor([&] { return v.session().reportsAllKeys() && screenText(v.shownGrid()).find("READY") != std::string::npos; },
+                  ltermWaitMs(3000, 8000)));
     GdkEventKey e = keyEv(GDK_KEY_A, GDK_SHIFT_MASK);
     e.window = w.win.get_window()->gobj();
     v.testKey(&e);
     CHECK(v.imCommits() >= 1);  // the letter went through the IM commit path
-    const bool ok = waitFor([&] { return screenText(v.shownGrid()).find("1b 5b 39 37 3b 32 75") != std::string::npos; },
+    const bool ok = waitFor([&] { return screenText(v.shownGrid()).find("1b5b39373b3275") != std::string::npos; },
                             ltermWaitMs(3000, 10000));
     CHECK(ok);
-    if (!ok) std::fprintf(stderr, "kitty IM screen: %s\n", screenText(v.shownGrid()).substr(0, 200).c_str());
-    std::printf("kitty IM Shift+a: %s (%ld commits)\n", ok ? "1b 5b 39 37 3b 32 75" : "missing", v.imCommits());
+    if (!ok) std::fprintf(stderr, "kitty IM screen: %s\n", screenText(v.shownGrid()).substr(0, 400).c_str());
+    std::printf("kitty IM Shift+a: %s (%ld commits)\n", ok ? "1b5b39373b3275" : "missing", v.imCommits());
 }
 
 // Ctrl chords go through onKey (the IM is skipped), which is the path a real

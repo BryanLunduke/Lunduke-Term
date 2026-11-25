@@ -365,7 +365,7 @@ private:
     double wheelAccum_ = 0;
     bool exited_ = false, holding_ = false;
     guint childWatch_ = 0;
-    Gtk::Scrollbar scrollbar_{Gtk::ORIENTATION_VERTICAL};
+    Gtk::VScrollbar scrollbar_;
     bool scrollbarAdjusting_ = false;
     int hoverRow_ = -1, hoverCol0_ = -1, hoverCol1_ = -1;
     std::string hoverUri_;
