@@ -11,6 +11,7 @@
 #include <cmath>
 
 #include <cerrno>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -569,32 +570,88 @@ static void testScrollbackCompress() {
     CHECK(s.cellText(s.topLine() - 1, 0) == "a");
 }
 
-static void testPasteCap() {
+// A paste larger than the old 1 MiB cap arrives intact, brackets included, and a
+// key typed while a pty is not reading is delivered after the paste, not dropped.
+static void testPasteStream() {
     VtermSession s(4, 20);
     s.paste(std::string(1000, 'q'));
     s.paste("Z");
     CHECK_EQ(s.takeOutput(), std::string(1000, 'q') + "Z");
 
+    const size_t n = (2u << 20);
+    std::string body(n, 'a');
+    body[n / 2] = '\n';  // must survive as CR, not be the point where a cap cuts the paste
     VtermSession big(4, 20);
-    big.paste(std::string(kMaxWriteQueueBytes + 250000, 'a'));
-    big.paste("XYZ");  // the queue is full: this paste must not grow it
+    big.paste(body);
+    big.paste("XYZ");
     const std::string out = big.takeOutput();
-    CHECK(out.size() <= kMaxWriteQueueBytes);
-    CHECK(out.size() >= kMaxWriteQueueBytes - 4);
-    CHECK(out.find("XYZ") == std::string::npos);
-    CHECK(out.find_first_not_of('a') == std::string::npos);
+    CHECK_EQ(out.size(), n + 3);
+    CHECK_EQ(out.compare(0, n / 2, std::string(n / 2, 'a')), 0);
+    CHECK_EQ(out[n / 2], '\r');
+    CHECK_EQ(out.compare(n / 2 + 1, n - n / 2 - 1, std::string(n - n / 2 - 1, 'a')), 0);
+    CHECK_EQ(out.compare(n, 3, "XYZ"), 0);
 
     VtermSession br(4, 20);
     br.feed("\x1b[?2004h");
     br.takeOutput();
-    br.paste(std::string(kMaxWriteQueueBytes, 'b'));
+    br.paste(body);
     const std::string wrapped = br.takeOutput();
-    CHECK(wrapped.size() <= kMaxWriteQueueBytes);
-    CHECK(wrapped.compare(0, 6, "\x1b[200~") == 0);
-    CHECK(wrapped.size() >= 12);
-    CHECK(wrapped.compare(wrapped.size() - 6, 6, "\x1b[201~") == 0);
-    std::printf("paste cap: plain %zu bytes, bracketed %zu bytes (cap %zu)\n", out.size(), wrapped.size(),
-                kMaxWriteQueueBytes);
+    CHECK_EQ(wrapped.size(), n + 12);
+    CHECK_EQ(wrapped.compare(0, 6, "\x1b[200~"), 0);
+    CHECK_EQ(wrapped.compare(wrapped.size() - 6, 6, "\x1b[201~"), 0);
+    CHECK_EQ(wrapped[6 + n / 2], '\r');  // the newline is still in the middle, not cut off
+    std::printf("paste stream: plain %zu bytes, bracketed %zu bytes\n", out.size(), wrapped.size());
+
+    // The child is not reading yet. The paste blocks on the pty, and a key typed
+    // then must still be delivered after it (not dropped, not spliced in).
+    char path[] = "/tmp/lterm-paste-XXXXXX";
+    const int tfd = mkstemp(path);
+    CHECK(tfd >= 0);
+    if (tfd >= 0) close(tfd);
+    VtermSession pty(4, 40);
+    SpawnOptions opt;
+    const std::string nbytes = std::to_string(n + 1);
+    opt.argv = {"/bin/sh", "-c",
+                "stty raw -echo; printf READY; head -c \"$1\" > \"$2\"; printf ' DONE'", "sh", nbytes.c_str(), path};
+    CHECK(pty.spawn(opt));
+    const auto readyBy = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+    std::string screen;
+    while (std::chrono::steady_clock::now() < readyBy) {
+        pollfd p{pty.masterFd(), POLLIN, 0};
+        if (poll(&p, 1, 20) > 0) pty.readAvailable();
+        screen.clear();
+        for (int r = 0; r < pty.rows(); ++r) screen += pty.rowText(r);
+        if (screen.find("READY") != std::string::npos) break;
+    }
+    CHECK(screen.find("READY") != std::string::npos);
+    const std::string streamed(n, 'b');
+    pty.paste(streamed);
+    pty.sendBytes("Z", 1);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(15);
+    std::string screen;
+    while (std::chrono::steady_clock::now() < deadline) {
+        pty.flushWrites();
+        pollfd p{pty.masterFd(), POLLIN, 0};
+        if (poll(&p, 1, 20) > 0) pty.readAvailable();
+        screen.clear();
+        for (int r = 0; r < pty.rows(); ++r) screen += pty.rowText(r);
+        if (screen.find("DONE") != std::string::npos) break;
+    }
+    CHECK(screen.find("DONE") != std::string::npos);
+    FILE* f = std::fopen(path, "rb");
+    CHECK(f != nullptr);
+    std::string got;
+    if (f) {
+        char buf[65536];
+        size_t k;
+        while ((k = std::fread(buf, 1, sizeof buf, f)) > 0) got.append(buf, k);
+        std::fclose(f);
+    }
+    std::remove(path);
+    CHECK_EQ(got.size(), n + 1);
+    CHECK(got.size() == n + 1 && got.compare(0, n, streamed) == 0 && got.back() == 'Z');
+    pty.hangup(50);
+    std::printf("paste stream pty: child received %zu bytes\n", got.size());
 }
 
 static void testCursor() {
@@ -861,7 +918,7 @@ int main() {
     testUnshiftedCodepoint();
     testKittyKeyboard();
     testPaste();
-    testPasteCap();
+    testPasteStream();
     testScrollbackCompress();
     testCursor();
     testGridCursorDiff();

@@ -36,8 +36,12 @@ std::string sanitizePaste(const std::string& text);
 constexpr size_t kMaxTitleBytes = 4096;            // OSC 0/2 window title
 constexpr size_t kMaxScrollbackLines = 100000;     // scrollback-lines setting / --scrollback
 constexpr size_t kDefaultScrollbackLines = 5000;   // when settings.ini and --scrollback give none
-// Bytes of input waiting on a PTY that is not reading. Further paste is dropped
-// until some of it is written, so a stuck reader cannot grow this without bound.
+// Paste is streamed: at most this many bytes of it sit in the pty write queue.
+// The rest stays in the source buffer and is written as the pty drains, so a
+// large paste is never truncated and a key typed during it is never dropped.
+constexpr size_t kPasteChunkBytes = 64u * 1024u;
+// The old hard cap (PR #17). Kept as the name tests and notes use; it is no
+// longer a truncate limit. In-flight paste bytes stay within kPasteChunkBytes.
 constexpr size_t kMaxWriteQueueBytes = 1u << 20;
 // Negative -> 0, above kMaxScrollbackLines -> kMaxScrollbackLines.
 size_t clampScrollbackLines(long long requested);
@@ -121,7 +125,10 @@ public:
     bool reportsAllKeys() const;
     void sendBytes(const char* bytes, size_t len);
     void flushWrites();
-    bool wantsWrite() const { return !writeQueue_.empty(); }
+    // True while keystrokes, a paste, or both are still waiting on the pty.
+    bool wantsWrite() const {
+        return !writeQueue_.empty() || !keyAfter_.empty() || pastePending();
+    }
     void paste(const std::string& text);  // sanitised, bracketed when the app enabled mode 2004
     // Mouse in screen cell coordinates (0-based).
     void mouseMove(int row, int col, int mod);
@@ -203,6 +210,13 @@ private:
     void syncMouseEncoder();
     void encodeKey(int ghostKey, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted, KeyAction action);
     void emitMouse(int row, int col, int button, int action, int mod);
+    bool pastePending() const {
+        return pasteNeedPrefix_ || pasteNeedSuffix_ || pasteOff_ < pasteBody_.size();
+    }
+    // Moves the next slice of pasteBody_ into `dst`. False when the paste is finished.
+    bool takePasteSlice(std::string& dst, size_t maxBytes);
+    // Writes `buf`, dropping the bytes that were accepted. False: the pty is blocked.
+    bool drainToPty(std::string& buf);
     bool locate(long line, int col, void* point) const;
     // One grid lookup per row; later cells on that row reuse it. Invalid after feed/resize.
     bool rowRef(long line, int col, void* ref) const;
@@ -228,6 +242,13 @@ private:
     std::string title_;
     std::string versionStr_;
     std::string pendingOut_, writeQueue_;
+    // Keystrokes (and other input) that arrived while a paste is still streaming.
+    // They are written after the paste, never dropped and never spliced into it.
+    std::string keyAfter_;
+    std::string pasteBody_;
+    size_t pasteOff_ = 0;
+    bool pasteNeedPrefix_ = false;
+    bool pasteNeedSuffix_ = false;
     Color8 fg_{208, 208, 208}, bg_{0, 0, 0};
     std::array<Color8, 16> palette_{};
     bool havePalette_ = false;

@@ -708,48 +708,109 @@ void VtermSession::sendChar(uint32_t cp, int mod, uint32_t unshifted, KeyAction 
 
 void VtermSession::sendBytes(const char* bytes, size_t len) {
     if (!len) return;
-    std::string& q = fd_ < 0 ? pendingOut_ : writeQueue_;
-    if (q.size() >= kMaxWriteQueueBytes) return;
-    if (q.size() + len > kMaxWriteQueueBytes) len = kMaxWriteQueueBytes - q.size();
-    q.append(bytes, len);
-    if (fd_ >= 0) flushWrites();
+    if (fd_ < 0) {
+        // No pty: tests collect everything. A paste with no pty is delivered
+        // in paste() itself, so this is a key, a mouse report, or a reply.
+        if (pastePending()) keyAfter_.append(bytes, len);
+        else pendingOut_.append(bytes, len);
+        return;
+    }
+    // While a paste is still streaming, hold later input until the paste
+    // (including its bracketed-paste end marker) has been written. Dropping
+    // it, or inserting it into the middle of the paste, both lose the user's text.
+    if (pastePending()) keyAfter_.append(bytes, len);
+    else writeQueue_.append(bytes, len);
+    flushWrites();
+}
+
+bool VtermSession::drainToPty(std::string& buf) {
+    size_t off = 0;
+    while (off < buf.size()) {
+        ssize_t n = write(fd_, buf.data() + off, buf.size() - off);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            if (errno != EAGAIN) {
+                buf.clear();
+                return true;
+            }
+            break;
+        }
+        if (n == 0) break;
+        off += static_cast<size_t>(n);
+    }
+    if (off) buf.erase(0, off);
+    return buf.empty();
+}
+
+bool VtermSession::takePasteSlice(std::string& dst, size_t maxBytes) {
+    if (!maxBytes) return pastePending();
+    if (pasteNeedPrefix_) {
+        dst.append("\x1b[200~", 6);
+        pasteNeedPrefix_ = false;
+        if (dst.size() >= maxBytes) return true;
+    }
+    if (pasteOff_ < pasteBody_.size()) {
+        const size_t n = std::min(pasteBody_.size() - pasteOff_, maxBytes - dst.size());
+        dst.append(pasteBody_.data() + pasteOff_, n);
+        pasteOff_ += n;
+        if (pasteOff_ == pasteBody_.size()) {
+            pasteBody_.clear();
+            pasteBody_.shrink_to_fit();
+            pasteOff_ = 0;
+        }
+        if (dst.size() >= maxBytes) return true;
+    }
+    if (pasteNeedSuffix_ && pasteOff_ == 0 && pasteBody_.empty()) {
+        dst.append("\x1b[201~", 6);
+        pasteNeedSuffix_ = false;
+    }
+    return pastePending();
 }
 
 void VtermSession::flushWrites() {
-    size_t off = 0;
-    while (off < writeQueue_.size()) {
-        ssize_t n = write(fd_, writeQueue_.data() + off, writeQueue_.size() - off);
-        if (n < 0) {
-            if (errno == EINTR) continue;
-            if (errno != EAGAIN) off = writeQueue_.size();
-            break;
-        }
-        off += static_cast<size_t>(n);
+    if (fd_ < 0) return;
+    for (;;) {
+        if (!writeQueue_.empty() && !drainToPty(writeQueue_)) return;
+        if (!pastePending()) break;
+        // One chunk in the queue. The rest of the paste stays in pasteBody_
+        // until the pty accepts this one (backpressure, no second full copy).
+        const size_t before = writeQueue_.size();
+        takePasteSlice(writeQueue_, kPasteChunkBytes);
+        if (writeQueue_.size() == before) break;
     }
-    if (off) writeQueue_.erase(0, off);
+    if (!keyAfter_.empty() && !pastePending()) {
+        writeQueue_.append(keyAfter_);
+        keyAfter_.clear();
+        drainToPty(writeQueue_);
+    }
 }
 
 void VtermSession::paste(const std::string& text) {
-    std::string& q = fd_ < 0 ? pendingOut_ : writeQueue_;
-    if (q.size() >= kMaxWriteQueueBytes) return;
     std::string body = sanitizePaste(text);
-    const bool bracketed = modeOn(g_->vt, GHOSTTY_MODE_BRACKETED_PASTE);
-    // Bracketed paste adds ESC[200~ and ESC[201~. Keep the whole sequence, including
-    // the closing bracket, inside the queue cap. The tail of an oversized paste is
-    // dropped until the program reads and the queue drains.
-    const size_t overhead = bracketed ? 12 : 0;
-    const size_t room = kMaxWriteQueueBytes - q.size();
-    if (overhead >= room) return;
-    if (body.size() > room - overhead) truncateUtf8(body, room - overhead);
     if (body.empty()) return;
-    size_t need = 0;
-    GhosttyResult r = ghostty_paste_encode(body.data(), body.size(), bracketed, nullptr, 0, &need);
-    if (r == GHOSTTY_SUCCESS) return;
-    if (r != GHOSTTY_OUT_OF_SPACE) return;
-    std::string buf(need, '\0');
-    size_t n = 0;
-    r = ghostty_paste_encode(body.data(), body.size(), bracketed, reinterpret_cast<uint8_t*>(buf.data()), buf.size(), &n);
-    if (r == GHOSTTY_SUCCESS && n) sendBytes(buf.data(), n);
+    const bool bracketed = modeOn(g_->vt, GHOSTTY_MODE_BRACKETED_PASTE);
+    if (!pastePending()) {
+        pasteNeedPrefix_ = bracketed;
+        pasteNeedSuffix_ = bracketed;
+        pasteBody_.clear();
+        pasteOff_ = 0;
+    }
+    // A second paste while the first is still draining joins the body, ahead
+    // of the closing bracket, so the end marker stays after every byte.
+    pasteBody_.append(body);
+    if (fd_ < 0) {
+        // No reader to push back on: deliver the whole paste, then anything
+        // that was held behind it. The cap is dst's size, so use a fresh buffer.
+        std::string chunk;
+        takePasteSlice(chunk, pasteBody_.size() + 16);
+        pendingOut_.append(chunk);
+        if (!keyAfter_.empty()) {
+            pendingOut_.append(keyAfter_);
+            keyAfter_.clear();
+        }
+        return;
+    }
+    flushWrites();
 }
 
 static GhosttyMouseButton mouseButtonId(int button) {
