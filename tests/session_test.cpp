@@ -665,6 +665,39 @@ static void testPasteStream() {
 }
 
 // A profile colour change repaints cells that are already on screen.
+static void testLinks() {
+    VtermSession s(4, 60);
+    s.feed("see https://example.com/a. next\r\n");
+    int a = -1, b = -1;
+    const long line = s.topLine();
+    // "see " is 4 columns, then the URL.
+    CHECK(s.linkAt(line, 4, &a, &b).find("https://example.com/a") != std::string::npos);
+    CHECK(a == 4);
+    CHECK(s.linkAt(line, 0).empty());
+    s.feed("\x1b]8;;https://lunduke.com/x\x1b\\click\x1b]8;;\x1b\\");
+    const long row = s.topLine() + 1;
+    const std::string uri = s.linkAt(row, 0, &a, &b);
+    CHECK(uri == "https://lunduke.com/x");
+    CHECK(a == 0 && b == 4);  // "click"
+    CHECK(s.hyperlinkAt(row, 0) == uri);
+    CHECK(s.hyperlinkAt(row, 5).empty());
+    std::printf("links: url span %d-%d, osc 8 %s\n", a, b, uri.c_str());
+}
+
+static void testOsc52() {
+    VtermSession s(4, 20);
+    // "hi" is aGk= ; "c" is the system clipboard. The read form must not echo it back.
+    s.feed("\x1b]52;c;aGk=\x07");
+    CHECK(s.osc52Text() == "hi");
+    s.feed("\x1b]52;c;?\x07");
+    const std::string reply = s.takeOutput();
+    CHECK(reply.find("aGk=") == std::string::npos);
+    CHECK(reply.find("hi") == std::string::npos);
+    s.feed("\x1b]52;c;\x07");
+    CHECK(s.osc52Text().empty());
+    std::printf("osc 52: write %s, read suppressed, clear ok\n", "hi");
+}
+
 static void testOscColors() {
     VtermSession s(4, 40);
     std::array<Color8, 16> pal{};
@@ -1021,6 +1054,8 @@ int main() {
     testColorRefresh();
     testSyncOutput();
     testOscColors();
+    testOsc52();
+    testLinks();
     testScrollbackCompress();
     testCursor();
     testGridCursorDiff();

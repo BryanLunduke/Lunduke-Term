@@ -95,6 +95,10 @@ TerminalView::TerminalView(const ViewOptions& opts)
     session_->onTitle = [this] { signalTitle.emit(session_->title()); };
     session_->onBell = [this] { onBell(); };
     session_->onSyncHold = [this](bool held) { onSyncHold(held); };
+    session_->onOsc52 = [this](const std::string& text) {
+        if (!g_utf8_validate(text.data(), static_cast<gssize>(text.size()), nullptr)) return;
+        Gtk::Clipboard::get(GDK_SELECTION_CLIPBOARD)->set_text(text);
+    };
     const size_t sb = clampScrollbackLines(opts_.scrollbackLines);
     if (opts_.scrollbackLines > static_cast<long long>(kMaxScrollbackLines))
         std::fprintf(stderr, "lunduke-terminal: scrollback-lines %lld is too large, using %zu\n", opts_.scrollbackLines, sb);
@@ -176,6 +180,14 @@ TerminalView::TerminalView(const ViewOptions& opts)
     property_scale_factor().signal_changed().connect(sigc::mem_fun(*this, &TerminalView::onScaleChanged));
     applyProfile();
     chooseMode();
+    // A bar beside a 4:3 CRT changes the screen, so retro profiles leave it off.
+    // Plain and modern (no tube) show it. set_no_show_all keeps show_all from
+    // overriding that.
+    scrollbar_.set_no_show_all(true);
+    scrollbar_.set_tooltip_text("Scrollback");
+    pack_end(scrollbar_, false, false);
+    scrollbar_.get_adjustment()->signal_value_changed().connect(sigc::mem_fun(*this, &TerminalView::onScrollbar));
+    applyScrollbar();
 }
 
 // M3 item 1c: background reaping of hung-up children.
@@ -467,6 +479,7 @@ void TerminalView::setProfile(const std::string& id) {
     applyTubeOverrides(profile_, opts_.tube);
     zoomPx_ = 0;  // perf step 1: a new profile starts at its own size
     if (opts_.effects < 0) effectsOn_ = profile_.effects;
+    if (opts_.scrollbar < 0) applyScrollbar();
     applyProfile();
     applyColors();
     chooseMode();
@@ -747,6 +760,12 @@ bool TerminalView::updateContent() {
     const auto t0 = std::chrono::steady_clock::now();
     session_->fillGrid(next_, scrollOffset_);
     if (session_->takeColorsChanged()) fullRepaint_ = true;
+    if (hoverRow_ >= 0 && hoverRow_ < next_.rows) {
+        for (int c = std::max(0, hoverCol0_); c <= std::min(next_.cols - 1, hoverCol1_); ++c) {
+            Cell& cell = next_.at(hoverRow_, c);
+            if (cell.underline == Underline::None) cell.underline = Underline::Single;
+        }
+    }
     // Selection, cursor style, reverse video / visual bell are applied to the composed grid, so the
     // changed-rows repaint picks them up like any other cell change.
     if (sel_.active()) {
@@ -1189,6 +1208,7 @@ bool TerminalView::readSlice(bool* more) {
     }
     ensureWriteWatch();  // replies (DA, DSR) that did not fit
     if (!*more) scheduleCompress();  // flood is over: compress idle scrollback, then return freed pages
+    updateScrollbar();
     return alive;  // false: EOF/HUP; the child watch decides what happens to the window
 }
 
@@ -1241,6 +1261,55 @@ void TerminalView::sendKeyInput() {
     ensureWriteWatch();
 }
 
+void TerminalView::setScrollbar(int mode) {
+    opts_.scrollbar = mode;
+    applyScrollbar();
+}
+
+void TerminalView::applyScrollbar() {
+    const bool on = opts_.scrollbar < 0 ? !profile_.crtAspect : opts_.scrollbar > 0;
+    if (on) scrollbar_.show();
+    else scrollbar_.hide();
+    if (on) updateScrollbar();
+}
+
+void TerminalView::updateScrollbar() {
+    if (!scrollbar_.get_visible() || !session_) return;
+    auto adj = scrollbar_.get_adjustment();
+    const int sb = static_cast<int>(session_->scrollbackSize());
+    const int rows = std::max(1, session_->rows());
+    scrollbarAdjusting_ = true;
+    adj->configure(sb - scrollOffset_, 0, sb + rows, 1, std::max(1, rows - 1), rows);
+    scrollbarAdjusting_ = false;
+}
+
+void TerminalView::onScrollbar() {
+    if (scrollbarAdjusting_ || !session_) return;
+    const int sb = static_cast<int>(session_->scrollbackSize());
+    int off = sb - static_cast<int>(scrollbar_.get_adjustment()->get_value() + 0.5);
+    off = std::clamp(off, 0, sb);
+    if (off == scrollOffset_) return;
+    scrollOffset_ = off;
+    contentDirty_ = true;
+    requestFrame();
+    updateBlink();
+}
+
+void TerminalView::openLink(const std::string& uri) {
+    auto bad = [](unsigned char c) { return c < 32 || c == 127; };
+    if (uri.empty() || std::any_of(uri.begin(), uri.end(), bad)) return;
+    const bool http = uri.compare(0, 7, "http://") == 0 || uri.compare(0, 8, "https://") == 0;
+    const bool mail = uri.compare(0, 7, "mailto:") == 0;
+    const bool file = uri.compare(0, 7, "file://") == 0;
+    if (!http && !mail && !file) return;
+    gchar* argv[] = {const_cast<gchar*>("xdg-open"), const_cast<gchar*>(uri.c_str()), nullptr};
+    GError* err = nullptr;
+    if (!g_spawn_async(nullptr, argv, nullptr, G_SPAWN_SEARCH_PATH, nullptr, nullptr, nullptr, &err) && err) {
+        std::fprintf(stderr, "lunduke-terminal: %s\n", err->message);
+        g_error_free(err);
+    }
+}
+
 void TerminalView::scrollBy(int lines) {
     const int off = std::clamp(scrollOffset_ + lines, 0, static_cast<int>(session_->scrollbackSize()));
     if (off == scrollOffset_) return;
@@ -1248,6 +1317,7 @@ void TerminalView::scrollBy(int lines) {
     contentDirty_ = true;
     requestFrame();
     updateBlink();
+    updateScrollbar();
 }
 
 void TerminalView::snapToBottom() {
@@ -1331,6 +1401,14 @@ bool TerminalView::onButtonPress(GdkEventButton* ev) {
         if (ev->button == 3 && ev->type == GDK_BUTTON_PRESS) showContextMenu(ev);
         return true;
     }
+    if (ev->button == 1 && (ev->state & GDK_CONTROL_MASK) && inside && ev->type == GDK_BUTTON_PRESS) {
+        const long line = session_->topLine() - scrollOffset_ + row;
+        const std::string uri = session_->linkAt(line, col);
+        if (!uri.empty()) {
+            openLink(uri);
+            return true;
+        }
+    }
     const int mod = modsOf(ev->state);
     if (mouseReporting(ev->state)) {
         if (ev->type != GDK_BUTTON_PRESS) return true;  // GTK's extra 2/3-click events
@@ -1411,6 +1489,22 @@ bool TerminalView::onMotion(GdkEventMotion* ev) {
         sel_.extend(*session_, SelPos{session_->topLine() - scrollOffset_ + row, col});
         selectionChanged();
         return true;
+    }
+    int a = -1, b = -1;
+    std::string uri;
+    if (cellAt(ev->x, ev->y, row, col)) {
+        const long line = session_->topLine() - scrollOffset_ + row;
+        uri = session_->linkAt(line, col, &a, &b);
+    }
+    if (uri != hoverUri_ || row != hoverRow_) {
+        hoverUri_ = std::move(uri);
+        hoverRow_ = hoverUri_.empty() ? -1 : row;
+        hoverCol0_ = a;
+        hoverCol1_ = b;
+        contentDirty_ = true;
+        requestFrame();
+        auto win = get_window();
+        if (win) win->set_cursor(hoverRow_ >= 0 ? Gdk::Cursor::create(Gdk::HAND2) : Glib::RefPtr<Gdk::Cursor>());
     }
     return false;
 }

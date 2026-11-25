@@ -159,6 +159,7 @@ public:
     Gtk::ComboBoxText profile, font, quality;
     Gtk::SpinButton fontPx, scrollback;
     Gtk::ComboBoxText frame;  // profile default / on / off
+    Gtk::ComboBoxText scrollbar;  // auto / on / off
     Gtk::Button save{"Save as default"};
     Gtk::Label status;
     Gtk::Label scrollbackNote;  // review item 4: memory per tab when the scrollback is full

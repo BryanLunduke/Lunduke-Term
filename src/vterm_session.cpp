@@ -179,6 +179,9 @@ extern "C" void ltermOnWrite(GhosttyTerminal, void* user, const uint8_t* data, s
 extern "C" void ltermOnRenderHold(GhosttyTerminal, void* user, bool held) {
     static_cast<VtermSession*>(user)->onRenderHold(held);
 }
+extern "C" void ltermOnClipboard(GhosttyTerminal, void* user, const GhosttyClipboardWrite* write) {
+    static_cast<VtermSession*>(user)->onClipboardWrite(write);
+}
 extern "C" GhosttyString ltermOnVersion(GhosttyTerminal, void*) {
     static const std::string v = std::string("lunduke-terminal ") + LTERM_VERSION;
     GhosttyString s;
@@ -211,6 +214,39 @@ void VtermSession::onRenderHold(bool held) {
     if (onSyncHold) onSyncHold(held);
 }
 
+void VtermSession::onClipboardWrite(const void* raw) {
+    const auto* write = static_cast<const GhosttyClipboardWrite*>(raw);
+    GhosttyClipboardWriteReply reply = GHOSTTY_INIT_SIZED(GhosttyClipboardWriteReply);
+    reply.result = GHOSTTY_CLIPBOARD_WRITE_RESULT_UNSUPPORTED;
+    std::string text;
+    bool saw = false;
+    bool tooBig = false;
+    for (size_t i = 0; write && i < write->contents_len; ++i) {
+        const GhosttyClipboardContent& c = write->contents[i];
+        const std::string mime(reinterpret_cast<const char*>(c.mime.ptr ? c.mime.ptr : reinterpret_cast<const uint8_t*>("")),
+                               c.mime.len);
+        if (!mime.empty() && mime.find("text") == std::string::npos) continue;
+        if (c.data.len > kMaxOsc52Bytes) {
+            tooBig = true;
+            break;
+        }
+        text.assign(reinterpret_cast<const char*>(c.data.ptr ? c.data.ptr : reinterpret_cast<const uint8_t*>("")), c.data.len);
+        saw = true;
+        break;
+    }
+    if (write && write->contents_len == 0) {
+        text.clear();
+        saw = true;  // a clear
+    }
+    if (tooBig) reply.result = GHOSTTY_CLIPBOARD_WRITE_RESULT_INVALID_DATA;
+    else if (saw) {
+        osc52_ = std::move(text);
+        reply.result = GHOSTTY_CLIPBOARD_WRITE_RESULT_SUCCESS;
+        if (onOsc52) onOsc52(osc52_);
+    }
+    if (write && write->reply) write->reply(write, &reply);
+}
+
 VtermSession::VtermSession(int rows, int cols) : rows_(std::max(1, rows)), cols_(std::max(1, cols)) {
     if (rows_ > 65535) rows_ = 65535;
     if (cols_ > 65535) cols_ = 65535;
@@ -223,6 +259,9 @@ VtermSession::VtermSession(int rows, int cols) : rows_(std::max(1, rows)), cols_
         ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_TITLE_CHANGED, reinterpret_cast<const void*>(ltermOnTitle));
         ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_WRITE_PTY, reinterpret_cast<const void*>(ltermOnWrite));
         ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_RENDER_HOLD, reinterpret_cast<const void*>(ltermOnRenderHold));
+        ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_CLIPBOARD_WRITE, reinterpret_cast<const void*>(ltermOnClipboard));
+        // OSC 52 "?" and kitty clipboard reads stay unanswered. Installing a
+        // read callback would let a remote program read the user's clipboard.
         ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_XTVERSION, reinterpret_cast<const void*>(ltermOnVersion));
         const char* tn = "xterm-256color";
         GhosttyString termName{reinterpret_cast<const uint8_t*>(tn), std::strlen(tn)};
@@ -1237,6 +1276,75 @@ void VtermSession::fillGrid(Grid& grid, int scrollOffset) const {
         viewCache_.cursorRow = viewRow;
     }
     grid = viewCache_;
+}
+
+std::string VtermSession::hyperlinkAt(long line, int col) const {
+    GhosttyGridRef ref{};
+    if (!rowRef(line, col, &ref)) return {};
+    size_t n = 0;
+    const GhosttyResult probe = ghostty_grid_ref_hyperlink_uri(&ref, nullptr, 0, &n);
+    if (probe == GHOSTTY_SUCCESS || n == 0) return {};
+    if (probe != GHOSTTY_OUT_OF_SPACE) return {};
+    std::string uri(n, '\0');
+    size_t n2 = 0;
+    if (ghostty_grid_ref_hyperlink_uri(&ref, reinterpret_cast<uint8_t*>(&uri[0]), uri.size(), &n2) != GHOSTTY_SUCCESS)
+        return {};
+    uri.resize(n2);
+    return uri;
+}
+
+namespace {
+bool urlByte(unsigned char c) {
+    if (c <= 32 || c >= 127) return false;
+    return c != '<' && c != '>' && c != '"' && c != '\'' && c != '(' && c != ')' && c != '[' && c != ']';
+}
+}  // namespace
+
+std::string VtermSession::linkAt(long line, int col, int* startCol, int* endCol) const {
+    const std::string direct = hyperlinkAt(line, col);
+    if (!direct.empty()) {
+        int a = col, b = col;
+        while (a > 0 && hyperlinkAt(line, a - 1) == direct) --a;
+        while (b + 1 < cols_ && hyperlinkAt(line, b + 1) == direct) ++b;
+        if (startCol) *startCol = a;
+        if (endCol) *endCol = b;
+        return direct;
+    }
+    std::string text;
+    std::vector<int> colOf;
+    for (int c = 0; c < cols_; ++c) {
+        if (cellWidth(line, c) == 0) continue;
+        std::string cell = cellText(line, c);
+        if (cell.empty()) cell = " ";
+        for (size_t i = 0; i < cell.size(); ++i) colOf.push_back(c);
+        text += cell;
+    }
+    const char* schemes[] = {"https://", "http://", "mailto:"};
+    for (size_t i = 0; i < text.size(); ++i) {
+        size_t slen = 0;
+        for (const char* s : schemes) {
+            const size_t n = std::strlen(s);
+            if (i + n <= text.size() && text.compare(i, n, s) == 0) {
+                slen = n;
+                break;
+            }
+        }
+        if (!slen) continue;
+        size_t j = i + slen;
+        while (j < text.size() && urlByte(static_cast<unsigned char>(text[j]))) ++j;
+        while (j > i + slen && (text[j - 1] == '.' || text[j - 1] == ',' || text[j - 1] == ';' || text[j - 1] == ':'))
+            --j;
+        if (j <= i + slen) continue;
+        const int a = colOf[i];
+        const int b = colOf[j - 1];
+        if (col >= a && col <= b) {
+            if (startCol) *startCol = a;
+            if (endCol) *endCol = b;
+            return text.substr(i, j - i);
+        }
+        i = j;
+    }
+    return {};
 }
 
 std::string VtermSession::rowText(int row) const {

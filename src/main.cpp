@@ -74,6 +74,8 @@ const char kUsage[] =
     "                            plain and modern stay a tight 80x24. Fits the screen.)\n"
     "  -T, --title TITLE         window title (also --title=TITLE)\n"
     "  --scrollback N            scrollback lines (default 5000)\n"
+    "  --scrollbar auto|on|off   scrollback bar (default auto: on for plain and\n"
+    "                            modern, off for CRT profiles so the tube is unchanged)\n"
     "  --cursor-shape block|underline|bar, --cursor-blink, --no-cursor-blink\n"
     "  --bell LIST               comma list of visual, urgent, audible or none\n"
     "                            (default: urgent. No screen flash and no beep.)\n"
@@ -168,6 +170,7 @@ void loadSettings(lterm::ViewOptions& o) {
     if (s.hasFrameColor) o.tube.frameColor = s.frameColor;
     if (s.hasFrameShininess) o.tube.frameShininess = s.frameShininess;
     if (s.hasRgbShift) o.tube.rgbShift = s.rgbShift;
+    if (s.hasScrollbar) o.scrollbar = s.scrollbar;
 }
 
 // An option as a separate argument (`--name value`) or, for a long option, `--name=value`.
@@ -328,6 +331,15 @@ int main(int argc, char** argv) {
         } else if (int taken = takeOpt(a, "--rgb-shift", i, argc, argv, optArg)) {
             if (taken < 0) return 2;
             opts.tube.rgbShift = static_cast<float>(std::atof(optArg.c_str()));
+        } else if (int taken = takeOpt(a, "--scrollbar", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            if (optArg == "auto") opts.scrollbar = -1;
+            else if (optArg == "on") opts.scrollbar = 1;
+            else if (optArg == "off") opts.scrollbar = 0;
+            else {
+                std::fprintf(stderr, "lunduke-terminal: --scrollbar must be auto, on or off\n");
+                return 2;
+            }
         }
         else if (a == "--list-profiles") {
             std::fputs(lterm::profileListText().c_str(), stdout);

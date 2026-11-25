@@ -515,6 +515,39 @@ static void testInputMethod() {
     std::printf("input method: dead_acute e, Compose o c, x -> c3 a9 c2 a9 78 (%ld commits)\n", v.imCommits());
 }
 
+// DEC 2026: the screen does not show the update until the synchronized output ends.
+// The bar is off for a CRT profile so the tube is unchanged, and on for plain.
+static void testScrollbarDefault() {
+    ViewOptions amber;
+    amber.profile = "amber";
+    Win wa(amber);
+    CHECK(!wa.view->scrollbarVisible());
+    ViewOptions plain;
+    plain.profile = "plain";
+    Win wp(plain);
+    CHECK(wp.view->scrollbarVisible());
+    wa.view->setScrollbar(1);
+    CHECK(wa.view->scrollbarVisible());
+    std::printf("scrollbar: amber off, plain on\n");
+}
+
+static void testSyncOutputView() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-c", "printf '\\033[?2026hHELLO'; sleep 0.6; printf '\\033[?2026l'; exec sleep 30"};
+    Win w(o);
+    TerminalView& v = *w.view;
+    CHECK(v.start());
+    CHECK(waitFor([&] { return v.session().syncHeld(); }, ltermWaitMs(2000, 6000)));
+    pump(100);
+    CHECK(screenText(v.shownGrid()).find("HELLO") == std::string::npos);
+    const bool shown = waitFor(
+        [&] { return !v.session().syncHeld() && screenText(v.shownGrid()).find("HELLO") != std::string::npos; },
+        ltermWaitMs(2000, 6000));
+    CHECK(shown);
+    std::printf("sync output: HELLO held, then shown (%s)\n", shown ? "ok" : "missing");
+}
+
 // Kitty "report all keys as escape codes". Shift+a is committed by the input
 // method; the encoder must still see Shift (ESC[97;2u, not ESC[65u).
 static void testKittyImShift() {
@@ -701,6 +734,8 @@ int main(int argc, char** argv) {
     testScrollbackMax();
     testInputMethod();
     testKittyImShift();
+    testSyncOutputView();
+    testScrollbarDefault();
     testLegacyCtrlKeys();
     testDeadKeyChord();
     testHiddenFrees("gl");

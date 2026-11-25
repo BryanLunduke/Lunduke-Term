@@ -263,6 +263,23 @@ SettingsValues parseSettingsIni(const std::string& text) {
         } else warn("rgb-shift", err);
         err = nullptr;
     }
+    if (g_key_file_has_key(kf, kGroup, "scrollbar", nullptr)) {
+        if (char* v = g_key_file_get_string(kf, kGroup, "scrollbar", &err)) {
+            const std::string s = v;
+            g_free(v);
+            if (s == "auto" || s == "-1") {
+                o.hasScrollbar = true;
+                o.scrollbar = -1;
+            } else if (s == "on" || s == "true" || s == "1") {
+                o.hasScrollbar = true;
+                o.scrollbar = 1;
+            } else if (s == "off" || s == "false" || s == "0") {
+                o.hasScrollbar = true;
+                o.scrollbar = 0;
+            } else o.warnings.push_back("scrollbar must be auto, on or off");
+        } else warn("scrollbar", err);
+        err = nullptr;
+    }
     // A key this build does not read is kept on disk (Save does not strip unknown
     // keys) but it is not applied, so say so instead of ignoring it.
     if (gchar** keys = g_key_file_get_keys(kf, kGroup, nullptr, nullptr)) {
@@ -270,7 +287,7 @@ SettingsValues parseSettingsIni(const std::string& text) {
             "profile", "effects", "renderer", "threads", "effects-fps", "max-fps", "effects-quality",
             "cpu-budget", "pause-unfocused", "font", "font-px", "scrollback-lines", "login-shell", "cwd",
             "on-exit", "bell", "cursor-shape", "cursor-blink", "word-chars", "frame", "frame-size",
-            "frame-color", "frame-shininess", "rgb-shift"};
+            "frame-color", "frame-shininess", "rgb-shift", "scrollbar"};
         for (gchar** k = keys; *k; ++k) {
             bool ok = false;
             for (const char* n : known)

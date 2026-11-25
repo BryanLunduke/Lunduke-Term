@@ -54,6 +54,9 @@ struct ViewOptions {
     // path's float buffers); showing it rebuilds them. -1: never.
     int effectsFreeHiddenMs = 3000;
     std::string wordChars = Selection::defaultWordChars();
+    // -1: on unless the profile is a 4:3 CRT (a bar beside the tube changes the
+    // screen). 0 off, 1 on.
+    int scrollbar = -1;
     // M2 item 5: bezel / RGB shift overrides of the profile (see profiles.hpp).
     TubeOverrides tube;
 };
@@ -147,6 +150,8 @@ public:
     std::string selectionText() const { return sel_.text(*session_); }
     void copyClipboard();
     void pasteClipboard(bool primary);
+    bool scrollbarVisible() const { return scrollbar_.get_visible(); }
+    void setScrollbar(int mode);
 
     // M2 stage 3: scrollback search. setSearch() finds every match (history + screen), highlights
     // them and goes to the newest one; searchStep() moves to the next/previous one (wrapping) and
@@ -235,10 +240,15 @@ private:
     bool frameActive() const;      // effects on with a bezel
     bool mouseReporting(guint state) const;
     void scrollBy(int lines);  // + = back into history
+    void applyScrollbar();
+    void updateScrollbar();
+    void openLink(const std::string& uri);
+    void onScrollbar();
     void snapToBottom();
     void selectionChanged();
     void onChildExit(int status);
     void onBell();
+    void onSyncHold(bool held);  // DEC 2026: hold presentation, with a 1 s timeout
     void updateBlink();
     void sendKeyInput();       // common handling for anything typed
     void ensureWriteWatch();
@@ -349,7 +359,12 @@ private:
     double wheelAccum_ = 0;
     bool exited_ = false, holding_ = false;
     guint childWatch_ = 0;
-    sigc::connection writeWatch_, bellTimer_, blink_;
+    Gtk::Scrollbar scrollbar_{Gtk::ORIENTATION_VERTICAL};
+    bool scrollbarAdjusting_ = false;
+    int hoverRow_ = -1, hoverCol0_ = -1, hoverCol1_ = -1;
+    std::string hoverUri_;
+    sigc::connection writeWatch_, bellTimer_, blink_, syncTimer_;
+    bool syncHold_ = false;  // synchronized output (DEC 2026) is open
     double lastBellMs_ = -1e9;
     bool bellFlash_ = false;
     bool inverseShown_ = false;  // margins currently painted for reverse video

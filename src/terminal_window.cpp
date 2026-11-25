@@ -57,6 +57,8 @@ bool saveSettings(const ViewOptions& o, const std::string& path, std::string* er
         kf.set_int64(g, "scrollback-lines", static_cast<gint64>(o.scrollbackLines));
         if (o.tube.frame < 0) drop("frame");
         else kf.set_boolean(g, "frame", o.tube.frame > 0);
+        if (o.scrollbar < 0) drop("scrollbar");
+        else kf.set_string(g, "scrollbar", o.scrollbar > 0 ? "on" : "off");
         const std::string dir = Glib::path_get_dirname(path);
         if (g_mkdir_with_parents(dir.c_str(), 0700) != 0) {
             if (error) *error = "cannot create " + dir;
@@ -705,6 +707,7 @@ void TerminalWindow::applySettings(const ViewOptions& o) {
         if (cur.fontFamily != o.fontFamily || cur.fontPx != o.fontPx) v.setFont(o.fontFamily, o.fontPx);
         if (cur.effectsQuality != o.effectsQuality) v.setEffectsQuality(o.effectsQuality);
         if (cur.scrollbackLines != o.scrollbackLines) v.setScrollbackLines(o.scrollbackLines);
+        if (cur.scrollbar != o.scrollbar) v.setScrollbar(o.scrollbar);
     }
     const auto command = opts_.command;
     opts_.profile = o.profile;
@@ -713,6 +716,7 @@ void TerminalWindow::applySettings(const ViewOptions& o) {
     opts_.effectsQuality = o.effectsQuality;
     opts_.scrollbackLines = o.scrollbackLines;
     opts_.tube.frame = o.tube.frame;
+    opts_.scrollbar = o.scrollbar;
     opts_.command = command;
 }
 
@@ -750,6 +754,11 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     frame.append("1", "On");
     frame.append("0", "Off");
     frame.set_tooltip_text("Monitor bezel (amber, green, green-scanlines, vintage, paper-white)");
+    scrollbar.append("-1", "Automatic");
+    scrollbar.append("1", "On");
+    scrollbar.append("0", "Off");
+    scrollbar.set_tooltip_text(
+        "Automatic shows the bar for plain and modern, and hides it on CRT profiles so the tube is unchanged");
 
     auto* grid = Gtk::manage(new Gtk::Grid);
     grid->set_row_spacing(6);
@@ -793,6 +802,7 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     scrollbackNote.set_max_width_chars(60);
     grid->attach(scrollbackNote, 1, row++, 1, 1);
     addRow("Bezel (frame)", frame);
+    addRow("Scrollbar", scrollbar);
     status.set_halign(Gtk::ALIGN_START);
     status.set_line_wrap(true);
     status.set_max_width_chars(60);
@@ -804,7 +814,8 @@ SettingsDialog::SettingsDialog(TerminalWindow& win, const ViewOptions& current)
     grid->show_all();
 
     load(current);
-    for (Gtk::ComboBoxText* c : {&profile, &font, &quality, &frame}) c->signal_changed().connect(sigc::mem_fun(*this, &SettingsDialog::changed));
+    for (Gtk::ComboBoxText* c : {&profile, &font, &quality, &frame, &scrollbar})
+        c->signal_changed().connect(sigc::mem_fun(*this, &SettingsDialog::changed));
     fontPx.signal_value_changed().connect(sigc::mem_fun(*this, &SettingsDialog::changed));
     scrollback.signal_value_changed().connect(sigc::mem_fun(*this, &SettingsDialog::changed));
     save.signal_clicked().connect([this] {
@@ -829,6 +840,7 @@ void SettingsDialog::load(const ViewOptions& o) {
     scrollback.set_value(static_cast<double>(clampScrollbackLines(o.scrollbackLines)));
     updateScrollbackNote();
     frame.set_active_id(std::to_string(o.tube.frame < 0 ? -1 : (o.tube.frame > 0 ? 1 : 0)));
+    scrollbar.set_active_id(std::to_string(o.scrollbar < 0 ? -1 : (o.scrollbar > 0 ? 1 : 0)));
     status.set_text("");
     updateFrameSensitivity();
     loading_ = false;
@@ -843,6 +855,7 @@ ViewOptions SettingsDialog::options() const {
     parseEffectsQuality(quality.get_active_id(), o.effectsQuality);
     o.scrollbackLines = static_cast<long long>(scrollback.get_value());
     o.tube.frame = std::stoi(frame.get_active_id().empty() ? std::string("-1") : std::string(frame.get_active_id()));
+    o.scrollbar = std::stoi(scrollbar.get_active_id().empty() ? std::string("-1") : std::string(scrollbar.get_active_id()));
     return o;
 }
 

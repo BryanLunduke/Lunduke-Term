@@ -40,6 +40,9 @@ constexpr size_t kDefaultScrollbackLines = 5000;   // when settings.ini and --sc
 // The rest stays in the source buffer and is written as the pty drains, so a
 // large paste is never truncated and a key typed during it is never dropped.
 constexpr size_t kPasteChunkBytes = 64u * 1024u;
+// OSC 52 write cap. Larger pastes from an application are refused.
+// Reading the clipboard (OSC 52 "?") stays disabled.
+constexpr size_t kMaxOsc52Bytes = 1u << 20;
 // The old hard cap (PR #17). Kept as the name tests and notes use; it is no
 // longer a truncate limit. In-flight paste bytes stay within kPasteChunkBytes.
 constexpr size_t kMaxWriteQueueBytes = 1u << 20;
@@ -159,6 +162,10 @@ public:
     // User cursor, used until the application sends DECSCUSR or mode 12.
     void setDefaultCursor(CursorShape shape, bool blink);
     std::string rowText(int row) const;
+    // OSC 8 hyperlink on this cell, or an http(s)/mailto URL in the row that
+    // covers `col`. startCol/endCol receive the span when non-null.
+    std::string hyperlinkAt(long line, int col) const;
+    std::string linkAt(long line, int col, int* startCol = nullptr, int* endCol = nullptr) const;
 
     // Scrollback. Lines have global numbers. Screen row r is line topLine() + r while the
     // primary screen is showing. libghostty prunes history a page at a time, so the line cap
@@ -204,11 +211,15 @@ public:
     // synchronized update open. The view should not present until it is false.
     std::function<void(bool held)> onSyncHold;
     bool syncHeld() const { return syncHeld_; }
+    // OSC 52 write. The text is what was set (empty means cleared). Reads are ignored.
+    std::function<void(const std::string& text)> onOsc52;
+    const std::string& osc52Text() const { return osc52_; }
     // libghostty callbacks (C function pointers cannot be private members).
     void onBellFired();
     void onTitleFired();
     void onWriteFired(const uint8_t* data, size_t len);
     void onRenderHold(bool held);
+    void onClipboardWrite(const void* write);
 
 private:
     struct Ghost;  // libghostty handles, kept out of this header
@@ -269,6 +280,7 @@ private:
     bool pasteNeedPrefix_ = false;
     bool pasteNeedSuffix_ = false;
     bool syncHeld_ = false;
+    std::string osc52_;
     // Effective colours (profile, then any OSC override). Mutable: fillGrid is
     // const and refreshes them from libghostty.
     mutable Color8 fg_{208, 208, 208}, bg_{0, 0, 0}, cursor_{208, 208, 208};
