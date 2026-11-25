@@ -1170,10 +1170,11 @@ void TerminalView::scheduleCompress() {
         [this] {
             const bool more = session_->compressScrollback(false);
             if (more) return true;
-            const size_t fed = session_->takeFedBytes();
-            // A large burst leaves glibc arenas holding tens of MB after the
-            // scrollback pages have been compressed. Return them once.
-            if (fed >= (1u << 20)) malloc_trim(0);
+            session_->takeFedBytes();
+            // Idle, not only after a >1 MiB flood: a search decompresses
+            // scrollback and then frees its index, and glibc keeps those
+            // pages until something asks for them back.
+            malloc_trim(0);
             return false;
         },
         Glib::PRIORITY_DEFAULT_IDLE + 30);
@@ -1674,6 +1675,9 @@ bool TerminalView::onSearchWork() {
         finishSearch(pendingKeep_);
     }
     noteSearchTime(t0);
+    // Building the index reads every row and decompresses scrollback. Put it
+    // back once the build is idle; the index itself stays until the search closes.
+    scheduleCompress();
     return false;
 }
 
@@ -1752,6 +1756,7 @@ void TerminalView::clearSearch() {
     searchRefresh_.disconnect();
     searchWork_.disconnect();
     searchIndex_.reset();  // the cache is rebuilt when the search bar opens again
+    scheduleCompress();    // recompress the rows the search decompressed, then malloc_trim
     const bool had = !matches_.empty() || !searchQuery_.empty() || searchPending_;
     searchPending_ = false;
     searchQuery_.clear();
