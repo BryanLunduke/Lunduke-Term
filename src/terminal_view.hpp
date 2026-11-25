@@ -54,6 +54,12 @@ struct ViewOptions {
     // path's float buffers); showing it rebuilds them. -1: never.
     int effectsFreeHiddenMs = 3000;
     std::string wordChars = Selection::defaultWordChars();
+    // Ask before a multi-line paste, and before any paste that runs sudo.
+    // Multi-line is not asked while bracketed paste is on. sudo still is.
+    bool confirmPaste = true;
+    // -1: on unless the profile is a 4:3 CRT (a bar beside the tube changes the
+    // screen). 0 off, 1 on.
+    int scrollbar = -1;
     // M2 item 5: bezel / RGB shift overrides of the profile (see profiles.hpp).
     TubeOverrides tube;
 };
@@ -147,6 +153,8 @@ public:
     std::string selectionText() const { return sel_.text(*session_); }
     void copyClipboard();
     void pasteClipboard(bool primary);
+    bool scrollbarVisible() const { return scrollbar_.get_visible(); }
+    void setScrollbar(int mode);
 
     // M2 stage 3: scrollback search. setSearch() finds every match (history + screen), highlights
     // them and goes to the newest one; searchStep() moves to the next/previous one (wrapping) and
@@ -161,6 +169,9 @@ public:
     // M6 item 1: right-click menu (Copy, Paste, Settings). Shift+right-click opens it while an
     // application reports the mouse. "Settings" asks the window to show its dialog.
     sigc::signal<void> signalSettingsRequested;
+    // The user checked "don't ask again" on the paste dialog.
+    sigc::signal<void> signalPasteConfirmOff;
+    void setConfirmPaste(bool ask) { opts_.confirmPaste = ask; }
     Gtk::Menu& contextMenu() { return menu_; }  // tests
     Gtk::MenuItem& contextCopy() { return menuCopy_; }
     Gtk::MenuItem& contextPaste() { return menuPaste_; }
@@ -219,7 +230,14 @@ private:
     // gtkmm 3 has no IMContext wrapper: the GTK C API (a GtkIMMulticontext).
     GtkIMContext* im_ = nullptr;
     void onImCommit(const char* text);
+    void noteImPreedit(bool active);
     void updateImCursor();
+    // The key the input method is handling. A direct commit (Shift+a) must be
+    // encoded from this event so kitty mode sees Shift; a real composition
+    // (dead key, CJK) sets imComposing_ and is sent as text.
+    GdkEventKey imKey_{};
+    bool imKeyValid_ = false;
+    bool imComposing_ = false;
     bool onButtonPress(GdkEventButton* ev);
     bool onButtonRelease(GdkEventButton* ev);
     bool onMotion(GdkEventMotion* ev);
@@ -228,10 +246,15 @@ private:
     bool frameActive() const;      // effects on with a bezel
     bool mouseReporting(guint state) const;
     void scrollBy(int lines);  // + = back into history
+    void applyScrollbar();
+    void updateScrollbar();
+    void openLink(const std::string& uri);
+    void onScrollbar();
     void snapToBottom();
     void selectionChanged();
     void onChildExit(int status);
     void onBell();
+    void onSyncHold(bool held);  // DEC 2026: hold presentation, with a 1 s timeout
     void updateBlink();
     void sendKeyInput();       // common handling for anything typed
     void ensureWriteWatch();
@@ -342,7 +365,12 @@ private:
     double wheelAccum_ = 0;
     bool exited_ = false, holding_ = false;
     guint childWatch_ = 0;
-    sigc::connection writeWatch_, bellTimer_, blink_;
+    Gtk::VScrollbar scrollbar_;
+    bool scrollbarAdjusting_ = false;
+    int hoverRow_ = -1, hoverCol0_ = -1, hoverCol1_ = -1;
+    std::string hoverUri_;
+    sigc::connection writeWatch_, bellTimer_, blink_, syncTimer_;
+    bool syncHold_ = false;  // synchronized output (DEC 2026) is open
     double lastBellMs_ = -1e9;
     bool bellFlash_ = false;
     bool inverseShown_ = false;  // margins currently painted for reverse video

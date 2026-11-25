@@ -166,7 +166,9 @@ void main() {
         color += fractf(smoothstep(-120.0, 0.0, uv.y * vrY - (vrY + 120.0) * fractf(time * 0.00015))) * glowingLine;
     }
     vec3 t = texture(staticTex, tc).rgb;
-    if (burnIn != 0.0) {
+    // Once the ghost has faded, burnInDecay is 1 and the sample is <= 0, so it
+    // cannot raise t. Skip the texture fetch; the frame is unchanged.
+    if (burnIn != 0.0 && burnInDecay < 1.0) {
         vec3 b = 0.65 * (texture(burnTex, sc).rgb - vec3(burnInDecay));
         t = max(t, fontColor * mix(vec3(rgb2grey(b)), b, chroma));
     }

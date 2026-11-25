@@ -515,6 +515,98 @@ static void testInputMethod() {
     std::printf("input method: dead_acute e, Compose o c, x -> c3 a9 c2 a9 78 (%ld commits)\n", v.imCommits());
 }
 
+// DEC 2026: the screen does not show the update until the synchronized output ends.
+// The bar is off for a CRT profile so the tube is unchanged, and on for plain.
+static void testScrollbarDefault() {
+    ViewOptions amber;
+    amber.profile = "amber";
+    Win wa(amber);
+    CHECK(!wa.view->scrollbarVisible());
+    ViewOptions plain;
+    plain.profile = "plain";
+    Win wp(plain);
+    CHECK(wp.view->scrollbarVisible());
+    wa.view->setScrollbar(1);
+    CHECK(wa.view->scrollbarVisible());
+    std::printf("scrollbar: amber off, plain on\n");
+}
+
+static void testSyncOutputView() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-c", "printf '\\033[?2026hHELLO'; sleep 0.6; printf '\\033[?2026l'; exec sleep 30"};
+    Win w(o);
+    TerminalView& v = *w.view;
+    CHECK(v.start());
+    CHECK(waitFor([&] { return v.session().syncHeld(); }, ltermWaitMs(2000, 6000)));
+    pump(100);
+    CHECK(screenText(v.shownGrid()).find("HELLO") == std::string::npos);
+    const bool shown = waitFor(
+        [&] { return !v.session().syncHeld() && screenText(v.shownGrid()).find("HELLO") != std::string::npos; },
+        ltermWaitMs(2000, 6000));
+    CHECK(shown);
+    std::printf("sync output: HELLO held, then shown (%s)\n", shown ? "ok" : "missing");
+}
+
+// Kitty "report all keys as escape codes". Shift+a is committed by the input
+// method; the encoder must still see Shift (ESC[97;2u, not ESC[65u).
+static void testKittyImShift() {
+    ViewOptions o;
+    o.profile = "plain";
+    // python waits up to 2 s for the key, then prints the bytes it got, so a
+    // sequence that is not exactly 8 bytes is still visible.
+    o.command = {"/bin/sh", "-c",
+                 "printf '\\033[=8u'; stty raw -echo; exec python3 -c '"
+                 "import os,select,sys\n"
+                 "sys.stdout.write(\"READY\"); sys.stdout.flush()\n"
+                 "r,_,_=select.select([sys.stdin],[],[],2)\n"
+                 "data=os.read(sys.stdin.fileno(),64) if r else b\"\"\n"
+                 "sys.stdout.write(\" HEX \"+data.hex()+\" END\")\n"
+                 "sys.stdout.flush()\n"
+                 "'"};
+    Win w(o);
+    TerminalView& v = *w.view;
+    CHECK(v.start());
+    w.view->grabTerminalFocus();
+    CHECK(waitFor([&] { return v.session().reportsAllKeys() && screenText(v.shownGrid()).find("READY") != std::string::npos; },
+                  ltermWaitMs(3000, 8000)));
+    GdkEventKey e = keyEv(GDK_KEY_A, GDK_SHIFT_MASK);
+    e.window = w.win.get_window()->gobj();
+    v.testKey(&e);
+    CHECK(v.imCommits() >= 1);  // the letter went through the IM commit path
+    const bool ok = waitFor([&] { return screenText(v.shownGrid()).find("1b5b39373b3275") != std::string::npos; },
+                            ltermWaitMs(3000, 10000));
+    CHECK(ok);
+    if (!ok) std::fprintf(stderr, "kitty IM screen: %s\n", screenText(v.shownGrid()).substr(0, 400).c_str());
+    std::printf("kitty IM Shift+a: %s (%ld commits)\n", ok ? "1b5b39373b3275" : "missing", v.imCommits());
+}
+
+// Ctrl chords go through onKey (the IM is skipped), which is the path a real
+// key press takes. Ctrl+Shift+A is ^A, Ctrl+@ is NUL, Ctrl+[ is ESC.
+static void testLegacyCtrlKeys() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-c", "stty raw -echo; dd bs=1 count=3 2>/dev/null | od -An -tx1; exec sleep 30"};
+    Win w(o);
+    TerminalView& v = *w.view;
+    CHECK(v.start());
+    w.view->grabTerminalFocus();
+    pump(400);
+    auto key = [&](guint kv, guint state) {
+        GdkEventKey e = keyEv(kv, state);
+        e.window = w.win.get_window()->gobj();
+        v.testKey(&e);
+    };
+    key(GDK_KEY_A, GDK_CONTROL_MASK | GDK_SHIFT_MASK);
+    key(GDK_KEY_at, GDK_CONTROL_MASK | GDK_SHIFT_MASK);
+    key(GDK_KEY_bracketleft, GDK_CONTROL_MASK);
+    const bool ok = waitFor([&] { return screenText(v.shownGrid()).find("01 00 1b") != std::string::npos; },
+                            ltermWaitMs(3000, 10000));
+    CHECK(ok);
+    if (!ok) std::fprintf(stderr, "legacy ctrl screen: %s\n", screenText(v.shownGrid()).substr(0, 160).c_str());
+    std::printf("legacy ctrl via onKey: Ctrl+Shift+A, Ctrl+@, Ctrl+[ -> %s\n", ok ? "01 00 1b" : "missing");
+}
+
 // ---- PR #6 review N3: a pending dead key does not survive a Ctrl chord ----
 static void testDeadKeyChord() {
     ViewOptions o;
@@ -651,6 +743,10 @@ int main(int argc, char** argv) {
     testScrollbackSettingsSlip();
     testScrollbackMax();
     testInputMethod();
+    testKittyImShift();
+    testSyncOutputView();
+    testScrollbarDefault();
+    testLegacyCtrlKeys();
     testDeadKeyChord();
     testHiddenFrees("gl");
     testHiddenFrees("cpu");

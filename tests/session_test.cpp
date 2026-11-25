@@ -11,6 +11,7 @@
 #include <cmath>
 
 #include <cerrno>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -501,7 +502,17 @@ static void testKittyKeyboard() {
     legacy.sendChar('A', ModShift, 'a');
     CHECK_EQ(legacy.takeOutput(), std::string("A"));  // legacy: the character, not a CSI
     legacy.sendChar('A', ModCtrl | ModShift, 'a');
-    CHECK_EQ(legacy.takeOutput(), std::string("\x1b[97;6u"));  // Ctrl+Shift+A is not Ctrl+A
+    CHECK_EQ(legacy.takeOutput(), std::string("\x01"));  // Ctrl+Shift+A is ^A, not CSI u
+    legacy.sendChar('@', ModCtrl | ModShift, '2');
+    CHECK_EQ(legacy.takeOutput(), std::string("\0", 1));  // Ctrl+@ is NUL
+    legacy.sendChar('[', ModCtrl, '[');
+    CHECK_EQ(legacy.takeOutput(), std::string("\x1b"));  // Ctrl+[ is ESC
+    legacy.sendChar('i', ModCtrl, 'i');
+    CHECK_EQ(legacy.takeOutput(), std::string("\t"));  // Ctrl+i is TAB
+    legacy.sendChar('m', ModCtrl, 'm');
+    CHECK_EQ(legacy.takeOutput(), std::string("\r"));  // Ctrl+m is CR
+    legacy.sendChar('a', ModAlt | ModCtrl, 'a');
+    CHECK_EQ(legacy.takeOutput(), std::string("\x1b\x01"));
     legacy.sendChar('x', ModAlt);
     CHECK_EQ(legacy.takeOutput(), std::string("\x1bx"));
 
@@ -569,32 +580,221 @@ static void testScrollbackCompress() {
     CHECK(s.cellText(s.topLine() - 1, 0) == "a");
 }
 
-static void testPasteCap() {
+// A paste larger than the old 1 MiB cap arrives intact, brackets included, and a
+// key typed while a pty is not reading is delivered after the paste, not dropped.
+static void testPasteStream() {
     VtermSession s(4, 20);
     s.paste(std::string(1000, 'q'));
     s.paste("Z");
     CHECK_EQ(s.takeOutput(), std::string(1000, 'q') + "Z");
 
+    const size_t n = (2u << 20);
+    std::string body(n, 'a');
+    body[n / 2] = '\n';  // must survive as CR, not be the point where a cap cuts the paste
     VtermSession big(4, 20);
-    big.paste(std::string(kMaxWriteQueueBytes + 250000, 'a'));
-    big.paste("XYZ");  // the queue is full: this paste must not grow it
+    big.paste(body);
+    big.paste("XYZ");
     const std::string out = big.takeOutput();
-    CHECK(out.size() <= kMaxWriteQueueBytes);
-    CHECK(out.size() >= kMaxWriteQueueBytes - 4);
-    CHECK(out.find("XYZ") == std::string::npos);
-    CHECK(out.find_first_not_of('a') == std::string::npos);
+    CHECK_EQ(out.size(), n + 3);
+    CHECK_EQ(out.compare(0, n / 2, std::string(n / 2, 'a')), 0);
+    CHECK_EQ(out[n / 2], '\r');
+    CHECK_EQ(out.compare(n / 2 + 1, n - n / 2 - 1, std::string(n - n / 2 - 1, 'a')), 0);
+    CHECK_EQ(out.compare(n, 3, "XYZ"), 0);
 
     VtermSession br(4, 20);
     br.feed("\x1b[?2004h");
     br.takeOutput();
-    br.paste(std::string(kMaxWriteQueueBytes, 'b'));
+    br.paste(body);
     const std::string wrapped = br.takeOutput();
-    CHECK(wrapped.size() <= kMaxWriteQueueBytes);
-    CHECK(wrapped.compare(0, 6, "\x1b[200~") == 0);
-    CHECK(wrapped.size() >= 12);
-    CHECK(wrapped.compare(wrapped.size() - 6, 6, "\x1b[201~") == 0);
-    std::printf("paste cap: plain %zu bytes, bracketed %zu bytes (cap %zu)\n", out.size(), wrapped.size(),
-                kMaxWriteQueueBytes);
+    CHECK_EQ(wrapped.size(), n + 12);
+    CHECK_EQ(wrapped.compare(0, 6, "\x1b[200~"), 0);
+    CHECK_EQ(wrapped.compare(wrapped.size() - 6, 6, "\x1b[201~"), 0);
+    CHECK_EQ(wrapped[6 + n / 2], '\r');  // the newline is still in the middle, not cut off
+    std::printf("paste stream: plain %zu bytes, bracketed %zu bytes\n", out.size(), wrapped.size());
+
+    // The child is not reading yet. The paste blocks on the pty, and a key typed
+    // then must still be delivered after it (not dropped, not spliced in).
+    char path[] = "/tmp/lterm-paste-XXXXXX";
+    const int tfd = mkstemp(path);
+    CHECK(tfd >= 0);
+    if (tfd >= 0) close(tfd);
+    VtermSession pty(4, 40);
+    SpawnOptions opt;
+    const std::string nbytes = std::to_string(n + 1);
+    opt.argv = {"/bin/sh", "-c",
+                "stty raw -echo; printf READY; head -c \"$1\" > \"$2\"; printf ' DONE'", "sh", nbytes.c_str(), path};
+    CHECK(pty.spawn(opt));
+    const auto readyBy = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+    std::string screen;
+    while (std::chrono::steady_clock::now() < readyBy) {
+        pollfd p{pty.masterFd(), POLLIN, 0};
+        if (poll(&p, 1, 20) > 0) pty.readAvailable();
+        screen.clear();
+        for (int r = 0; r < pty.rows(); ++r) screen += pty.rowText(r);
+        if (screen.find("READY") != std::string::npos) break;
+    }
+    CHECK(screen.find("READY") != std::string::npos);
+    const std::string streamed(n, 'b');
+    pty.paste(streamed);
+    pty.sendBytes("Z", 1);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(15);
+    while (std::chrono::steady_clock::now() < deadline) {
+        pty.flushWrites();
+        pollfd p{pty.masterFd(), POLLIN, 0};
+        if (poll(&p, 1, 20) > 0) pty.readAvailable();
+        screen.clear();
+        for (int r = 0; r < pty.rows(); ++r) screen += pty.rowText(r);
+        if (screen.find("DONE") != std::string::npos) break;
+    }
+    CHECK(screen.find("DONE") != std::string::npos);
+    FILE* f = std::fopen(path, "rb");
+    CHECK(f != nullptr);
+    std::string got;
+    if (f) {
+        char buf[65536];
+        size_t k;
+        while ((k = std::fread(buf, 1, sizeof buf, f)) > 0) got.append(buf, k);
+        std::fclose(f);
+    }
+    std::remove(path);
+    CHECK_EQ(got.size(), n + 1);
+    CHECK(got.size() == n + 1 && got.compare(0, n, streamed) == 0 && got.back() == 'Z');
+    pty.hangup(50);
+    std::printf("paste stream pty: child received %zu bytes\n", got.size());
+}
+
+// A profile colour change repaints cells that are already on screen.
+static void testPasteConfirm() {
+    CHECK(!pasteNeedsConfirm("echo hi", false, true));
+    CHECK(pasteNeedsConfirm("echo hi\nls", false, true));
+    CHECK(!pasteNeedsConfirm("echo hi\nls", true, true));  // bracketed paste: the app asked for the lines
+    CHECK(pasteNeedsConfirm("sudo reboot", false, true));
+    CHECK(pasteNeedsConfirm("sudo reboot", true, true));  // sudo still asks inside brackets
+    CHECK(pasteNeedsConfirm("echo hi; sudo -n true", true, true));
+    CHECK(!pasteNeedsConfirm("pseudocode\n", true, true));
+    CHECK(!pasteNeedsConfirm("sudo reboot", false, false));  // don't ask again
+    std::printf("paste confirm: multi-line, bracketed skip, sudo kept\n");
+}
+
+static void testLinks() {
+    VtermSession s(4, 60);
+    s.feed("see https://example.com/a. next\r\n");
+    int a = -1, b = -1;
+    const long line = s.topLine();
+    // "see " is 4 columns, then the URL.
+    CHECK(s.linkAt(line, 4, &a, &b).find("https://example.com/a") != std::string::npos);
+    CHECK(a == 4);
+    CHECK(s.linkAt(line, 0).empty());
+    s.feed("\x1b]8;;https://lunduke.com/x\x1b\\click\x1b]8;;\x1b\\");
+    const long row = s.topLine() + 1;
+    const std::string uri = s.linkAt(row, 0, &a, &b);
+    CHECK(uri == "https://lunduke.com/x");
+    CHECK(a == 0 && b == 4);  // "click"
+    CHECK(s.hyperlinkAt(row, 0) == uri);
+    CHECK(s.hyperlinkAt(row, 5).empty());
+    std::printf("links: url span %d-%d, osc 8 %s\n", a, b, uri.c_str());
+}
+
+static void testOsc52() {
+    VtermSession s(4, 20);
+    // "hi" is aGk= ; "c" is the system clipboard. The read form must not echo it back.
+    s.feed("\x1b]52;c;aGk=\x07");
+    CHECK(s.osc52Text() == "hi");
+    s.feed("\x1b]52;c;?\x07");
+    const std::string reply = s.takeOutput();
+    CHECK(reply.find("aGk=") == std::string::npos);
+    CHECK(reply.find("hi") == std::string::npos);
+    s.feed("\x1b]52;c;\x07");
+    CHECK(s.osc52Text().empty());
+    std::printf("osc 52: write %s, read suppressed, clear ok\n", "hi");
+}
+
+static void testOscColors() {
+    VtermSession s(4, 40);
+    std::array<Color8, 16> pal{};
+    pal[1] = Color8{205, 0, 0};
+    s.setColors(Color8{200, 200, 200}, Color8{0, 0, 0}, pal, 0);
+    s.setCursorColor(Color8{200, 200, 200});
+    s.feed("\x1b[31mX");
+    Grid g;
+    s.fillGrid(g);
+    CHECK(g.at(0, 0).fg.r == 205 && g.at(0, 0).fg.b == 0);
+    s.feed("\x1b]4;1;#0000ff\x1b\\");
+    s.fillGrid(g);
+    CHECK(g.at(0, 0).fg.r == 0 && g.at(0, 0).fg.b == 255);
+    s.feed("\x1b[0m\x1b]10;#00ff00\x1b\\Z");
+    s.fillGrid(g);
+    CHECK(g.at(0, 1).text == "Z");
+    CHECK(g.at(0, 1).fg.g == 255 && g.at(0, 1).fg.r == 0);
+    s.feed("\x1b]11;#010203\x1b\\");
+    s.fillGrid(g);
+    CHECK(g.at(0, 1).bg.r == 1 && g.at(0, 1).bg.g == 2 && g.at(0, 1).bg.b == 3);
+    s.feed("\x1b]12;#abcdef\x1b\\");
+    s.fillGrid(g);
+    CHECK(s.cursorColor().r == 0xab && s.cursorColor().g == 0xcd && s.cursorColor().b == 0xef);
+    s.takeOutput();
+    s.feed("\x1b]10;?\x1b\\");
+    const std::string q10 = s.takeOutput();
+    CHECK(q10.find("\x1b]10;") != std::string::npos);
+    CHECK(q10.find("rgb:") != std::string::npos);
+    s.feed("\x1b]11;?\x1b\\");
+    const std::string q11 = s.takeOutput();
+    CHECK(q11.find("\x1b]11;") != std::string::npos);
+    s.feed("\x1b]4;1;?\x1b\\");
+    const std::string q4 = s.takeOutput();
+    CHECK(q4.find("\x1b]4;1;") != std::string::npos);
+    s.feed("\x1b]104;1\x1b\\\x1b[31mQ");
+    s.fillGrid(g);
+    CHECK(g.at(0, 2).text == "Q");
+    CHECK(g.at(0, 2).fg.r == 205 && g.at(0, 2).fg.b == 0);
+    s.feed("\x1b[0m\x1b]110\x1b\\W");
+    s.fillGrid(g);
+    CHECK(g.at(0, 3).text == "W");
+    CHECK(g.at(0, 3).fg.r == 200 && g.at(0, 3).fg.g == 200);
+    s.feed("\x1b]111\x1b\\");
+    s.fillGrid(g);
+    CHECK(g.at(0, 3).bg.r == 0 && g.at(0, 3).bg.g == 0 && g.at(0, 3).bg.b == 0);
+    s.feed("\x1b]112\x1b\\");
+    s.fillGrid(g);
+    CHECK(s.cursorColor().r == 200 && s.cursorColor().g == 200 && s.cursorColor().b == 200);
+    std::printf("osc colors: palette, fg/bg/cursor, queries, resets\n");
+}
+
+static void testSyncOutput() {
+    VtermSession s(4, 20);
+    int began = 0, ended = 0;
+    s.onSyncHold = [&](bool held) {
+        if (held) ++began;
+        else ++ended;
+    };
+    CHECK(!s.syncHeld());
+    s.feed("\x1b[?2026h");
+    CHECK(s.syncHeld());
+    CHECK(began == 1);
+    s.feed("HELLO");
+    CHECK(s.syncHeld());  // the text is in the model; presentation is the view's job
+    s.feed("\x1b[?2026h");  // already held: no second begin
+    CHECK(began == 1);
+    s.feed("\x1b[?2026l");
+    CHECK(!s.syncHeld());
+    CHECK(ended == 1);
+    Grid g;
+    s.fillGrid(g);
+    CHECK(g.at(0, 0).text == "H" && g.at(0, 4).text == "O");
+}
+
+static void testColorRefresh() {
+    VtermSession s(4, 20);
+    std::array<Color8, 16> pal{};
+    s.setColors(Color8{200, 180, 40}, Color8{0, 0, 0}, pal, 0);
+    s.feed("A");
+    Grid g;
+    s.fillGrid(g);
+    CHECK(g.at(0, 0).text == "A");
+    CHECK(g.at(0, 0).fg.r == 200);
+    s.setColors(Color8{10, 20, 30}, Color8{1, 2, 3}, pal, 0);
+    s.fillGrid(g);
+    CHECK(g.at(0, 0).fg.r == 10 && g.at(0, 0).fg.g == 20 && g.at(0, 0).bg.b == 3);
 }
 
 static void testCursor() {
@@ -861,7 +1061,13 @@ int main() {
     testUnshiftedCodepoint();
     testKittyKeyboard();
     testPaste();
-    testPasteCap();
+    testPasteStream();
+    testColorRefresh();
+    testSyncOutput();
+    testOscColors();
+    testOsc52();
+    testLinks();
+    testPasteConfirm();
     testScrollbackCompress();
     testCursor();
     testGridCursorDiff();

@@ -400,8 +400,19 @@ void CpuEffects::renderTo(float timeMs, uint8_t* out, int stride, PixelOrder ord
             float* const rDist = rSv + w_;
             float* const rIn = rDist + w_;
             warpRow(y, rSu, rSv, rDist, rIn);  // distance from the centre of the unwarped glass: noise, ambient
+            const bool burnLive = p_.burnIn != 0.0f && fu.burnInDecay < 1.0f;
             for (int x = 0; x < w_; ++x) {
                 const float su = rSu[x], sv = rSv[x], dist = rDist[x], inScreen = rIn[x];
+                // Outside the tube the pixel is black (the bezel, if any, is
+                // composited below). Sampling noise, static and burn-in there
+                // cannot change the stored byte.
+                if (inScreen == 0.0f) {
+                    uint8_t* o = orow + x * 4;
+                    o[ri] = o[1] = o[bi] = 0;
+                    o[3] = 255;
+                    if (frame) rowf[x * 3] = rowf[x * 3 + 1] = rowf[x * 3 + 2] = 0.0f;
+                    continue;
+                }
                 const float u = (x + 0.5f) / w_ + dx;
                 if (useNoise) sampleRepeat(noise, kNoiseSize, kNoiseSize, snx * u + fu.noiseOffsetX,
                                            sny * v + fu.noiseOffsetY, nt);
@@ -414,7 +425,7 @@ void CpuEffects::renderTo(float timeMs, uint8_t* out, int stride, PixelOrder ord
                 if (p_.staticNoise != 0.0f) color += nt[3] * noiseAmount * (1.0f - dist * 1.3f);
                 color += glow;
                 sampleClamp<3, 3>(static_.data(), w_, h_, tu, tv, t);
-                if (p_.burnIn != 0.0f) {
+                if (burnLive) {
                     sampleClamp<3>(burn_.data(), bw_, bh_, su, sv, b);
                     float br = 0.65f * (b[0] - fu.burnInDecay);
                     float bgc = 0.65f * (b[1] - fu.burnInDecay);

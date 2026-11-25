@@ -61,6 +61,10 @@ struct SettingsValues {
     float frameShininess = 0;
     bool hasRgbShift = false;
     float rgbShift = 0;
+    bool hasScrollbar = false;
+    int scrollbar = -1;  // -1 auto, 0 off, 1 on
+    bool hasConfirmPaste = false;
+    bool confirmPaste = true;
     std::vector<std::string> warnings;
 };
 

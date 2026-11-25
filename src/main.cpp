@@ -74,6 +74,10 @@ const char kUsage[] =
     "                            plain and modern stay a tight 80x24. Fits the screen.)\n"
     "  -T, --title TITLE         window title (also --title=TITLE)\n"
     "  --scrollback N            scrollback lines (default 5000)\n"
+    "  --scrollbar auto|on|off   scrollback bar (default auto: on for plain and\n"
+    "                            modern, off for CRT profiles so the tube is unchanged)\n"
+    "                            confirm-paste in settings asks before a multi-line paste\n"
+    "                            and before sudo (multi-line is skipped in bracketed paste)\n"
     "  --cursor-shape block|underline|bar, --cursor-blink, --no-cursor-blink\n"
     "  --bell LIST               comma list of visual, urgent, audible or none\n"
     "                            (default: urgent. No screen flash and no beep.)\n"
@@ -168,6 +172,8 @@ void loadSettings(lterm::ViewOptions& o) {
     if (s.hasFrameColor) o.tube.frameColor = s.frameColor;
     if (s.hasFrameShininess) o.tube.frameShininess = s.frameShininess;
     if (s.hasRgbShift) o.tube.rgbShift = s.rgbShift;
+    if (s.hasScrollbar) o.scrollbar = s.scrollbar;
+    if (s.hasConfirmPaste) o.confirmPaste = s.confirmPaste;
 }
 
 // An option as a separate argument (`--name value`) or, for a long option, `--name=value`.
@@ -202,6 +208,14 @@ int takeDir(const std::string& a, int& i, int argc, char** argv, std::string& va
 int takeTitle(const std::string& a, int& i, int argc, char** argv, std::string& value) {
     if (int t = takeOpt(a, "--title", i, argc, argv, value)) return t;
     return takeOpt(a, "-T", i, argc, argv, value);
+}
+
+// `--size 80x24`, `--size=80x24` and `80X24`.
+bool parseWindowSize(const std::string& s, int& w, int& h) {
+    char sep = 0;
+    if (std::sscanf(s.c_str(), "%d%c%d", &w, &sep, &h) != 3) return false;
+    if (sep != 'x' && sep != 'X') return false;
+    return w > 0 && h > 0;
 }
 
 }  // namespace
@@ -242,45 +256,94 @@ int main(int argc, char** argv) {
             if (taken < 0) return 2;
             opts.profile = optArg;
         }
-        else if (a == "--renderer" && i + 1 < argc) opts.renderer = argv[++i];
-        else if (a == "--threads" && i + 1 < argc) opts.threads = std::atoi(argv[++i]);
-        else if (a == "--effects-fps" && i + 1 < argc) opts.effectsFps = std::atoi(argv[++i]);
-        else if (a == "--max-fps" && i + 1 < argc) opts.maxFps = std::atoi(argv[++i]);
-        else if (a == "--no-pause-unfocused") opts.pauseWhenUnfocused = false;
-        else if (a == "--effects-quality" && i + 1 < argc) {
-            if (!parseEffectsQuality(argv[++i], opts.effectsQuality)) {
+        else if (int taken = takeOpt(a, "--renderer", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.renderer = optArg;
+        } else if (int taken = takeOpt(a, "--threads", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.threads = std::atoi(optArg.c_str());
+        } else if (int taken = takeOpt(a, "--effects-fps", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.effectsFps = std::atoi(optArg.c_str());
+        } else if (int taken = takeOpt(a, "--max-fps", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.maxFps = std::atoi(optArg.c_str());
+        } else if (a == "--no-pause-unfocused") opts.pauseWhenUnfocused = false;
+        else if (int taken = takeOpt(a, "--effects-quality", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            if (!parseEffectsQuality(optArg, opts.effectsQuality)) {
                 std::fprintf(stderr, "lunduke-terminal: --effects-quality must be auto, full, reduced or static\n");
                 return 2;
             }
-        } else if (a == "--cpu-budget" && i + 1 < argc) opts.cpuBudget = std::atof(argv[++i]) / 100.0;
-        else if (a == "--font" && i + 1 < argc) opts.fontFamily = argv[++i];
-        else if (a == "--font-px" && i + 1 < argc) opts.fontPx = std::atoi(argv[++i]);
-        else if (a == "--size" && i + 1 < argc) {
-            if (std::sscanf(argv[++i], "%dx%d", &w, &h) == 2 && w > 0 && h > 0) sizeSet = true;
-        }
-        else if (a == "--quit-after" && i + 1 < argc) quitAfter = std::atoi(argv[++i]);
-        else if (a == "--stats") opts.stats = true;
-        else if (a == "--stats-every" && i + 1 < argc) statsEvery = std::atoi(argv[++i]);
-        else if (a == "--scrollback" && i + 1 < argc) opts.scrollbackLines = std::strtoll(argv[++i], nullptr, 10);
-        else if (a == "--login") opts.loginShell = true;
+        } else if (int taken = takeOpt(a, "--cpu-budget", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.cpuBudget = std::atof(optArg.c_str()) / 100.0;
+        } else if (int taken = takeOpt(a, "--font", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.fontFamily = optArg;
+        } else if (int taken = takeOpt(a, "--font-px", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.fontPx = std::atoi(optArg.c_str());
+        } else if (int taken = takeOpt(a, "--size", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            if (!parseWindowSize(optArg, w, h)) {
+                std::fprintf(stderr, "lunduke-terminal: --size must be WxH (for example 80x24)\n");
+                return 2;
+            }
+            sizeSet = true;
+        } else if (int taken = takeOpt(a, "--quit-after", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            quitAfter = std::atoi(optArg.c_str());
+        } else if (a == "--stats") opts.stats = true;
+        else if (int taken = takeOpt(a, "--stats-every", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            statsEvery = std::atoi(optArg.c_str());
+        } else if (int taken = takeOpt(a, "--scrollback", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.scrollbackLines = std::strtoll(optArg.c_str(), nullptr, 10);
+        } else if (a == "--login") opts.loginShell = true;
         else if (int taken = takeDir(a, i, argc, argv, optArg)) {
             if (taken < 0) return 2;
             opts.cwd = optArg;
         } else if (int taken = takeTitle(a, i, argc, argv, optArg)) {
             if (taken < 0) return 2;
             title = optArg;
-        } else if (a == "--on-exit" && i + 1 < argc) opts.onExit = argv[++i];
-        else if (a == "--hold") opts.onExit = "hold";
-        else if (a == "--bell" && i + 1 < argc) parseBell(opts, argv[++i]);
-        else if (a == "--cursor-shape" && i + 1 < argc) opts.cursorShape = argv[++i];
-        else if (a == "--cursor-blink") opts.cursorBlink = true;
+        } else if (int taken = takeOpt(a, "--on-exit", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.onExit = optArg;
+        } else if (a == "--hold") opts.onExit = "hold";
+        else if (int taken = takeOpt(a, "--bell", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            parseBell(opts, optArg);
+        } else if (int taken = takeOpt(a, "--cursor-shape", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.cursorShape = optArg;
+        } else if (a == "--cursor-blink") opts.cursorBlink = true;
         else if (a == "--no-cursor-blink") opts.cursorBlink = false;
         else if (a == "--frame") opts.tube.frame = 1;
         else if (a == "--no-frame") opts.tube.frame = 0;
-        else if (a == "--frame-size" && i + 1 < argc) opts.tube.frameSize = static_cast<float>(std::atof(argv[++i]));
-        else if (a == "--frame-color" && i + 1 < argc) opts.tube.frameColor = argv[++i];
-        else if (a == "--frame-shininess" && i + 1 < argc) opts.tube.frameShininess = static_cast<float>(std::atof(argv[++i]));
-        else if (a == "--rgb-shift" && i + 1 < argc) opts.tube.rgbShift = static_cast<float>(std::atof(argv[++i]));
+        else if (int taken = takeOpt(a, "--frame-size", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.tube.frameSize = static_cast<float>(std::atof(optArg.c_str()));
+        } else if (int taken = takeOpt(a, "--frame-color", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.tube.frameColor = optArg;
+        } else if (int taken = takeOpt(a, "--frame-shininess", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.tube.frameShininess = static_cast<float>(std::atof(optArg.c_str()));
+        } else if (int taken = takeOpt(a, "--rgb-shift", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            opts.tube.rgbShift = static_cast<float>(std::atof(optArg.c_str()));
+        } else if (int taken = takeOpt(a, "--scrollbar", i, argc, argv, optArg)) {
+            if (taken < 0) return 2;
+            if (optArg == "auto") opts.scrollbar = -1;
+            else if (optArg == "on") opts.scrollbar = 1;
+            else if (optArg == "off") opts.scrollbar = 0;
+            else {
+                std::fprintf(stderr, "lunduke-terminal: --scrollbar must be auto, on or off\n");
+                return 2;
+            }
+        }
         else if (a == "--list-profiles") {
             std::fputs(lterm::profileListText().c_str(), stdout);
             return 0;

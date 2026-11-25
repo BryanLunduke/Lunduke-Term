@@ -7,6 +7,7 @@
 #include <ghostty/vt.h>
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -94,6 +95,11 @@ TerminalView::TerminalView(const ViewOptions& opts)
     session_.reset(new VtermSession(kDefaultRows, kDefaultCols));
     session_->onTitle = [this] { signalTitle.emit(session_->title()); };
     session_->onBell = [this] { onBell(); };
+    session_->onSyncHold = [this](bool held) { onSyncHold(held); };
+    session_->onOsc52 = [this](const std::string& text) {
+        if (!g_utf8_validate(text.data(), static_cast<gssize>(text.size()), nullptr)) return;
+        Gtk::Clipboard::get(GDK_SELECTION_CLIPBOARD)->set_text(text);
+    };
     const size_t sb = clampScrollbackLines(opts_.scrollbackLines);
     if (opts_.scrollbackLines > static_cast<long long>(kMaxScrollbackLines))
         std::fprintf(stderr, "lunduke-terminal: scrollback-lines %lld is too large, using %zu\n", opts_.scrollbackLines, sb);
@@ -105,6 +111,12 @@ TerminalView::TerminalView(const ViewOptions& opts)
     gtk_im_context_set_use_preedit(im_, FALSE);
     g_signal_connect(im_, "commit", G_CALLBACK(+[](GtkIMContext*, const char* text, gpointer self) {
         static_cast<TerminalView*>(self)->onImCommit(text);
+    }), this);
+    g_signal_connect(im_, "preedit-changed", G_CALLBACK(+[](GtkIMContext* im, gpointer self) {
+        gchar* s = nullptr;
+        gtk_im_context_get_preedit_string(im, &s, nullptr, nullptr);
+        static_cast<TerminalView*>(self)->noteImPreedit(s && *s);
+        g_free(s);
     }), this);
     for (Gtk::Widget* w : {static_cast<Gtk::Widget*>(&area_), static_cast<Gtk::Widget*>(&gl_)}) {
         w->set_can_focus(true);
@@ -169,6 +181,14 @@ TerminalView::TerminalView(const ViewOptions& opts)
     property_scale_factor().signal_changed().connect(sigc::mem_fun(*this, &TerminalView::onScaleChanged));
     applyProfile();
     chooseMode();
+    // A bar beside a 4:3 CRT changes the screen, so retro profiles leave it off.
+    // Plain and modern (no tube) show it. set_no_show_all keeps show_all from
+    // overriding that.
+    scrollbar_.set_no_show_all(true);
+    scrollbar_.set_tooltip_text("Scrollback");
+    pack_end(scrollbar_, false, false);
+    scrollbar_.get_adjustment()->signal_value_changed().connect(sigc::mem_fun(*this, &TerminalView::onScrollbar));
+    applyScrollbar();
 }
 
 // M3 item 1c: background reaping of hung-up children.
@@ -446,6 +466,7 @@ void TerminalView::applyColors() {
     const bool fxPal = effectsOn_ && profile_.hasEffectsPalette;
     session_->setColors(profile_.fg, profile_.bg, fxPal ? profile_.effectsPalette : profile_.palette,
                         fxPal ? profile_.effectsMinFgGrey : profile_.minFgGrey);
+    session_->setCursorColor(profile_.cursor);
     session_->setDefaultCursor(opts_.cursorShape == "underline" ? CursorShape::Underline
                                 : opts_.cursorShape == "bar"    ? CursorShape::Bar
                                                                  : CursorShape::Block,
@@ -459,6 +480,7 @@ void TerminalView::setProfile(const std::string& id) {
     applyTubeOverrides(profile_, opts_.tube);
     zoomPx_ = 0;  // perf step 1: a new profile starts at its own size
     if (opts_.effects < 0) effectsOn_ = profile_.effects;
+    if (opts_.scrollbar < 0) applyScrollbar();
     applyProfile();
     applyColors();
     chooseMode();
@@ -738,6 +760,13 @@ bool TerminalView::updateContent() {
     if (!src_ || (!contentDirty_ && !fullRepaint_)) return false;
     const auto t0 = std::chrono::steady_clock::now();
     session_->fillGrid(next_, scrollOffset_);
+    if (session_->takeColorsChanged()) fullRepaint_ = true;
+    if (hoverRow_ >= 0 && hoverRow_ < next_.rows) {
+        for (int c = std::max(0, hoverCol0_); c <= std::min(next_.cols - 1, hoverCol1_); ++c) {
+            Cell& cell = next_.at(hoverRow_, c);
+            if (cell.underline == Underline::None) cell.underline = Underline::Single;
+        }
+    }
     // Selection, cursor style, reverse video / visual bell are applied to the composed grid, so the
     // changed-rows repaint picks them up like any other cell change.
     if (sel_.active()) {
@@ -778,7 +807,9 @@ bool TerminalView::updateContent() {
         inverseShown_ = inverse;
         fullRepaint_ = true;
     }
-    const Color8 clearColor = inverse ? profile_.fg : profile_.bg;
+    // OSC 10/11 override the profile's default fg/bg. The profile stays what a
+    // reset (OSC 110/111) returns to.
+    const Color8 clearColor = inverse ? session_->foregroundColor() : session_->backgroundColor();
     const int shape = session_->cursorShape();
     if (shape == static_cast<int>(CursorShape::Underline)) next_.cursorShape = Grid::CursorShape::Underline;
     else if (shape == static_cast<int>(CursorShape::Bar)) next_.cursorShape = Grid::CursorShape::Bar;
@@ -805,7 +836,8 @@ bool TerminalView::updateContent() {
         cairo_set_source_rgb(c, clearColor.r / 255.0, clearColor.g / 255.0, clearColor.b / 255.0);
         cairo_paint(c);
     }
-    painter_->paintRows(c, next_, marginX_, marginY_, inverse ? profile_.bg : profile_.cursor, clearColor, full ? nullptr : &rows, w_);
+    const Color8 cursor = inverse ? session_->backgroundColor() : session_->cursorColor();
+    painter_->paintRows(c, next_, marginX_, marginY_, cursor, clearColor, full ? nullptr : &rows, w_);
     cairo_destroy(c);
     std::swap(cur_, next_);
     fullRepaint_ = false;
@@ -834,7 +866,29 @@ bool TerminalView::updateContent() {
     return true;
 }
 
+void TerminalView::onSyncHold(bool held) {
+    syncTimer_.disconnect();
+    if (!held) {
+        syncHold_ = false;
+        contentDirty_ = true;
+        requestFrame();
+        return;
+    }
+    syncHold_ = true;
+    // A program that forgets to end the synchronized update must not freeze
+    // the screen. One second is long enough for a normal redraw (neovim, tmux).
+    syncTimer_ = Glib::signal_timeout().connect(
+        [this] {
+            syncHold_ = false;
+            contentDirty_ = true;
+            requestFrame();
+            return false;
+        },
+        1000);
+}
+
 void TerminalView::requestFrame() {
+    if (syncHold_) return;  // one present when the synchronized update ends
     if (frameTimer_.connected()) return;
     // Review item 7: a hidden tab (or minimised window) only parses; contentDirty_ stays set and
     // setWindowVisible(true) paints the changed rows once.
@@ -858,6 +912,7 @@ void TerminalView::requestFrame() {
 }
 
 void TerminalView::onFrameTimer() {
+    if (syncHold_) return;  // the timer was queued before the hold; present on release
     if (!visible_) return;  // hidden since the request: paint on show (contentDirty_ stays set)
     if (mode_ == Mode::Plain) lastFrameMs_ = nowMs();
     const bool changed = updateContent();
@@ -1154,6 +1209,7 @@ bool TerminalView::readSlice(bool* more) {
     }
     ensureWriteWatch();  // replies (DA, DSR) that did not fit
     if (!*more) scheduleCompress();  // flood is over: compress idle scrollback, then return freed pages
+    updateScrollbar();
     return alive;  // false: EOF/HUP; the child watch decides what happens to the window
 }
 
@@ -1164,10 +1220,11 @@ void TerminalView::scheduleCompress() {
         [this] {
             const bool more = session_->compressScrollback(false);
             if (more) return true;
-            const size_t fed = session_->takeFedBytes();
-            // A large burst leaves glibc arenas holding tens of MB after the
-            // scrollback pages have been compressed. Return them once.
-            if (fed >= (1u << 20)) malloc_trim(0);
+            session_->takeFedBytes();
+            // Idle, not only after a >1 MiB flood: a search decompresses
+            // scrollback and then frees its index, and glibc keeps those
+            // pages until something asks for them back.
+            malloc_trim(0);
             return false;
         },
         Glib::PRIORITY_DEFAULT_IDLE + 30);
@@ -1205,6 +1262,55 @@ void TerminalView::sendKeyInput() {
     ensureWriteWatch();
 }
 
+void TerminalView::setScrollbar(int mode) {
+    opts_.scrollbar = mode;
+    applyScrollbar();
+}
+
+void TerminalView::applyScrollbar() {
+    const bool on = opts_.scrollbar < 0 ? !profile_.crtAspect : opts_.scrollbar > 0;
+    if (on) scrollbar_.show();
+    else scrollbar_.hide();
+    if (on) updateScrollbar();
+}
+
+void TerminalView::updateScrollbar() {
+    if (!scrollbar_.get_visible() || !session_) return;
+    auto adj = scrollbar_.get_adjustment();
+    const int sb = static_cast<int>(session_->scrollbackSize());
+    const int rows = std::max(1, session_->rows());
+    scrollbarAdjusting_ = true;
+    adj->configure(sb - scrollOffset_, 0, sb + rows, 1, std::max(1, rows - 1), rows);
+    scrollbarAdjusting_ = false;
+}
+
+void TerminalView::onScrollbar() {
+    if (scrollbarAdjusting_ || !session_) return;
+    const int sb = static_cast<int>(session_->scrollbackSize());
+    int off = sb - static_cast<int>(scrollbar_.get_adjustment()->get_value() + 0.5);
+    off = std::clamp(off, 0, sb);
+    if (off == scrollOffset_) return;
+    scrollOffset_ = off;
+    contentDirty_ = true;
+    requestFrame();
+    updateBlink();
+}
+
+void TerminalView::openLink(const std::string& uri) {
+    auto bad = [](unsigned char c) { return c < 32 || c == 127; };
+    if (uri.empty() || std::any_of(uri.begin(), uri.end(), bad)) return;
+    const bool http = uri.compare(0, 7, "http://") == 0 || uri.compare(0, 8, "https://") == 0;
+    const bool mail = uri.compare(0, 7, "mailto:") == 0;
+    const bool file = uri.compare(0, 7, "file://") == 0;
+    if (!http && !mail && !file) return;
+    gchar* argv[] = {const_cast<gchar*>("xdg-open"), const_cast<gchar*>(uri.c_str()), nullptr};
+    GError* err = nullptr;
+    if (!g_spawn_async(nullptr, argv, nullptr, G_SPAWN_SEARCH_PATH, nullptr, nullptr, nullptr, &err) && err) {
+        std::fprintf(stderr, "lunduke-terminal: %s\n", err->message);
+        g_error_free(err);
+    }
+}
+
 void TerminalView::scrollBy(int lines) {
     const int off = std::clamp(scrollOffset_ + lines, 0, static_cast<int>(session_->scrollbackSize()));
     if (off == scrollOffset_) return;
@@ -1212,6 +1318,7 @@ void TerminalView::scrollBy(int lines) {
     contentDirty_ = true;
     requestFrame();
     updateBlink();
+    updateScrollbar();
 }
 
 void TerminalView::snapToBottom() {
@@ -1235,8 +1342,29 @@ void TerminalView::pasteClipboard(bool primary) {
         ->request_text([this, alive](const Glib::ustring& t) {
             if (alive.expired()) return;  // the view was destroyed while the request was pending
             if (t.empty() || holding_ || exited_) return;
+            const std::string text = t.raw();
+            if (pasteNeedsConfirm(text, session_->bracketedPaste(), opts_.confirmPaste)) {
+                Gtk::Window* top = dynamic_cast<Gtk::Window*>(get_toplevel());
+                const bool sudo = pasteNeedsConfirm(text, true, true);
+                Gtk::MessageDialog dlg(*top, sudo ? "This paste contains sudo." : "This paste is more than one line.",
+                                       false, Gtk::MESSAGE_WARNING, Gtk::BUTTONS_NONE, true);
+                std::string preview = text.size() > 500 ? text.substr(0, 500) + "…" : text;
+                dlg.set_secondary_text(preview);
+                dlg.add_button("_Cancel", Gtk::RESPONSE_CANCEL);
+                dlg.add_button("_Paste", Gtk::RESPONSE_OK);
+                dlg.set_default_response(Gtk::RESPONSE_CANCEL);
+                Gtk::CheckButton again("Don't ask again");
+                dlg.get_content_area()->pack_start(again, false, false);
+                again.show();
+                const int response = dlg.run();
+                if (response != Gtk::RESPONSE_OK) return;
+                if (again.get_active()) {
+                    opts_.confirmPaste = false;
+                    signalPasteConfirmOff.emit();
+                }
+            }
             snapToBottom();
-            session_->paste(t.raw());
+            session_->paste(text);
             ensureWriteWatch();
         });
 }
@@ -1294,6 +1422,14 @@ bool TerminalView::onButtonPress(GdkEventButton* ev) {
     if (!inside && frameActive() && ev->button != 2) {
         if (ev->button == 3 && ev->type == GDK_BUTTON_PRESS) showContextMenu(ev);
         return true;
+    }
+    if (ev->button == 1 && (ev->state & GDK_CONTROL_MASK) && inside && ev->type == GDK_BUTTON_PRESS) {
+        const long line = session_->topLine() - scrollOffset_ + row;
+        const std::string uri = session_->linkAt(line, col);
+        if (!uri.empty()) {
+            openLink(uri);
+            return true;
+        }
     }
     const int mod = modsOf(ev->state);
     if (mouseReporting(ev->state)) {
@@ -1375,6 +1511,22 @@ bool TerminalView::onMotion(GdkEventMotion* ev) {
         sel_.extend(*session_, SelPos{session_->topLine() - scrollOffset_ + row, col});
         selectionChanged();
         return true;
+    }
+    int a = -1, b = -1;
+    std::string uri;
+    if (cellAt(ev->x, ev->y, row, col)) {
+        const long line = session_->topLine() - scrollOffset_ + row;
+        uri = session_->linkAt(line, col, &a, &b);
+    }
+    if (uri != hoverUri_ || row != hoverRow_) {
+        hoverUri_ = std::move(uri);
+        hoverRow_ = hoverUri_.empty() ? -1 : row;
+        hoverCol0_ = a;
+        hoverCol1_ = b;
+        contentDirty_ = true;
+        requestFrame();
+        auto win = get_window();
+        if (win) win->set_cursor(hoverRow_ >= 0 ? Gdk::Cursor::create(Gdk::HAND2) : Glib::RefPtr<Gdk::Cursor>());
     }
     return false;
 }
@@ -1472,11 +1624,19 @@ bool TerminalView::onKey(GdkEventKey* ev) {
     const bool keypad = ev->keyval >= GDK_KEY_KP_Space && ev->keyval <= GDK_KEY_KP_9;
     if (ev->window && !(ev->state & (GDK_CONTROL_MASK | GDK_MOD1_MASK)) && !keypad) {
         updateImCursor();
+        // A second key before the previous one committed is a composition
+        // (dead acute, then e). The commit must not be reported as that key.
+        if (imKeyValid_) imComposing_ = true;
+        imKey_ = *ev;
+        imKeyValid_ = true;
         if (gtk_im_context_filter_keypress(im_, ev)) return true;
+        imKeyValid_ = false;
     } else if (ev->window && !ev->is_modifier) {
         // PR #6 review N3: a pending dead key or compose sequence must not survive a chord
         // (dead acute, Ctrl+C, q sent "^C" then "´q"); drop it before the chord goes out.
         gtk_im_context_reset(im_);
+        imKeyValid_ = false;
+        imComposing_ = false;
     }
     return deliverKey(ev, false);
 }
@@ -1585,9 +1745,33 @@ bool TerminalView::onKeyRelease(GdkEventKey* ev) {
     return deliverKey(ev, true);
 }
 
+void TerminalView::noteImPreedit(bool active) {
+    if (active) imComposing_ = true;
+}
+
 void TerminalView::onImCommit(const char* text) {
     if (holding_ || exited_ || !text || !*text || !g_utf8_validate(text, -1, nullptr)) return;
     ++imCommits_;
+    // Kitty mode encodes Shift+a as the unshifted key plus the Shift modifier
+    // (ESC[97;2u). The input method commits the shifted character and would
+    // otherwise drop Shift, so a direct one-character commit is re-encoded
+    // from the key event. A composition (dead key, CJK) does not match the
+    // key's own character and is still sent as text.
+    const bool direct = imKeyValid_ && !imComposing_ && session_->kittyKeyboard() && g_utf8_strlen(text, -1) == 1;
+    if (direct) {
+        const uint32_t cp = g_utf8_get_char(text);
+        const uint32_t keyCp = gdk_keyval_to_unicode(imKey_.keyval);
+        if (cp && cp == keyCp) {
+            const uint32_t uns = unshiftedOf(&imKey_);
+            session_->sendChar(cp, modsOf(imKey_.state), uns ? uns : cp);
+            imKeyValid_ = false;
+            imComposing_ = false;
+            sendKeyInput();
+            return;
+        }
+    }
+    imKeyValid_ = false;
+    imComposing_ = false;
     for (const char* p = text; *p; p = g_utf8_next_char(p)) session_->sendChar(g_utf8_get_char(p), ModNone);
     sendKeyInput();
 }
@@ -1636,6 +1820,9 @@ bool TerminalView::onSearchWork() {
         finishSearch(pendingKeep_);
     }
     noteSearchTime(t0);
+    // Building the index reads every row and decompresses scrollback. Put it
+    // back once the build is idle; the index itself stays until the search closes.
+    scheduleCompress();
     return false;
 }
 
@@ -1714,6 +1901,7 @@ void TerminalView::clearSearch() {
     searchRefresh_.disconnect();
     searchWork_.disconnect();
     searchIndex_.reset();  // the cache is rebuilt when the search bar opens again
+    scheduleCompress();    // recompress the rows the search decompressed, then malloc_trim
     const bool had = !matches_.empty() || !searchQuery_.empty() || searchPending_;
     searchPending_ = false;
     searchQuery_.clear();

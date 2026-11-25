@@ -85,7 +85,7 @@ std::vector<int> parseList(const char* s) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    bool doPaint = false, doTick = false, doTickGl = false, doCompare = false;
+    bool doPaint = false, doTick = false, doTickGl = false, doTickIdle = false, doCompare = false;
     int resizeLoop = 0, runs = 30;
     std::vector<int> threads = {1, 4, 8};
     std::string profileId = "amber";
@@ -98,6 +98,7 @@ int main(int argc, char** argv) {
         if (a == "--paint") doPaint = true;
         else if (a == "--tick") doTick = true;
         else if (a == "--tick-gl") doTickGl = true;
+        else if (a == "--tick-idle") doTickIdle = true;
         else if (a == "--compare") doCompare = true;
         else if (a == "--resize-loop") resizeLoop = std::atoi(next());
         else if (a == "--threads") threads = parseList(next());
@@ -201,6 +202,42 @@ int main(int argc, char** argv) {
             std::printf("cpu %s/%s %dx%d threads=%d: content pass %.2f ms, tick %.2f ms\n", profileId.c_str(), effectsQualityName(quality), W, H, th,
                         median(content), median(tick));
         }
+    }
+
+    // Idle tick: one content update, then frames well after burn-in has faded.
+    if (doTickIdle) {
+        std::vector<uint8_t> out(static_cast<size_t>(W) * H * 4);
+        for (int th : {1, 4}) {
+            CpuEffects cpu(fx, th);
+            cpu.resize(W, H);
+            cpu.setSource(fa.data(), W * 4, 0.0f);
+            cpu.render(0.0f, out.data());
+            std::vector<double> tick;
+            for (int i = 0; i < runs; ++i) {
+                auto t0 = Clock::now();
+                cpu.render(3000.0f + i, out.data());
+                tick.push_back(ms(t0, Clock::now()));
+            }
+            std::printf("cpu-idle %s/%s %dx%d threads=%d: tick %.2f ms\n", profileId.c_str(), effectsQualityName(quality),
+                        W, H, th, median(tick));
+        }
+        std::vector<double> tick;
+        GlEffects gl(fx);
+        if (!gl.ok()) {
+            std::printf("GL unavailable: %s\n", gl.error().c_str());
+            return 1;
+        }
+        gl.resize(W, H);
+        gl.setSource(fa.data(), W * 4, 0.0f);
+        gl.renderNoReadback(0.0f);
+        tick.clear();
+        for (int i = 0; i < runs; ++i) {
+            auto t0 = Clock::now();
+            gl.renderNoReadback(3000.0f + i);
+            tick.push_back(ms(t0, Clock::now()));
+        }
+        std::printf("gl-idle %s/%s %dx%d (%s): tick %.2f ms\n", profileId.c_str(), effectsQualityName(quality), W, H,
+                    gl.renderer().c_str(), median(tick));
     }
 
     if (doTickGl) {

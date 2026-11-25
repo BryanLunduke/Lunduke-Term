@@ -5,6 +5,7 @@
 #include <ghostty/vt.h>
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <climits>
 #include <cerrno>
@@ -93,6 +94,27 @@ static size_t utf8Seq(const std::string& s, size_t i, uint32_t& cp) {
     return n;
 }
 
+bool pasteNeedsConfirm(const std::string& text, bool bracketedPaste, bool ask) {
+    if (!ask || text.empty()) return false;
+    auto command = [&](const char* word) {
+        const size_t n = std::strlen(word);
+        for (size_t i = 0; i + n <= text.size(); ++i) {
+            if (text.compare(i, n, word) != 0) continue;
+            if (i > 0 && std::isalnum(static_cast<unsigned char>(text[i - 1]))) continue;
+            if (i + n < text.size() && std::isalnum(static_cast<unsigned char>(text[i + n]))) continue;
+            size_t k = i;
+            while (k > 0 && (text[k - 1] == ' ' || text[k - 1] == '\t')) --k;
+            if (k == 0 || text[k - 1] == '\n' || text[k - 1] == '\r' || text[k - 1] == ';' || text[k - 1] == '|' ||
+                text[k - 1] == '&')
+                return true;
+        }
+        return false;
+    };
+    if (command("sudo")) return true;
+    const bool multiline = text.find('\n') != std::string::npos || text.find('\r') != std::string::npos;
+    return multiline && !bracketedPaste;
+}
+
 std::string sanitizePaste(const std::string& text) {
     std::string out;
     out.reserve(text.size());
@@ -176,6 +198,12 @@ extern "C" void ltermOnTitle(GhosttyTerminal, void* user) {
 extern "C" void ltermOnWrite(GhosttyTerminal, void* user, const uint8_t* data, size_t len) {
     static_cast<VtermSession*>(user)->onWriteFired(data, len);
 }
+extern "C" void ltermOnRenderHold(GhosttyTerminal, void* user, bool held) {
+    static_cast<VtermSession*>(user)->onRenderHold(held);
+}
+extern "C" void ltermOnClipboard(GhosttyTerminal, void* user, const GhosttyClipboardWrite* write) {
+    static_cast<VtermSession*>(user)->onClipboardWrite(write);
+}
 extern "C" GhosttyString ltermOnVersion(GhosttyTerminal, void*) {
     static const std::string v = std::string("lunduke-terminal ") + LTERM_VERSION;
     GhosttyString s;
@@ -202,6 +230,45 @@ void VtermSession::onWriteFired(const uint8_t* data, size_t len) {
     sendBytes(reinterpret_cast<const char*>(data), len);
 }
 
+void VtermSession::onRenderHold(bool held) {
+    if (held == syncHeld_) return;
+    syncHeld_ = held;
+    if (onSyncHold) onSyncHold(held);
+}
+
+void VtermSession::onClipboardWrite(const void* raw) {
+    const auto* write = static_cast<const GhosttyClipboardWrite*>(raw);
+    GhosttyClipboardWriteReply reply = GHOSTTY_INIT_SIZED(GhosttyClipboardWriteReply);
+    reply.result = GHOSTTY_CLIPBOARD_WRITE_RESULT_UNSUPPORTED;
+    std::string text;
+    bool saw = false;
+    bool tooBig = false;
+    for (size_t i = 0; write && i < write->contents_len; ++i) {
+        const GhosttyClipboardContent& c = write->contents[i];
+        const std::string mime(reinterpret_cast<const char*>(c.mime.ptr ? c.mime.ptr : reinterpret_cast<const uint8_t*>("")),
+                               c.mime.len);
+        if (!mime.empty() && mime.find("text") == std::string::npos) continue;
+        if (c.data.len > kMaxOsc52Bytes) {
+            tooBig = true;
+            break;
+        }
+        text.assign(reinterpret_cast<const char*>(c.data.ptr ? c.data.ptr : reinterpret_cast<const uint8_t*>("")), c.data.len);
+        saw = true;
+        break;
+    }
+    if (write && write->contents_len == 0) {
+        text.clear();
+        saw = true;  // a clear
+    }
+    if (tooBig) reply.result = GHOSTTY_CLIPBOARD_WRITE_RESULT_INVALID_DATA;
+    else if (saw) {
+        osc52_ = std::move(text);
+        reply.result = GHOSTTY_CLIPBOARD_WRITE_RESULT_SUCCESS;
+        if (onOsc52) onOsc52(osc52_);
+    }
+    if (write && write->reply) write->reply(write, &reply);
+}
+
 VtermSession::VtermSession(int rows, int cols) : rows_(std::max(1, rows)), cols_(std::max(1, cols)) {
     if (rows_ > 65535) rows_ = 65535;
     if (cols_ > 65535) cols_ = 65535;
@@ -213,6 +280,10 @@ VtermSession::VtermSession(int rows, int cols) : rows_(std::max(1, rows)), cols_
         ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_BELL, reinterpret_cast<const void*>(ltermOnBell));
         ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_TITLE_CHANGED, reinterpret_cast<const void*>(ltermOnTitle));
         ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_WRITE_PTY, reinterpret_cast<const void*>(ltermOnWrite));
+        ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_RENDER_HOLD, reinterpret_cast<const void*>(ltermOnRenderHold));
+        ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_CLIPBOARD_WRITE, reinterpret_cast<const void*>(ltermOnClipboard));
+        // OSC 52 "?" and kitty clipboard reads stay unanswered. Installing a
+        // read callback would let a remote program read the user's clipboard.
         ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_XTVERSION, reinterpret_cast<const void*>(ltermOnVersion));
         const char* tn = "xterm-256color";
         GhosttyString termName{reinterpret_cast<const uint8_t*>(tn), std::strlen(tn)};
@@ -629,7 +700,87 @@ static GhosttyMods ghostMods(int mod) {
     return m;
 }
 
+static uint8_t kittyFlags(GhosttyTerminal vt);
+
+// libghostty's legacy encoder follows fixterms: Ctrl+Shift+letter, Ctrl+@ and
+// Ctrl+[ (and Ctrl+i / Ctrl+m) become CSI u sequences even when no kitty keyboard
+// mode is on. A classic terminal sends the C0 byte: ^A, NUL, ESC, TAB, CR.
+static int legacyCtrlByte(uint32_t cp) {
+    if (cp >= 'A' && cp <= 'Z') cp = cp - 'A' + 'a';
+    if (cp >= 'a' && cp <= 'z') return static_cast<int>(cp & 0x1fu);
+    switch (cp) {
+    case ' ':
+    case '@': return 0;
+    case '[': return 0x1b;
+    case '\\': return 0x1c;
+    case ']': return 0x1d;
+    case '^': return 0x1e;
+    case '_':
+    case '/': return 0x1f;
+    case '?': return 0x7f;
+    default: return -1;
+    }
+}
+
+static int ghostKeyForCodepoint(uint32_t cp) {
+    if (cp >= 'a' && cp <= 'z') return GHOSTTY_KEY_A + static_cast<int>(cp - 'a');
+    if (cp >= 'A' && cp <= 'Z') return GHOSTTY_KEY_A + static_cast<int>(cp - 'A');
+    if (cp >= '0' && cp <= '9') return GHOSTTY_KEY_DIGIT_0 + static_cast<int>(cp - '0');
+    switch (cp) {
+    case ' ': return GHOSTTY_KEY_SPACE;
+    case '\t': return GHOSTTY_KEY_TAB;
+    case '\r':
+    case '\n': return GHOSTTY_KEY_ENTER;
+    case 0x1b: return GHOSTTY_KEY_ESCAPE;
+    case 0x7f: return GHOSTTY_KEY_BACKSPACE;
+    case '-':
+    case '_': return GHOSTTY_KEY_MINUS;
+    case '=':
+    case '+': return GHOSTTY_KEY_EQUAL;
+    case '[':
+    case '{': return GHOSTTY_KEY_BRACKET_LEFT;
+    case ']':
+    case '}': return GHOSTTY_KEY_BRACKET_RIGHT;
+    case '\\':
+    case '|': return GHOSTTY_KEY_BACKSLASH;
+    case ';':
+    case ':': return GHOSTTY_KEY_SEMICOLON;
+    case '\'':
+    case '"': return GHOSTTY_KEY_QUOTE;
+    case ',':
+    case '<': return GHOSTTY_KEY_COMMA;
+    case '.':
+    case '>': return GHOSTTY_KEY_PERIOD;
+    case '/':
+    case '?': return GHOSTTY_KEY_SLASH;
+    case '`':
+    case '~': return GHOSTTY_KEY_BACKQUOTE;
+    case '@': return GHOSTTY_KEY_DIGIT_2;
+    default: return GHOSTTY_KEY_UNIDENTIFIED;
+    }
+}
+
 void VtermSession::encodeKey(int key, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted, KeyAction action) {
+    // Kitty mode keeps libghostty's encoding, including Ctrl+Shift as a CSI u
+    // sequence. With no kitty flags, those chords are the legacy control bytes.
+    if (action != KeyAction::Release && kittyFlags(g_->vt) == 0 && (mod & ModCtrl) &&
+        (mod & ~(ModCtrl | ModShift | ModAlt)) == 0) {
+        uint32_t cp = 0;
+        if (utf8 && utf8Len == 1) cp = static_cast<unsigned char>(utf8[0]);
+        if ((mod & ModShift) && unshifted >= 'a' && unshifted <= 'z') cp = unshifted;
+        else if ((mod & ModShift) && unshifted == '2' && (cp == '@' || cp == 0 || cp == '2')) cp = '@';
+        else if ((mod & ModShift) && unshifted && legacyCtrlByte(cp) < 0 && legacyCtrlByte(unshifted) >= 0)
+            cp = unshifted;
+        const int b = legacyCtrlByte(cp);
+        if (b >= 0) {
+            char out[2];
+            size_t n = 0;
+            if (mod & ModAlt) out[n++] = 0x1b;
+            out[n++] = static_cast<char>(b);
+            sendBytes(out, n);
+            return;
+        }
+    }
     ghostty_key_encoder_set_from_terminal(g_->keys, g_->vt);
     GhosttyKeyAction act = GHOSTTY_KEY_ACTION_PRESS;
     if (action == KeyAction::Release) act = GHOSTTY_KEY_ACTION_RELEASE;
@@ -672,6 +823,8 @@ static uint8_t kittyFlags(GhosttyTerminal vt) {
     return flags;
 }
 
+bool VtermSession::bracketedPaste() const { return modeOn(g_->vt, GHOSTTY_MODE_BRACKETED_PASTE); }
+
 bool VtermSession::reportsKeyEvents() const {
     return (kittyFlags(g_->vt) & GHOSTTY_KITTY_KEY_REPORT_EVENTS) != 0;
 }
@@ -680,21 +833,20 @@ bool VtermSession::reportsAllKeys() const {
     return (kittyFlags(g_->vt) & GHOSTTY_KITTY_KEY_REPORT_ALL) != 0;
 }
 
+bool VtermSession::kittyKeyboard() const { return kittyFlags(g_->vt) != 0; }
+
 void VtermSession::sendPhysical(int ghostKey, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted,
                                 KeyAction action) {
     encodeKey(ghostKey, mod, utf8, utf8Len, unshifted, action);
 }
 
 void VtermSession::sendChar(uint32_t cp, int mod, uint32_t unshifted, KeyAction action) {
-    int key = GHOSTTY_KEY_UNIDENTIFIED;
-    if (cp >= 'a' && cp <= 'z') key = GHOSTTY_KEY_A + static_cast<int>(cp - 'a');
-    else if (cp >= 'A' && cp <= 'Z') key = GHOSTTY_KEY_A + static_cast<int>(cp - 'A');
-    else if (cp >= '0' && cp <= '9') key = GHOSTTY_KEY_DIGIT_0 + static_cast<int>(cp - '0');
-    else if (cp == ' ') key = GHOSTTY_KEY_SPACE;
-    else if (cp == '\t') key = GHOSTTY_KEY_TAB;
-    else if (cp == '\r' || cp == '\n') key = GHOSTTY_KEY_ENTER;
-    else if (cp == 0x1b) key = GHOSTTY_KEY_ESCAPE;
-    else if (cp == 0x7f) key = GHOSTTY_KEY_BACKSPACE;
+    // The physical key, not the shifted character: Ctrl+@ is the 2 key, Ctrl+[ is
+    // bracketleft. Falling back to the shifted character covers a layout where
+    // the symbol itself is unshifted.
+    const uint32_t base = unshifted ? unshifted : cp;
+    int key = ghostKeyForCodepoint(base);
+    if (key == GHOSTTY_KEY_UNIDENTIFIED) key = ghostKeyForCodepoint(cp);
     char utf8[4];
     const bool printable = cp >= 0x20 && cp != 0x7f && !(cp >= 0x80 && cp <= 0x9f);
     const int n = printable ? utf8Of(cp, utf8) : 0;
@@ -708,48 +860,109 @@ void VtermSession::sendChar(uint32_t cp, int mod, uint32_t unshifted, KeyAction 
 
 void VtermSession::sendBytes(const char* bytes, size_t len) {
     if (!len) return;
-    std::string& q = fd_ < 0 ? pendingOut_ : writeQueue_;
-    if (q.size() >= kMaxWriteQueueBytes) return;
-    if (q.size() + len > kMaxWriteQueueBytes) len = kMaxWriteQueueBytes - q.size();
-    q.append(bytes, len);
-    if (fd_ >= 0) flushWrites();
+    if (fd_ < 0) {
+        // No pty: tests collect everything. A paste with no pty is delivered
+        // in paste() itself, so this is a key, a mouse report, or a reply.
+        if (pastePending()) keyAfter_.append(bytes, len);
+        else pendingOut_.append(bytes, len);
+        return;
+    }
+    // While a paste is still streaming, hold later input until the paste
+    // (including its bracketed-paste end marker) has been written. Dropping
+    // it, or inserting it into the middle of the paste, both lose the user's text.
+    if (pastePending()) keyAfter_.append(bytes, len);
+    else writeQueue_.append(bytes, len);
+    flushWrites();
+}
+
+bool VtermSession::drainToPty(std::string& buf) {
+    size_t off = 0;
+    while (off < buf.size()) {
+        ssize_t n = write(fd_, buf.data() + off, buf.size() - off);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            if (errno != EAGAIN) {
+                buf.clear();
+                return true;
+            }
+            break;
+        }
+        if (n == 0) break;
+        off += static_cast<size_t>(n);
+    }
+    if (off) buf.erase(0, off);
+    return buf.empty();
+}
+
+bool VtermSession::takePasteSlice(std::string& dst, size_t maxBytes) {
+    if (!maxBytes) return pastePending();
+    if (pasteNeedPrefix_) {
+        dst.append("\x1b[200~", 6);
+        pasteNeedPrefix_ = false;
+        if (dst.size() >= maxBytes) return true;
+    }
+    if (pasteOff_ < pasteBody_.size()) {
+        const size_t n = std::min(pasteBody_.size() - pasteOff_, maxBytes - dst.size());
+        dst.append(pasteBody_.data() + pasteOff_, n);
+        pasteOff_ += n;
+        if (pasteOff_ == pasteBody_.size()) {
+            pasteBody_.clear();
+            pasteBody_.shrink_to_fit();
+            pasteOff_ = 0;
+        }
+        if (dst.size() >= maxBytes) return true;
+    }
+    if (pasteNeedSuffix_ && pasteOff_ == 0 && pasteBody_.empty()) {
+        dst.append("\x1b[201~", 6);
+        pasteNeedSuffix_ = false;
+    }
+    return pastePending();
 }
 
 void VtermSession::flushWrites() {
-    size_t off = 0;
-    while (off < writeQueue_.size()) {
-        ssize_t n = write(fd_, writeQueue_.data() + off, writeQueue_.size() - off);
-        if (n < 0) {
-            if (errno == EINTR) continue;
-            if (errno != EAGAIN) off = writeQueue_.size();
-            break;
-        }
-        off += static_cast<size_t>(n);
+    if (fd_ < 0) return;
+    for (;;) {
+        if (!writeQueue_.empty() && !drainToPty(writeQueue_)) return;
+        if (!pastePending()) break;
+        // One chunk in the queue. The rest of the paste stays in pasteBody_
+        // until the pty accepts this one (backpressure, no second full copy).
+        const size_t before = writeQueue_.size();
+        takePasteSlice(writeQueue_, kPasteChunkBytes);
+        if (writeQueue_.size() == before) break;
     }
-    if (off) writeQueue_.erase(0, off);
+    if (!keyAfter_.empty() && !pastePending()) {
+        writeQueue_.append(keyAfter_);
+        keyAfter_.clear();
+        drainToPty(writeQueue_);
+    }
 }
 
 void VtermSession::paste(const std::string& text) {
-    std::string& q = fd_ < 0 ? pendingOut_ : writeQueue_;
-    if (q.size() >= kMaxWriteQueueBytes) return;
     std::string body = sanitizePaste(text);
-    const bool bracketed = modeOn(g_->vt, GHOSTTY_MODE_BRACKETED_PASTE);
-    // Bracketed paste adds ESC[200~ and ESC[201~. Keep the whole sequence, including
-    // the closing bracket, inside the queue cap. The tail of an oversized paste is
-    // dropped until the program reads and the queue drains.
-    const size_t overhead = bracketed ? 12 : 0;
-    const size_t room = kMaxWriteQueueBytes - q.size();
-    if (overhead >= room) return;
-    if (body.size() > room - overhead) truncateUtf8(body, room - overhead);
     if (body.empty()) return;
-    size_t need = 0;
-    GhosttyResult r = ghostty_paste_encode(body.data(), body.size(), bracketed, nullptr, 0, &need);
-    if (r == GHOSTTY_SUCCESS) return;
-    if (r != GHOSTTY_OUT_OF_SPACE) return;
-    std::string buf(need, '\0');
-    size_t n = 0;
-    r = ghostty_paste_encode(body.data(), body.size(), bracketed, reinterpret_cast<uint8_t*>(buf.data()), buf.size(), &n);
-    if (r == GHOSTTY_SUCCESS && n) sendBytes(buf.data(), n);
+    const bool bracketed = modeOn(g_->vt, GHOSTTY_MODE_BRACKETED_PASTE);
+    if (!pastePending()) {
+        pasteNeedPrefix_ = bracketed;
+        pasteNeedSuffix_ = bracketed;
+        pasteBody_.clear();
+        pasteOff_ = 0;
+    }
+    // A second paste while the first is still draining joins the body, ahead
+    // of the closing bracket, so the end marker stays after every byte.
+    pasteBody_.append(body);
+    if (fd_ < 0) {
+        // No reader to push back on: deliver the whole paste, then anything
+        // that was held behind it. The cap is dst's size, so use a fresh buffer.
+        std::string chunk;
+        takePasteSlice(chunk, pasteBody_.size() + 16);
+        pendingOut_.append(chunk);
+        if (!keyAfter_.empty()) {
+            pendingOut_.append(keyAfter_);
+            keyAfter_.clear();
+        }
+        return;
+    }
+    flushWrites();
 }
 
 static GhosttyMouseButton mouseButtonId(int button) {
@@ -814,7 +1027,49 @@ void VtermSession::setColors(Color8 fg, Color8 bg, const std::array<Color8, 16>&
     GhosttyColorRgb f{fg.r, fg.g, fg.b}, b{bg.r, bg.g, bg.b};
     ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_COLOR_FOREGROUND, &f);
     ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_COLOR_BACKGROUND, &b);
+    // Resolved colours live in the viewport cache. A profile change has to
+    // repaint the cells already on screen, not only the next output.
+    viewFull_ = true;
+    colorsChanged_ = true;
     damaged_ = true;
+}
+
+void VtermSession::setCursorColor(Color8 c) {
+    cursor_ = c;
+    GhosttyColorRgb g{c.r, c.g, c.b};
+    ghostty_terminal_set(g_->vt, GHOSTTY_TERMINAL_OPT_COLOR_CURSOR, &g);
+    colorsChanged_ = true;
+    damaged_ = true;
+}
+
+bool VtermSession::takeColorsChanged() {
+    const bool c = colorsChanged_;
+    colorsChanged_ = false;
+    return c;
+}
+
+void VtermSession::pullAppColors() const {
+    auto rgb = [](const GhosttyColorRgb& c) { return Color8{c.r, c.g, c.b}; };
+    auto take = [&](GhosttyTerminalData key, Color8& slot) {
+        GhosttyColorRgb c{};
+        if (ghostty_terminal_get(g_->vt, key, &c) != GHOSTTY_SUCCESS) return;
+        const Color8 n = rgb(c);
+        if (n == slot) return;
+        slot = n;
+        viewFull_ = true;
+        colorsChanged_ = true;
+    };
+    take(GHOSTTY_TERMINAL_DATA_COLOR_FOREGROUND, fg_);
+    take(GHOSTTY_TERMINAL_DATA_COLOR_BACKGROUND, bg_);
+    take(GHOSTTY_TERMINAL_DATA_COLOR_CURSOR, cursor_);
+    GhosttyColorRgb pal[256];
+    if (ghostty_terminal_get(g_->vt, GHOSTTY_TERMINAL_DATA_COLOR_PALETTE, pal) != GHOSTTY_SUCCESS) return;
+    for (int i = 0; i < 256; ++i) {
+        if (g_->pal[i].r == pal[i].r && g_->pal[i].g == pal[i].g && g_->pal[i].b == pal[i].b) continue;
+        g_->pal[i] = pal[i];
+        viewFull_ = true;
+        colorsChanged_ = true;
+    }
 }
 
 bool VtermSession::altScreen() const {
@@ -872,8 +1127,10 @@ bool VtermSession::locate(long line, int col, void* out) const {
 Color8 VtermSession::resolveColor(uint8_t tag, uint8_t a, uint8_t b, uint8_t c, bool foreground) const {
     if (tag == GHOSTTY_STYLE_COLOR_NONE) return foreground ? fg_ : bg_;
     if (tag == GHOSTTY_STYLE_COLOR_PALETTE) {
-        if (havePalette_ && a < 16) return palette_[a];
+        // g_->pal is the profile palette plus any OSC 4 override. Indices
+        // 0-15 are not lifted; the profile's min-grey applies to the cube.
         Color8 o{g_->pal[a].r, g_->pal[a].g, g_->pal[a].b};
+        if (havePalette_ && a < 16) return o;
         return foreground ? liftToGrey(o, minFgGrey_) : o;
     }
     Color8 o{a, b, c};
@@ -1000,6 +1257,7 @@ VtermSession::CellRead VtermSession::readAt(long line, int col) const {
 }
 
 void VtermSession::fillGrid(Grid& grid, int scrollOffset) const {
+    pullAppColors();
     const bool alt = altScreen();
     int off = 0;
     if (!alt) {
@@ -1042,6 +1300,75 @@ void VtermSession::fillGrid(Grid& grid, int scrollOffset) const {
         viewCache_.cursorRow = viewRow;
     }
     grid = viewCache_;
+}
+
+std::string VtermSession::hyperlinkAt(long line, int col) const {
+    GhosttyGridRef ref{};
+    if (!rowRef(line, col, &ref)) return {};
+    size_t n = 0;
+    const GhosttyResult probe = ghostty_grid_ref_hyperlink_uri(&ref, nullptr, 0, &n);
+    if (probe == GHOSTTY_SUCCESS || n == 0) return {};
+    if (probe != GHOSTTY_OUT_OF_SPACE) return {};
+    std::string uri(n, '\0');
+    size_t n2 = 0;
+    if (ghostty_grid_ref_hyperlink_uri(&ref, reinterpret_cast<uint8_t*>(&uri[0]), uri.size(), &n2) != GHOSTTY_SUCCESS)
+        return {};
+    uri.resize(n2);
+    return uri;
+}
+
+namespace {
+bool urlByte(unsigned char c) {
+    if (c <= 32 || c >= 127) return false;
+    return c != '<' && c != '>' && c != '"' && c != '\'' && c != '(' && c != ')' && c != '[' && c != ']';
+}
+}  // namespace
+
+std::string VtermSession::linkAt(long line, int col, int* startCol, int* endCol) const {
+    const std::string direct = hyperlinkAt(line, col);
+    if (!direct.empty()) {
+        int a = col, b = col;
+        while (a > 0 && hyperlinkAt(line, a - 1) == direct) --a;
+        while (b + 1 < cols_ && hyperlinkAt(line, b + 1) == direct) ++b;
+        if (startCol) *startCol = a;
+        if (endCol) *endCol = b;
+        return direct;
+    }
+    std::string text;
+    std::vector<int> colOf;
+    for (int c = 0; c < cols_; ++c) {
+        if (cellWidth(line, c) == 0) continue;
+        std::string cell = cellText(line, c);
+        if (cell.empty()) cell = " ";
+        for (size_t i = 0; i < cell.size(); ++i) colOf.push_back(c);
+        text += cell;
+    }
+    const char* schemes[] = {"https://", "http://", "mailto:"};
+    for (size_t i = 0; i < text.size(); ++i) {
+        size_t slen = 0;
+        for (const char* s : schemes) {
+            const size_t n = std::strlen(s);
+            if (i + n <= text.size() && text.compare(i, n, s) == 0) {
+                slen = n;
+                break;
+            }
+        }
+        if (!slen) continue;
+        size_t j = i + slen;
+        while (j < text.size() && urlByte(static_cast<unsigned char>(text[j]))) ++j;
+        while (j > i + slen && (text[j - 1] == '.' || text[j - 1] == ',' || text[j - 1] == ';' || text[j - 1] == ':'))
+            --j;
+        if (j <= i + slen) continue;
+        const int a = colOf[i];
+        const int b = colOf[j - 1];
+        if (col >= a && col <= b) {
+            if (startCol) *startCol = a;
+            if (endCol) *endCol = b;
+            return text.substr(i, j - i);
+        }
+        i = j;
+    }
+    return {};
 }
 
 std::string VtermSession::rowText(int row) const {
