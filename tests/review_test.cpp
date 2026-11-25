@@ -515,6 +515,32 @@ static void testInputMethod() {
     std::printf("input method: dead_acute e, Compose o c, x -> c3 a9 c2 a9 78 (%ld commits)\n", v.imCommits());
 }
 
+// Ctrl chords go through onKey (the IM is skipped), which is the path a real
+// key press takes. Ctrl+Shift+A is ^A, Ctrl+@ is NUL, Ctrl+[ is ESC.
+static void testLegacyCtrlKeys() {
+    ViewOptions o;
+    o.profile = "plain";
+    o.command = {"/bin/sh", "-c", "stty raw -echo; dd bs=1 count=3 2>/dev/null | od -An -tx1; exec sleep 30"};
+    Win w(o);
+    TerminalView& v = *w.view;
+    CHECK(v.start());
+    w.view->grabTerminalFocus();
+    pump(400);
+    auto key = [&](guint kv, guint state) {
+        GdkEventKey e = keyEv(kv, state);
+        e.window = w.win.get_window()->gobj();
+        v.testKey(&e);
+    };
+    key(GDK_KEY_A, GDK_CONTROL_MASK | GDK_SHIFT_MASK);
+    key(GDK_KEY_at, GDK_CONTROL_MASK | GDK_SHIFT_MASK);
+    key(GDK_KEY_bracketleft, GDK_CONTROL_MASK);
+    const bool ok = waitFor([&] { return screenText(v.shownGrid()).find("01 00 1b") != std::string::npos; },
+                            ltermWaitMs(3000, 10000));
+    CHECK(ok);
+    if (!ok) std::fprintf(stderr, "legacy ctrl screen: %s\n", screenText(v.shownGrid()).substr(0, 160).c_str());
+    std::printf("legacy ctrl via onKey: Ctrl+Shift+A, Ctrl+@, Ctrl+[ -> %s\n", ok ? "01 00 1b" : "missing");
+}
+
 // ---- PR #6 review N3: a pending dead key does not survive a Ctrl chord ----
 static void testDeadKeyChord() {
     ViewOptions o;
@@ -651,6 +677,7 @@ int main(int argc, char** argv) {
     testScrollbackSettingsSlip();
     testScrollbackMax();
     testInputMethod();
+    testLegacyCtrlKeys();
     testDeadKeyChord();
     testHiddenFrees("gl");
     testHiddenFrees("cpu");

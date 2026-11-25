@@ -502,7 +502,17 @@ static void testKittyKeyboard() {
     legacy.sendChar('A', ModShift, 'a');
     CHECK_EQ(legacy.takeOutput(), std::string("A"));  // legacy: the character, not a CSI
     legacy.sendChar('A', ModCtrl | ModShift, 'a');
-    CHECK_EQ(legacy.takeOutput(), std::string("\x1b[97;6u"));  // Ctrl+Shift+A is not Ctrl+A
+    CHECK_EQ(legacy.takeOutput(), std::string("\x01"));  // Ctrl+Shift+A is ^A, not CSI u
+    legacy.sendChar('@', ModCtrl | ModShift, '2');
+    CHECK_EQ(legacy.takeOutput(), std::string("\0", 1));  // Ctrl+@ is NUL
+    legacy.sendChar('[', ModCtrl, '[');
+    CHECK_EQ(legacy.takeOutput(), std::string("\x1b"));  // Ctrl+[ is ESC
+    legacy.sendChar('i', ModCtrl, 'i');
+    CHECK_EQ(legacy.takeOutput(), std::string("\t"));  // Ctrl+i is TAB
+    legacy.sendChar('m', ModCtrl, 'm');
+    CHECK_EQ(legacy.takeOutput(), std::string("\r"));  // Ctrl+m is CR
+    legacy.sendChar('a', ModAlt | ModCtrl, 'a');
+    CHECK_EQ(legacy.takeOutput(), std::string("\x1b\x01"));
     legacy.sendChar('x', ModAlt);
     CHECK_EQ(legacy.takeOutput(), std::string("\x1bx"));
 

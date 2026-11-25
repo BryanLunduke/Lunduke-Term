@@ -629,7 +629,87 @@ static GhosttyMods ghostMods(int mod) {
     return m;
 }
 
+static uint8_t kittyFlags(GhosttyTerminal vt);
+
+// libghostty's legacy encoder follows fixterms: Ctrl+Shift+letter, Ctrl+@ and
+// Ctrl+[ (and Ctrl+i / Ctrl+m) become CSI u sequences even when no kitty keyboard
+// mode is on. A classic terminal sends the C0 byte: ^A, NUL, ESC, TAB, CR.
+static int legacyCtrlByte(uint32_t cp) {
+    if (cp >= 'A' && cp <= 'Z') cp = cp - 'A' + 'a';
+    if (cp >= 'a' && cp <= 'z') return static_cast<int>(cp & 0x1fu);
+    switch (cp) {
+    case ' ':
+    case '@': return 0;
+    case '[': return 0x1b;
+    case '\\': return 0x1c;
+    case ']': return 0x1d;
+    case '^': return 0x1e;
+    case '_':
+    case '/': return 0x1f;
+    case '?': return 0x7f;
+    default: return -1;
+    }
+}
+
+static int ghostKeyForCodepoint(uint32_t cp) {
+    if (cp >= 'a' && cp <= 'z') return GHOSTTY_KEY_A + static_cast<int>(cp - 'a');
+    if (cp >= 'A' && cp <= 'Z') return GHOSTTY_KEY_A + static_cast<int>(cp - 'A');
+    if (cp >= '0' && cp <= '9') return GHOSTTY_KEY_DIGIT_0 + static_cast<int>(cp - '0');
+    switch (cp) {
+    case ' ': return GHOSTTY_KEY_SPACE;
+    case '\t': return GHOSTTY_KEY_TAB;
+    case '\r':
+    case '\n': return GHOSTTY_KEY_ENTER;
+    case 0x1b: return GHOSTTY_KEY_ESCAPE;
+    case 0x7f: return GHOSTTY_KEY_BACKSPACE;
+    case '-':
+    case '_': return GHOSTTY_KEY_MINUS;
+    case '=':
+    case '+': return GHOSTTY_KEY_EQUAL;
+    case '[':
+    case '{': return GHOSTTY_KEY_BRACKET_LEFT;
+    case ']':
+    case '}': return GHOSTTY_KEY_BRACKET_RIGHT;
+    case '\\':
+    case '|': return GHOSTTY_KEY_BACKSLASH;
+    case ';':
+    case ':': return GHOSTTY_KEY_SEMICOLON;
+    case '\'':
+    case '"': return GHOSTTY_KEY_QUOTE;
+    case ',':
+    case '<': return GHOSTTY_KEY_COMMA;
+    case '.':
+    case '>': return GHOSTTY_KEY_PERIOD;
+    case '/':
+    case '?': return GHOSTTY_KEY_SLASH;
+    case '`':
+    case '~': return GHOSTTY_KEY_BACKQUOTE;
+    case '@': return GHOSTTY_KEY_DIGIT_2;
+    default: return GHOSTTY_KEY_UNIDENTIFIED;
+    }
+}
+
 void VtermSession::encodeKey(int key, int mod, const char* utf8, size_t utf8Len, uint32_t unshifted, KeyAction action) {
+    // Kitty mode keeps libghostty's encoding, including Ctrl+Shift as a CSI u
+    // sequence. With no kitty flags, those chords are the legacy control bytes.
+    if (action != KeyAction::Release && kittyFlags(g_->vt) == 0 && (mod & ModCtrl) &&
+        (mod & ~(ModCtrl | ModShift | ModAlt)) == 0) {
+        uint32_t cp = 0;
+        if (utf8 && utf8Len == 1) cp = static_cast<unsigned char>(utf8[0]);
+        if ((mod & ModShift) && unshifted >= 'a' && unshifted <= 'z') cp = unshifted;
+        else if ((mod & ModShift) && unshifted == '2' && (cp == '@' || cp == 0 || cp == '2')) cp = '@';
+        else if ((mod & ModShift) && unshifted && legacyCtrlByte(cp) < 0 && legacyCtrlByte(unshifted) >= 0)
+            cp = unshifted;
+        const int b = legacyCtrlByte(cp);
+        if (b >= 0) {
+            char out[2];
+            size_t n = 0;
+            if (mod & ModAlt) out[n++] = 0x1b;
+            out[n++] = static_cast<char>(b);
+            sendBytes(out, n);
+            return;
+        }
+    }
     ghostty_key_encoder_set_from_terminal(g_->keys, g_->vt);
     GhosttyKeyAction act = GHOSTTY_KEY_ACTION_PRESS;
     if (action == KeyAction::Release) act = GHOSTTY_KEY_ACTION_RELEASE;
@@ -686,15 +766,12 @@ void VtermSession::sendPhysical(int ghostKey, int mod, const char* utf8, size_t 
 }
 
 void VtermSession::sendChar(uint32_t cp, int mod, uint32_t unshifted, KeyAction action) {
-    int key = GHOSTTY_KEY_UNIDENTIFIED;
-    if (cp >= 'a' && cp <= 'z') key = GHOSTTY_KEY_A + static_cast<int>(cp - 'a');
-    else if (cp >= 'A' && cp <= 'Z') key = GHOSTTY_KEY_A + static_cast<int>(cp - 'A');
-    else if (cp >= '0' && cp <= '9') key = GHOSTTY_KEY_DIGIT_0 + static_cast<int>(cp - '0');
-    else if (cp == ' ') key = GHOSTTY_KEY_SPACE;
-    else if (cp == '\t') key = GHOSTTY_KEY_TAB;
-    else if (cp == '\r' || cp == '\n') key = GHOSTTY_KEY_ENTER;
-    else if (cp == 0x1b) key = GHOSTTY_KEY_ESCAPE;
-    else if (cp == 0x7f) key = GHOSTTY_KEY_BACKSPACE;
+    // The physical key, not the shifted character: Ctrl+@ is the 2 key, Ctrl+[ is
+    // bracketleft. Falling back to the shifted character covers a layout where
+    // the symbol itself is unshifted.
+    const uint32_t base = unshifted ? unshifted : cp;
+    int key = ghostKeyForCodepoint(base);
+    if (key == GHOSTTY_KEY_UNIDENTIFIED) key = ghostKeyForCodepoint(cp);
     char utf8[4];
     const bool printable = cp >= 0x20 && cp != 0x7f && !(cp >= 0x80 && cp <= 0x9f);
     const int n = printable ? utf8Of(cp, utf8) : 0;
